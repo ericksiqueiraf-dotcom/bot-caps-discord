@@ -431,16 +431,24 @@ async function handleVictoryCommand(message, args) {
     for(const p of winningPlayers) {
         const s = getStoredPlayerStats(statsData, p);
         const m = getModeStats(s, match.mode, match.format);
-        const delta = Math.round(calculateEloDelta(m.internalRating, 1200, 1, 0) * (match.mode === QUEUE_MODES.ARAM ? 0.5 : 1));
-        upsertPlayerStats(statsData, p, { modes: { ...normalizePlayerModes(s), [getStatsBucketKey(match.mode, match.format)]: { ...m, customWins: (m.customWins || 0) + 1, internalRating: (m.internalRating || 0) + delta, winStreak: (m.winStreak || 0) + 1 } } });
-        winners.push({ ...p, afterRank: (m.internalRating || 0) + delta, ratingDelta: delta, winStreak: (m.winStreak || 0) + 1 });
+        const beforeRank = m.internalRating || 0;
+        const beforeRecord = formatCustomRecord(m);
+        const delta = Math.round(calculateEloDelta(beforeRank, 1200, 1, 0) * (match.mode === QUEUE_MODES.ARAM ? 0.5 : 1));
+        const afterRank = beforeRank + delta;
+        const updatedModes = { ...normalizePlayerModes(s), [getStatsBucketKey(match.mode, match.format)]: { ...m, customWins: (m.customWins || 0) + 1, internalRating: afterRank, winStreak: (m.winStreak || 0) + 1 } };
+        upsertPlayerStats(statsData, p, { modes: updatedModes });
+        winners.push({ ...p, beforeRank, afterRank, beforeRecord, afterRecord: formatCustomRecord(updatedModes[getStatsBucketKey(match.mode, match.format)]), ratingDelta: delta, winStreak: (m.winStreak || 0) + 1 });
     }
     for(const p of losingPlayers) {
         const s = getStoredPlayerStats(statsData, p);
         const m = getModeStats(s, match.mode, match.format);
-        const delta = Math.round(calculateEloDelta(m.internalRating, 1200, 0, 0) * (match.mode === QUEUE_MODES.ARAM ? 0.5 : 1));
-        upsertPlayerStats(statsData, p, { modes: { ...normalizePlayerModes(s), [getStatsBucketKey(match.mode, match.format)]: { ...m, customLosses: (m.customLosses || 0) + 1, internalRating: Math.max(0, (m.internalRating || 0) + delta), winStreak: 0 } } });
-        losers.push({ ...p, afterRank: Math.max(0, (m.internalRating || 0) + delta), ratingDelta: delta });
+        const beforeRank = m.internalRating || 0;
+        const beforeRecord = formatCustomRecord(m);
+        const delta = Math.round(calculateEloDelta(beforeRank, 1200, 0, 0) * (match.mode === QUEUE_MODES.ARAM ? 0.5 : 1));
+        const afterRank = Math.max(0, beforeRank + delta);
+        const updatedModes = { ...normalizePlayerModes(s), [getStatsBucketKey(match.mode, match.format)]: { ...m, customLosses: (m.customLosses || 0) + 1, internalRating: afterRank, winStreak: 0 } };
+        upsertPlayerStats(statsData, p, { modes: updatedModes });
+        losers.push({ ...p, beforeRank, afterRank, beforeRecord, afterRecord: formatCustomRecord(updatedModes[getStatsBucketKey(match.mode, match.format)]), ratingDelta: delta });
     }
 
     savePlayerStats(statsData);
@@ -450,6 +458,9 @@ async function handleVictoryCommand(message, args) {
     for(const p of [...winners, ...losers]) await syncMemberRankRole(message.guild, p.discordId, p.afterRank);
     const mvp = winners.reduce((a, b) => a.winStreak > b.winStreak ? a : b, winners[0]);
     if(mvp) { await syncMvpRole(message.guild, mvp.discordId); await postMvpAnnouncement(message.guild, mvp); }
+    await deleteManagedChannelsForLobby(message.guild, match.mode, match.format, match.letter, [
+        match.teamOneChannelId, match.teamTwoChannelId, match.waitingChannelId
+    ]);
 
     await replyToMessage(message, `Vitoria registrada para a Equipe ${winningTeam}!`);
     await updateQueueDashboard(message.guild);
