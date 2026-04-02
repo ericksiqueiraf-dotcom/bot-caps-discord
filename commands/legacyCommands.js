@@ -20,7 +20,8 @@ const {
   getRankedPlayersByMode, archiveCurrentSeason, resetStatsForNewSeason, 
   buildLobbyFromMatch, upsertPlayerStats, normalizePlayerModes, 
   movePlayersToTeamChannels, sendMatchStartAnnouncement, syncMvpRole, 
-  postMvpAnnouncement, postMatchHistoryLog
+  postMvpAnnouncement, postMatchHistoryLog, buildPlayerCardEmbed, 
+  buildSeasonHistoryEmbed
 } = require('../utils/lobbyUtils');
 
 const { 
