@@ -540,14 +540,17 @@ client.on('interactionCreate', async (interaction) => {
         break;
     }
   } catch (error) {
-    console.error('[SLASH] Erro inesperado ao processar comando:', error);
+    console.error(`[SLASH] Erro no comando '${interaction.commandName}':`, error);
+
+    const errorMessage = `❌ Ocorreu um erro inesperado: \`${error.name}: ${error.message}\`. Por favor, relate ao desenvolvedor.`;
 
     if (!interaction.deferred && !interaction.replied) {
-      await interaction.reply({ content: 'Ocorreu um erro inesperado ao processar este comando.', ephemeral: true }).catch(() => null);
+      await interaction.reply({ content: errorMessage, ephemeral: true }).catch(() => null);
       return;
     }
 
-    await interaction.followUp({ content: 'Ocorreu um erro inesperado ao processar este comando.' }).catch(() => null);
+    // Se já foi adiado ou respondido, atualizamos a resposta original para tirar o "pensando"
+    await interaction.editReply({ content: errorMessage }).catch(() => interaction.followUp({ content: errorMessage })).catch(() => null);
   }
 });
 
