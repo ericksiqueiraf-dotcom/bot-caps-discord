@@ -1670,5 +1670,10 @@ module.exports = {
   sendToMessageChannel,
   replyToMessage,
   normalizeDiscordPayload,
-  createInteractionContext
+  createInteractionContext,
+  THEME,
+  FOOTER_PREFIX,
+  RANK_ROLES_MAP,
+  ALL_RANK_ROLE_NAMES,
+  MVP_ROLE_NAME
 };
