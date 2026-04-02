@@ -24,6 +24,18 @@ function getRankName(mmr) {
   return 'Diamante';
 }
 
+const RANK_ROLES_MAP = {
+  Ferro: 'Ferro',
+  Bronze: '🥉 Bronze',
+  Prata: '🥈 Prata',
+  Ouro: '🥇 Ouro',
+  Platina: '🔷Platina',
+  Diamante: '💎 Diamante'
+};
+
+const ALL_RANK_ROLE_NAMES = Object.values(RANK_ROLES_MAP);
+const MVP_ROLE_NAME = '⭐ MVP';
+
 function getSeasonDisplayLabel(seasonMeta) {
   if (seasonMeta.phase === 'official') {
     return `Temporada #${seasonMeta.currentSeason}`;
@@ -485,6 +497,68 @@ function getModeStats(player, mode, format = null) {
   const bucketKey = getStatsBucketKey(mode, format);
 
   return modes[bucketKey] || createEmptyModeStats(player.baseMmr || 0);
+}
+async function syncMemberRankRole(guild, discordId, mmr) {
+  if (!guild || !discordId) return;
+
+  try {
+    const member = await guild.members.fetch(discordId).catch(() => null);
+    if (!member) return;
+
+    const rankTier = getRankName(mmr);
+    const targetRoleName = RANK_ROLES_MAP[rankTier];
+    if (!targetRoleName) return;
+
+    const roles = guild.roles.cache;
+    const targetRole = roles.find(r => r.name === targetRoleName);
+
+    // Remove other rank roles
+    const currentRankRoles = member.roles.cache.filter(r => 
+      ALL_RANK_ROLE_NAMES.includes(r.name) && r.name !== targetRoleName
+    );
+
+    if (currentRankRoles.size > 0) {
+      await member.roles.remove(currentRankRoles).catch(err => 
+        console.error(`[ROLES] Erro ao remover cargos de ${member.user.tag}:`, err.message)
+      );
+    }
+
+    // Add target role if not present
+    if (targetRole && !member.roles.cache.has(targetRole.id)) {
+      await member.roles.add(targetRole).catch(err => 
+        console.error(`[ROLES] Erro ao adicionar cargo ${targetRoleName} em ${member.user.tag}:`, err.message)
+      );
+    }
+  } catch (err) {
+    console.error(`[ROLES] Erro crítico na sincronização de cargo para ${discordId}:`, err.message);
+  }
+}
+
+async function syncMvpRole(guild, mvpId) {
+  if (!guild || !mvpId) return;
+
+  try {
+    const mvpRole = guild.roles.cache.find(r => r.name === MVP_ROLE_NAME);
+    if (!mvpRole) return;
+
+    // Remove from previous holders
+    const previousHolders = mvpRole.members;
+    for (const [id, member] of previousHolders) {
+      if (id !== mvpId) {
+        await member.roles.remove(mvpRole).catch(() => null);
+      }
+    }
+
+    // Add to new MVP
+    const newMvp = await guild.members.fetch(mvpId).catch(() => null);
+    if (newMvp && !newMvp.roles.cache.has(mvpRole.id)) {
+      await newMvp.roles.add(mvpRole).catch(err => 
+        console.error(`[ROLES] Erro ao atribuir cargo MVP para ${newMvp.user.tag}:`, err.message)
+      );
+    }
+  } catch (err) {
+    console.error(`[ROLES] Erro ao sincronizar cargo MVP:`, err.message);
+  }
 }
 
 function getPlayerStatsKey(player) {
@@ -1504,6 +1578,8 @@ module.exports = {
   getStoredPlayerStats,
   upsertPlayerStats,
   getRankName,
+  syncMemberRankRole,
+  syncMvpRole,
   THEME,
   FOOTER_PREFIX,
   buildQueueEmbed,

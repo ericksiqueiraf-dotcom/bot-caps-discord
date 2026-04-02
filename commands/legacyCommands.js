@@ -1037,8 +1037,19 @@ async function handleVictoryCommand(message, args) {
   delete currentMatchData.matches[matchId];
   saveCurrentMatch(currentMatchData);
 
+  // Sync roles for all players (Rank tiers)
+  for (const p of [...winnerSnapshots, ...loserSnapshots]) {
+    await syncMemberRankRole(message.guild, p.discordId, p.afterRank);
+  }
+
   // MVP selection (Highest Win Streak among winners)
   const mvp = winnerSnapshots.reduce((prev, current) => (prev.winStreak > current.winStreak ? prev : current), winnerSnapshots[0]);
+
+  // Sync MVP role
+  if (mvp) {
+    await syncMvpRole(message.guild, mvp.discordId);
+  }
+
 
   const winnersText = winnerSnapshots
     .map((p) => `- <@${p.discordId}>: **${p.afterRank} pts** (\`+${p.ratingDelta}\`) ${p.winStreak > 1 ? `🔥 ${p.winStreak} winstreak` : ''}`)
