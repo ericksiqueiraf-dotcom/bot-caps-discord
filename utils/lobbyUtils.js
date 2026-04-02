@@ -79,14 +79,6 @@ function getQueueChannel(guild) {
   };
 }
 
-function getTeamChannels(guild) {
-  return {
-    classicTeamOneChannel: guild.channels.cache.get(config.voiceChannels.classicTeamOneChannelId),
-    classicTeamTwoChannel: guild.channels.cache.get(config.voiceChannels.classicTeamTwoChannelId),
-    aramTeamOneChannel: guild.channels.cache.get(config.voiceChannels.aramTeamOneChannelId),
-    aramTeamTwoChannel: guild.channels.cache.get(config.voiceChannels.aramTeamTwoChannelId)
-  };
-}
 
 function isMemberInQueueVoiceChannel(member, mode) {
   const voiceChannel = member.voice?.channel;
@@ -1545,7 +1537,6 @@ module.exports = {
   formatDateTimeForHistory,
   getArchivedSeasonLabel,
   getQueueChannel,
-  getTeamChannels,
   isMemberInQueueVoiceChannel,
   formatRank,
   formatQueueMode,

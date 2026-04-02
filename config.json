@@ -2,16 +2,12 @@
   "prefix": "!",
   "region": "br1",
   "voiceChannels": {
-    "classicQueueChannelId": "1459241773745307957",
-    "aramQueueChannelId": "1487684268523257986",
-    "classicTeamOneChannelId": "1369435521608188014",
-    "classicTeamTwoChannelId": "1369623334773461012",
-    "aramTeamOneChannelId": "1487156784950018098",
-    "aramTeamTwoChannelId": "1487156752658071652"
+    "classicQueueChannelId": "1489240283051856023",
+    "aramQueueChannelId": "1489240459875455169"
   },
   "textChannels": {
-    "rankUpdatesChannelId": "1488254734505607271",
-    "matchHistoryChannelId": "1488347452766421033"
+    "rankUpdatesChannelId": "1489237387103174767",
+    "matchHistoryChannelId": "1489237294241153144"
   },
   "automation": {
     "dailyRankUpdatesHour": 8,

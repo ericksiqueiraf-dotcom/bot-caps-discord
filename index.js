@@ -225,7 +225,6 @@ const {
   formatDateTimeForHistory,
   getArchivedSeasonLabel,
   getQueueChannel,
-  getTeamChannels,
   isMemberInQueueVoiceChannel,
   formatRank,
   formatQueueMode,
