@@ -151,9 +151,28 @@ async function handleListCommand(message, args = []) {
     const queueData = loadQueue();
     const currentVoiceChannelId = message.member?.voice?.channelId || null;
     const lobbies = Object.values(queueData?.lobbies || {});
+    
+    if (lobbies.length === 0) {
+      return await replyToMessage(message, 'Nao ha nenhuma fila ativa no momento.');
+    }
+
+    // Tentar encontrar um lobby específico pelo seletor ou pelo canal atual
     const lobby = findLobbyBySelector(queueData, args) || (currentVoiceChannelId ? findLobbyByChannelId(queueData, currentVoiceChannelId) : null);
 
+    if (lobby) {
+      // Se encontrou um lobby específico, mostra o detalhe dele
+      const embed = buildQueueEmbed(lobby);
+      await sendToMessageChannel(message, { embeds: [embed] });
+    } else {
+      // Se não especificou e não está em um canal de lobby, mostra um resumo de todos
+      const embed = buildQueueEmbed(null, lobbies);
+      await sendToMessageChannel(message, { embeds: [embed] });
+    }
+
     await updateQueueDashboard(message.guild);
+  } catch (error) {
+    console.error('[ERRO] !lista:', error);
+    await replyToMessage(message, `❌ Erro ao listar filas: ${error.message}`);
   } finally {
     if (message.deletable) await message.delete().catch(() => null);
   }

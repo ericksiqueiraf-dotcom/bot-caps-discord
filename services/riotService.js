@@ -78,24 +78,24 @@ function createRiotService(apiKey, region = DEFAULT_REGION) {
     };
   }
 
-  async function request(handler) {
+  async function request(handler, context = '') {
     try {
       return await handler();
     } catch (error) {
       if (error.response?.status === 404) {
-        throw new Error('Jogador nao encontrado na Riot API.');
+        throw new Error(`Jogador nao encontrado na Riot API${context ? ` (${context})` : ''}. Verifique se o Nick#TAG esta correto.`);
       }
 
       if (error.response?.status === 403) {
-        throw new Error('A chave da Riot API esta invalida ou expirou.');
+        throw new Error('A chave da Riot API esta invalida ou expirou. Contate o administrador.');
       }
 
       if (error.response?.status === 429) {
-        throw new Error('Limite de requisicoes da Riot API atingido. Tente novamente em instantes.');
+        throw new Error('Limite de requisicoes atingido. Tente novamente em 2 minutos.');
       }
 
       const riotMessage = error.response?.data?.status?.message;
-      throw new Error(riotMessage || 'Falha ao consultar a Riot API.');
+      throw new Error(riotMessage || 'Falha de comunicacao com a Riot API.');
     }
   }
 
@@ -103,24 +103,26 @@ function createRiotService(apiKey, region = DEFAULT_REGION) {
     const riotId = normalizeRiotId(playerInput);
 
     if (riotId) {
-      const account = await request(() =>
+      const accountLookup = await request(() =>
         regionalClient.get(
           `/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(riotId.gameName)}/${encodeURIComponent(riotId.tagLine)}`
-        )
+        ), 
+        `Conta: ${riotId.gameName}#${riotId.tagLine}`
       );
 
-      const summoner = await request(() =>
-        platformClient.get(`/lol/summoner/v4/summoners/by-puuid/${encodeURIComponent(account.data.puuid)}`)
+      const summonerLookup = await request(() =>
+        platformClient.get(`/lol/summoner/v4/summoners/by-puuid/${encodeURIComponent(accountLookup.data.puuid)}`),
+        `Perfil LOL: ${riotId.gameName}#${riotId.tagLine}`
       );
 
       return {
-        puuid: summoner.data.puuid,
-        summonerId: summoner.data.id || null,
+        puuid: summonerLookup.data.puuid,
+        summonerId: summonerLookup.data.id || null,
         displayName: `${riotId.gameName}#${riotId.tagLine}`
       };
     }
 
-    throw new Error('A Riot exige o uso da #TAG. Por favor, forneça o Nickname no formato Nome#TAG (ex: Faker#BR1).');
+    throw new Error('Formato invalido! Use Nome#TAG (ex: Faker#BR1).');
   }
 
   async function getSoloQueueRank({ puuid, summonerId }) {
