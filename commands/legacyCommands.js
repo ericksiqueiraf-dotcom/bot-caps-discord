@@ -18,7 +18,9 @@ const {
   THEME, FOOTER_PREFIX, createLobbyChannels, createTeamChannelsForLobby, 
   findLobbyBySelector, buildLeaderboardEmbed, buildTopTenEmbed, 
   getRankedPlayersByMode, archiveCurrentSeason, resetStatsForNewSeason, 
-  buildLobbyFromMatch
+  buildLobbyFromMatch, upsertPlayerStats, normalizePlayerModes, 
+  movePlayersToTeamChannels, sendMatchStartAnnouncement, syncMvpRole, 
+  postMvpAnnouncement, postMatchHistoryLog
 } = require('../utils/lobbyUtils');
 
 const { 
