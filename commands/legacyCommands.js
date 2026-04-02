@@ -21,7 +21,7 @@ const {
   buildLobbyFromMatch, upsertPlayerStats, normalizePlayerModes, 
   movePlayersToTeamChannels, sendMatchStartAnnouncement, syncMvpRole, 
   postMvpAnnouncement, postMatchHistoryLog, buildPlayerCardEmbed, 
-  buildSeasonHistoryEmbed
+  buildSeasonHistoryEmbed, formatCustomRecord
 } = require('../utils/lobbyUtils');
 
 const { 
@@ -214,27 +214,32 @@ async function handleHelpCommand(message) {
 
 async function handleLeaveCommand(message) {
   try {
-    const queueData = loadQueue();
-    const lobby = findLobbyByPlayer(queueData, message.author.id);
-    if (!lobby) return await replyToMessage(message, 'Voce nao esta em nenhuma fila.');
+    await withQueueOperationLock(`${message.guild.id}:global:queue`, async () => {
+      const queueData = loadQueue();
+      const lobby = findLobbyByPlayer(queueData, message.author.id);
+      if (!lobby) return await replyToMessage(message, 'Voce nao esta em nenhuma fila.');
 
-    const playerIndex = lobby.players.findIndex(p => p.discordId === message.author.id);
-    const [removedPlayer] = lobby.players.splice(playerIndex, 1);
+      const playerIndex = lobby.players.findIndex(p => p.discordId === message.author.id);
+      const [removedPlayer] = lobby.players.splice(playerIndex, 1);
 
-    if (message.member.voice?.channelId === lobby.waitingChannelId) {
-      const baseQueueChannelId = getBaseQueueChannelIdByMode(lobby.mode);
-      await movePlayersToVoiceChannel(message.guild, [removedPlayer], baseQueueChannelId);
-    }
+      if (message.member.voice?.channelId === lobby.waitingChannelId) {
+        const baseQueueChannelId = getBaseQueueChannelIdByMode(lobby.mode);
+        await movePlayersToVoiceChannel(message.guild, [removedPlayer], baseQueueChannelId);
+      }
 
-    if (lobby.players.length === 0) {
-      await deleteVoiceChannelIfExists(message.guild, lobby.waitingChannelId);
-      delete queueData.lobbies[lobby.id];
-    } else {
-      queueData.lobbies[lobby.id] = lobby;
-    }
+      if (lobby.players.length === 0) {
+        await deleteVoiceChannelIfExists(message.guild, lobby.waitingChannelId);
+        delete queueData.lobbies[lobby.id];
+      } else {
+        queueData.lobbies[lobby.id] = lobby;
+      }
 
-    saveQueue(queueData);
+      saveQueue(queueData);
+    });
     await updateQueueDashboard(message.guild);
+  } catch (error) {
+    console.error('[ERRO] !sair:', error);
+    await replyToMessage(message, `❌ Erro ao sair da fila: ${error.message}`);
   } finally {
     if (message.deletable) await message.delete().catch(() => null);
   }
@@ -246,27 +251,29 @@ async function handleRemoveCommand(message, targetUserOverride = null) {
     const targetUser = targetUserOverride || message.mentions.users.first();
     if (!targetUser) return await replyToMessage(message, 'Mencione um jogador.');
 
-    const queueData = loadQueue();
-    const lobby = findLobbyByPlayer(queueData, targetUser.id);
-    if (!lobby) return await replyToMessage(message, 'Jogador nao esta na fila.');
+    await withQueueOperationLock(`${message.guild.id}:global:queue`, async () => {
+      const queueData = loadQueue();
+      const lobby = findLobbyByPlayer(queueData, targetUser.id);
+      if (!lobby) return await replyToMessage(message, 'Jogador nao esta na fila.');
 
-    const playerIndex = lobby.players.findIndex(p => p.discordId === targetUser.id);
-    const [removedPlayer] = lobby.players.splice(playerIndex, 1);
+      const playerIndex = lobby.players.findIndex(p => p.discordId === targetUser.id);
+      const [removedPlayer] = lobby.players.splice(playerIndex, 1);
 
-    const targetMember = await message.guild.members.fetch(targetUser.id).catch(() => null);
-    if (targetMember?.voice?.channelId === lobby.waitingChannelId) {
-      const baseQueueChannelId = getBaseQueueChannelIdByMode(lobby.mode);
-      await movePlayersToVoiceChannel(message.guild, [removedPlayer], baseQueueChannelId);
-    }
+      const targetMember = await message.guild.members.fetch(targetUser.id).catch(() => null);
+      if (targetMember?.voice?.channelId === lobby.waitingChannelId) {
+        const baseQueueChannelId = getBaseQueueChannelIdByMode(lobby.mode);
+        await movePlayersToVoiceChannel(message.guild, [removedPlayer], baseQueueChannelId);
+      }
 
-    if (lobby.players.length === 0) {
-      await deleteVoiceChannelIfExists(message.guild, lobby.waitingChannelId);
-      delete queueData.lobbies[lobby.id];
-    } else {
-      queueData.lobbies[lobby.id] = lobby;
-    }
+      if (lobby.players.length === 0) {
+        await deleteVoiceChannelIfExists(message.guild, lobby.waitingChannelId);
+        delete queueData.lobbies[lobby.id];
+      } else {
+        queueData.lobbies[lobby.id] = lobby;
+      }
 
-    saveQueue(queueData);
+      saveQueue(queueData);
+    });
     await updateQueueDashboard(message.guild);
   } finally {
     if (message.deletable) await message.delete().catch(() => null);
@@ -425,35 +432,48 @@ async function handleVictoryCommand(message, args) {
     const match = entry.match;
     const winningPlayers = winningTeam === '1' ? match.teamOne : match.teamTwo;
     const losingPlayers = winningTeam === '1' ? match.teamTwo : match.teamOne;
-    const statsData = loadPlayerStats();
-    
-    const winners = []; const losers = [];
-    for(const p of winningPlayers) {
-        const s = getStoredPlayerStats(statsData, p);
-        const m = getModeStats(s, match.mode, match.format);
-        const beforeRank = m.internalRating || 0;
-        const beforeRecord = formatCustomRecord(m);
-        const delta = Math.round(calculateEloDelta(beforeRank, 1200, 1, 0) * (match.mode === QUEUE_MODES.ARAM ? 0.5 : 1));
-        const afterRank = beforeRank + delta;
-        const updatedModes = { ...normalizePlayerModes(s), [getStatsBucketKey(match.mode, match.format)]: { ...m, customWins: (m.customWins || 0) + 1, internalRating: afterRank, winStreak: (m.winStreak || 0) + 1 } };
-        upsertPlayerStats(statsData, p, { modes: updatedModes });
-        winners.push({ ...p, beforeRank, afterRank, beforeRecord, afterRecord: formatCustomRecord(updatedModes[getStatsBucketKey(match.mode, match.format)]), ratingDelta: delta, winStreak: (m.winStreak || 0) + 1 });
-    }
-    for(const p of losingPlayers) {
-        const s = getStoredPlayerStats(statsData, p);
-        const m = getModeStats(s, match.mode, match.format);
-        const beforeRank = m.internalRating || 0;
-        const beforeRecord = formatCustomRecord(m);
-        const delta = Math.round(calculateEloDelta(beforeRank, 1200, 0, 0) * (match.mode === QUEUE_MODES.ARAM ? 0.5 : 1));
-        const afterRank = Math.max(0, beforeRank + delta);
-        const updatedModes = { ...normalizePlayerModes(s), [getStatsBucketKey(match.mode, match.format)]: { ...m, customLosses: (m.customLosses || 0) + 1, internalRating: afterRank, winStreak: 0 } };
-        upsertPlayerStats(statsData, p, { modes: updatedModes });
-        losers.push({ ...p, beforeRank, afterRank, beforeRecord, afterRecord: formatCustomRecord(updatedModes[getStatsBucketKey(match.mode, match.format)]), ratingDelta: delta });
-    }
+    await withQueueOperationLock(`${message.guild.id}:victory:${matchId}`, async () => {
+        const currentMatchData = loadCurrentMatch();
+        const matchEntryStatus = currentMatchData.matches[matchId];
+        if (!matchEntryStatus) throw new Error('A partida ja foi finalizada ou nao existe mais.');
 
-    savePlayerStats(statsData);
-    delete currentMatchData.matches[matchId];
-    saveCurrentMatch(currentMatchData);
+        const statsData = loadPlayerStats();
+        
+        const winners = []; const losers = [];
+        for(const p of winningPlayers) {
+            const s = getStoredPlayerStats(statsData, p);
+            const m = getModeStats(s, match.mode, match.format);
+            const beforeRank = m.internalRating || 0;
+            const beforeRecord = formatCustomRecord(m);
+            const delta = Math.round(calculateEloDelta(beforeRank, 1200, 1, 0) * (match.mode === QUEUE_MODES.ARAM ? 0.5 : 1));
+            const afterRank = beforeRank + delta;
+            const updatedModes = { ...normalizePlayerModes(s), [getStatsBucketKey(match.mode, match.format)]: { ...m, customWins: (m.customWins || 0) + 1, internalRating: afterRank, winStreak: (m.winStreak || 0) + 1 } };
+            upsertPlayerStats(statsData, p, { modes: updatedModes });
+            winners.push({ ...p, beforeRank, afterRank, beforeRecord, afterRecord: formatCustomRecord(updatedModes[getStatsBucketKey(match.mode, match.format)]), ratingDelta: delta, winStreak: (m.winStreak || 0) + 1 });
+        }
+        for(const p of losingPlayers) {
+            const s = getStoredPlayerStats(statsData, p);
+            const m = getModeStats(s, match.mode, match.format);
+            const beforeRank = m.internalRating || 0;
+            const beforeRecord = formatCustomRecord(m);
+            const delta = Math.round(calculateEloDelta(beforeRank, 1200, 0, 0) * (match.mode === QUEUE_MODES.ARAM ? 0.5 : 1));
+            const afterRank = Math.max(0, beforeRank + delta);
+            const updatedModes = { ...normalizePlayerModes(s), [getStatsBucketKey(match.mode, match.format)]: { ...m, customLosses: (m.customLosses || 0) + 1, internalRating: afterRank, winStreak: 0 } };
+            upsertPlayerStats(statsData, p, { modes: updatedModes });
+            losers.push({ ...p, beforeRank, afterRank, beforeRecord, afterRecord: formatCustomRecord(updatedModes[getStatsBucketKey(match.mode, match.format)]), ratingDelta: delta });
+        }
+
+        savePlayerStats(statsData);
+        delete currentMatchData.matches[matchId];
+        saveCurrentMatch(currentMatchData);
+
+        // Export data for history log inside lock to ensure consistency
+        match.winners = winners;
+        match.losers = losers;
+    });
+
+    const { winners, losers } = match;
+    for(const p of [...winners, ...losers]) await syncMemberRankRole(message.guild, p.discordId, p.afterRank);
 
     for(const p of [...winners, ...losers]) await syncMemberRankRole(message.guild, p.discordId, p.afterRank);
     const mvp = winners.reduce((a, b) => a.winStreak > b.winStreak ? a : b, winners[0]);
