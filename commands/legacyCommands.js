@@ -288,6 +288,7 @@ async function handleHelpCommand(message) {
       { name: '!top10 aram 1x1', value: 'Mostra o top 10 atual da temporada em ARAM 1x1.', inline: false },
       { name: '!temporadas', value: 'Lista fases de testes e temporadas arquivadas.', inline: false },
       { name: '!temporada <numero>', value: 'Mostra o resumo de uma temporada/fase arquivada.', inline: false },
+      { name: '!sincronizar-cargos (!sync)', value: 'Força a atualização dos cargos de todos os jogadores (Admin).', inline: false },
       { name: '!desfazerresettemporada', value: 'Restaura o ultimo periodo arquivado que tenha dados validos.', inline: false },
       { name: '!restaurarperiodo <numero>', value: 'Restaura um periodo arquivado especifico pelo numero.', inline: false },
       { name: '!iniciartemporada', value: 'Encerra os testes e inicia a Temporada #1 oficial.', inline: false },
@@ -1095,6 +1096,40 @@ async function handleVictoryCommand(message, args) {
     losers: loserSnapshots
   });
 }
+async function handleSyncAllRolesCommand(message) {
+  if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
+    await replyToMessage(message, 'Apenas administradores podem sincronizar todos os cargos.');
+    return;
+  }
+
+  const statsData = loadPlayerStats();
+  const players = Object.values(statsData.players || {});
+  
+  if (players.length === 0) {
+    await replyToMessage(message, 'Nao ha estatisticas de jogadores para sincronizar.');
+    return;
+  }
+
+  await replyToMessage(message, `Iniciando a sincronizacao de cargos para **${players.length}** jogadores registrados... (isso pode levar alguns instantes)`);
+
+  let successCount = 0;
+  for (const playerStats of players) {
+    if (playerStats.discordId) {
+      const classicMmr = calculateHybridMmr(
+        playerStats.baseMmr,
+        playerStats.customWins,
+        playerStats.customLosses,
+        playerStats.internalRating
+      );
+      
+      await syncMemberRankRole(message.guild, playerStats.discordId, classicMmr);
+      successCount++;
+    }
+  }
+
+  await sendToMessageChannel(message, `✅ Sincronizacao concluida! **${successCount}** contas revisadas e cargos atualizados.`);
+}
+
 module.exports = {
   handleEnterCommand,
   handleListCommand,
@@ -1114,5 +1149,6 @@ module.exports = {
   handleRestoreArchivedPeriodCommand,
   handleCancelStartCommand,
   handleStartCommand,
+  handleSyncAllRolesCommand,
   handleVictoryCommand
 };

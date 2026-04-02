@@ -190,6 +190,7 @@ function buildSlashCommands() {
     new SlashCommandBuilder().setName('limparsalas').setDescription('Limpa salas automaticas orfas.'),
     new SlashCommandBuilder().setName('reset').setDescription('Limpa todas as filas e partidas ativas.'),
     new SlashCommandBuilder().setName('resetgeral').setDescription('Arquiva a fase atual e inicia uma nova.'),
+    new SlashCommandBuilder().setName('sincronizar-cargos').setDescription('Força a atualização dos cargos de todos os jogadores.'),
     new SlashCommandBuilder().setName('desfazerresettemporada').setDescription('Restaura o ultimo periodo arquivado com dados.'),
     new SlashCommandBuilder()
       .setName('restaurarperiodo')
@@ -384,6 +385,10 @@ async function processCommand(message, rawContent) {
       case 'resultado':
         await handlers.handleVictoryCommand(message, args);
         break;
+      case 'sincronizar-cargos':
+      case 'sync':
+        await handlers.handleSyncAllRolesCommand(message);
+        break;
       default:
         await replyToMessage(message, `Comando desconhecido: \`${rawContent}\`. Use \`!ajuda\` para ver os comandos.`);
         break;
@@ -488,6 +493,9 @@ client.on('interactionCreate', async (interaction) => {
         break;
       case 'resetgeral':
         await handlers.handleSeasonResetCommand(context);
+        break;
+      case 'sincronizar-cargos':
+        await handlers.handleSyncAllRolesCommand(context);
         break;
       case 'desfazerresettemporada':
         await handlers.handleUndoSeasonResetCommand(context);
