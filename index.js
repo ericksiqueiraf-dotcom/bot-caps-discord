@@ -458,17 +458,14 @@ client.on('interactionCreate', async (interaction) => {
         await handlers.handleHelpCommand(context);
         break;
       case 'entrar': {
-        const args = [];
+        const selectedMode = interaction.options.getString('modo') || QUEUE_MODES.CLASSIC;
+        const selectedFormat = interaction.options.getString('formato');
+        const nickname = interaction.options.getString('nick');
+        
+        const args = [selectedMode];
+        if (selectedFormat) args.push(selectedFormat);
+        args.push(nickname);
 
-        if (mode === QUEUE_MODES.ARAM) {
-          args.push(QUEUE_MODES.ARAM);
-
-          if (format) {
-            args.push(format);
-          }
-        }
-
-        args.push(nick);
         await handlers.handleEnterCommand(context, args);
         break;
       }
