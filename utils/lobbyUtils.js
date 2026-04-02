@@ -1,7 +1,28 @@
 const { ChannelType, EmbedBuilder } = require('discord.js');
+const db = require('../services/dataService');
 const config = require('../config.json');
 const { QUEUE_MODES } = require('../services/dataService');
 const { calculateSeedRating, calculateHybridMmr, calculateEloDelta } = require('../services/balanceService');
+
+const THEME = {
+  SUCCESS: '#00ff88',
+  ERROR: '#ff4d4d',
+  INFO: '#00c3ff',
+  WARNING: '#ffaa00',
+  RANK: '#ffd700'
+};
+
+const FOOTER_PREFIX = 'Caps Bot';
+
+function getRankName(mmr) {
+  const val = Number(mmr || 0);
+  if (val < 900) return 'Ferro';
+  if (val < 1100) return 'Bronze';
+  if (val < 1300) return 'Prata';
+  if (val < 1500) return 'Ouro';
+  if (val < 1700) return 'Platina';
+  return 'Diamante';
+}
 
 function getSeasonDisplayLabel(seasonMeta) {
   if (seasonMeta.phase === 'official') {
@@ -417,7 +438,8 @@ function createEmptyModeStats(baseMmr = 0) {
     customWins: 0,
     customLosses: 0,
     baseMmr: Number(baseMmr || 0),
-    internalRating: seedRating
+    internalRating: seedRating,
+    winStreak: 0
   };
 }
 
@@ -434,7 +456,8 @@ function normalizePlayerModes(player) {
       customWins: Number(modes.classic?.customWins ?? legacyWins),
       customLosses: Number(modes.classic?.customLosses ?? legacyLosses),
       baseMmr: Number(modes.classic?.baseMmr ?? legacyBaseMmr),
-      internalRating: Number(modes.classic?.internalRating ?? calculateSeedRating(legacyBaseMmr))
+      internalRating: Number(modes.classic?.internalRating ?? calculateSeedRating(legacyBaseMmr)),
+      winStreak: Number(modes.classic?.winStreak ?? 0)
     },
     aram: {
       ...createEmptyModeStats(legacyBaseMmr),
@@ -442,7 +465,8 @@ function normalizePlayerModes(player) {
       customWins: Number(modes.aram?.customWins ?? 0),
       customLosses: Number(modes.aram?.customLosses ?? 0),
       baseMmr: Number(modes.aram?.baseMmr ?? legacyBaseMmr),
-      internalRating: Number(modes.aram?.internalRating ?? calculateSeedRating(legacyBaseMmr))
+      internalRating: Number(modes.aram?.internalRating ?? calculateSeedRating(legacyBaseMmr)),
+      winStreak: Number(modes.aram?.winStreak ?? 0)
     },
     aram1x1: {
       ...createEmptyModeStats(legacyBaseMmr),
@@ -450,7 +474,8 @@ function normalizePlayerModes(player) {
       customWins: Number(modes.aram1x1?.customWins ?? 0),
       customLosses: Number(modes.aram1x1?.customLosses ?? 0),
       baseMmr: Number(modes.aram1x1?.baseMmr ?? legacyBaseMmr),
-      internalRating: Number(modes.aram1x1?.internalRating ?? calculateSeedRating(legacyBaseMmr))
+      internalRating: Number(modes.aram1x1?.internalRating ?? calculateSeedRating(legacyBaseMmr)),
+      winStreak: Number(modes.aram1x1?.winStreak ?? 0)
     }
   };
 }
@@ -510,7 +535,7 @@ function buildQueueEmbed(lobby, allLobbies = []) {
     : [];
   const normalizedLobby = lobby && typeof lobby === 'object' ? lobby : null;
   const embed = new EmbedBuilder()
-    .setColor(0x00bcd4)
+    .setColor(THEME.INFO)
     .setTitle('Fila Atual')
     .setDescription('Acompanhe os jogadores confirmados para a partida personalizada.')
     .setTimestamp();
@@ -545,7 +570,7 @@ function buildQueueEmbed(lobby, allLobbies = []) {
         inline: true
       }
     )
-    .setFooter({ text: 'Use !entrar Nome#TAG, !entrar aram 1x1 Nome#TAG ou !entrar aram 3x3 Nome#TAG.' });
+    .setFooter({ text: `${FOOTER_PREFIX} • Fila de Espera` });
 
   if (!Array.isArray(normalizedLobby.players) || normalizedLobby.players.length === 0) {
     embed.addFields({
@@ -630,8 +655,8 @@ function buildTeamsEmbed(teams) {
     .join('\n');
 
   return new EmbedBuilder()
-    .setColor(0x57f287)
-    .setTitle('Times Balanceados')
+    .setColor(THEME.SUCCESS)
+    .setTitle('⚔️ Times Balanceados')
     .setDescription(
       `Os times foram montados automaticamente com base no MMR dos jogadores.\nModo: **${formatQueueMode(teams.mode)}** | Formato: **${teams.teamOne.length}x${teams.teamTwo.length}**`
     )
@@ -649,71 +674,38 @@ function buildTeamsEmbed(teams) {
         value: `${teams.difference}`
       }
     )
-    .setFooter({ text: 'Boa partida e boa sorte.' })
+    .setFooter({ text: `${FOOTER_PREFIX} • Times Formados` })
     .setTimestamp();
 }
 
-function buildLeaderboardEmbed(statsData) {
-  const rankedPlayers = getRankedPlayersByMode(statsData, QUEUE_MODES.CLASSIC);
-
-  const embed = new EmbedBuilder()
-    .setColor(0xf39c12)
-    .setTitle('Placar Geral')
-    .setDescription('Ranking interno das partidas personalizadas com base no historico registrado.')
-    .setTimestamp();
-
-  if (rankedPlayers.length === 0) {
-    embed.addFields({
-      name: 'Sem estatisticas ainda',
-      value: 'Nenhuma partida custom foi registrada ate o momento.'
-    });
-
-    return embed;
-  }
-
-  const leaderboardEntries = rankedPlayers
-    .slice(0, 15)
-    .map((player, index) => {
-      const label = player.discordId ? `<@${player.discordId}>` : `\`${player.nickname}\``;
-
-      return `**${index + 1}.** ${label}\nNick: \`${player.nickname}\`\nCustom: \`${player.customWins}V / ${player.customLosses}D\`\nWin rate: \`${player.winRate}%\`\nMMR interno: \`${player.adjustedMmr}\``;
-    });
-
-  splitEmbedFieldChunks(leaderboardEntries).forEach((chunk, index) => {
-    embed.addFields({
-      name: index === 0 ? 'Top jogadores - CLASSIC' : `Top jogadores - CLASSIC (${index + 1})`,
-      value: chunk
-    });
-  });
-
-  return embed;
-}
-
-function buildModeLeaderboardEmbed(statsData, mode, format = null) {
+function buildLeaderboardEmbed(statsData, mode = QUEUE_MODES.CLASSIC, format = null) {
   const rankedPlayers = getRankedPlayersByMode(statsData, mode, format);
   const modeLabel = getStatsBucketLabel(mode, format);
+  const medals = ['🥇', '🥈', '🥉'];
 
   const embed = new EmbedBuilder()
-    .setColor(mode === QUEUE_MODES.ARAM ? 0xe74c3c : 0xf39c12)
-    .setTitle(`Placar Geral - ${modeLabel}`)
-    .setDescription(`Ranking interno do modo ${modeLabel}.`)
+    .setColor(THEME.RANK)
+    .setTitle(`🏆 Placar Geral - ${modeLabel}`)
+    .setDescription(`Ranking interno de **${modeLabel}** baseado no histórico.`)
+    .setFooter({ text: `${FOOTER_PREFIX} • Ranking ${modeLabel}` })
     .setTimestamp();
 
   if (rankedPlayers.length === 0) {
     embed.addFields({
-      name: 'Sem estatisticas ainda',
-      value: `Nenhuma partida ${modeLabel} foi registrada ate o momento.`
+      name: 'Sem estatísticas ainda',
+      value: `Nenhuma partida ${modeLabel} foi registrada até o momento.`
     });
-
     return embed;
   }
 
   const leaderboardEntries = rankedPlayers
     .slice(0, 15)
     .map((player, index) => {
+      const medal = medals[index] || `#${index + 1}`;
+      const rankName = getRankName(player.adjustedMmr);
       const label = player.discordId ? `<@${player.discordId}>` : `\`${player.nickname}\``;
 
-      return `**${index + 1}.** ${label}\nNick: \`${player.nickname}\`\n${modeLabel}: \`${player.customWins}V / ${player.customLosses}D\`\nWin rate: \`${player.winRate}%\`\nMMR interno: \`${player.adjustedMmr}\``;
+      return `${medal} ${label}\n**${rankName} (${player.adjustedMmr} pts)** • ${player.customWins}V / ${player.customLosses}D`;
     });
 
   splitEmbedFieldChunks(leaderboardEntries).forEach((chunk, index) => {
@@ -755,7 +747,8 @@ function getRankedPlayersByMode(statsData, mode, format = null) {
         totalGames,
         adjustedMmr,
         winRate,
-        internalRating: Number(modeStats.internalRating || calculateSeedRating(baseMmr))
+        internalRating: Number(modeStats.internalRating || calculateSeedRating(baseMmr)),
+        winStreak: Number(modeStats.winStreak || 0)
       };
     })
     .filter((player) => player.totalGames >= minGames)
@@ -771,10 +764,13 @@ function getRankedPlayersByMode(statsData, mode, format = null) {
 function buildTopTenEmbed(statsData, seasonMeta, mode, format = null) {
   const rankedPlayers = getRankedPlayersByMode(statsData, mode, format).slice(0, 10);
   const modeLabel = getStatsBucketLabel(mode, format);
+  const medals = ['🥇', '🥈', '🥉'];
+
   const embed = new EmbedBuilder()
-    .setColor(mode === QUEUE_MODES.ARAM ? 0xc0392b : 0x2980b9)
-    .setTitle(`Top 10 - ${modeLabel}`)
-    .setDescription(`Periodo atual: **${getSeasonDisplayLabel(seasonMeta)}**`)
+    .setColor(THEME.RANK)
+    .setTitle(`🏆 Top 10 - ${modeLabel}`)
+    .setDescription(`Período atual: **${getSeasonDisplayLabel(seasonMeta)}**`)
+    .setFooter({ text: `${FOOTER_PREFIX} • Top 10 ${modeLabel}` })
     .setTimestamp();
 
   if (rankedPlayers.length === 0) {
@@ -788,8 +784,11 @@ function buildTopTenEmbed(statsData, seasonMeta, mode, format = null) {
 
   const entries = rankedPlayers
     .map(
-      (player, index) =>
-        `**${index + 1}.** <@${player.discordId}>\nNick: \`${player.nickname}\`\n${modeLabel}: \`${player.customWins}V / ${player.customLosses}D\`\nRank: \`${player.adjustedMmr}\``
+      (player, index) => {
+        const medal = medals[index] || `#${index + 1}`;
+        const rankName = getRankName(player.adjustedMmr);
+        return `${medal} <@${player.discordId}>\n**${rankName} (${player.adjustedMmr} pts)** • ${player.customWins}V / ${player.customLosses}D`;
+      }
     );
 
   splitEmbedFieldChunks(entries).forEach((chunk, index) => {
@@ -1010,21 +1009,18 @@ function buildPlayerCardEmbed(playerStats, targetUser) {
   );
 
   return new EmbedBuilder()
-    .setColor(0x1abc9c)
-    .setTitle('Ficha do Jogador')
+    .setColor(THEME.INFO)
+    .setTitle('👤 Ficha do Jogador')
     .setDescription(targetUser ? `${targetUser}` : `\`${playerStats.nickname}\``)
     .addFields(
       { name: 'Nick', value: `\`${playerStats.nickname || 'Nao identificado'}\``, inline: true },
-      { name: 'CLASSIC', value: `\`${classicStats.customWins}V / ${classicStats.customLosses}D\``, inline: true },
-      { name: 'ARAM', value: `\`${aramStats.customWins}V / ${aramStats.customLosses}D\``, inline: true },
-      { name: 'ARAM 1x1', value: `\`${aram1x1Stats.customWins}V / ${aram1x1Stats.customLosses}D\``, inline: true },
-      { name: 'Win rate CLASSIC', value: `\`${classicWinRate}%\``, inline: true },
-      { name: 'Win rate ARAM', value: `\`${aramWinRate}%\``, inline: true },
-      { name: 'Win rate ARAM 1x1', value: `\`${aram1x1WinRate}%\``, inline: true },
-      { name: 'MMR CLASSIC', value: `\`${classicMmr}\``, inline: true },
-      { name: 'MMR ARAM', value: `\`${aramMmr}\``, inline: true },
-      { name: 'MMR ARAM 1x1', value: `\`${aram1x1Mmr}\``, inline: true }
+      { name: 'Rank Principal', value: `**${getRankName(classicMmr)}** (${classicMmr} pts)`, inline: true },
+      { name: '\u200B', value: '\u200B', inline: true },
+      { name: '📊 CLASSIC', value: `\`${classicStats.customWins}V / ${classicStats.customLosses}D\`\nWR: \`${classicWinRate}%\`\nStreak: \`${classicStats.winStreak || 0}\``, inline: true },
+      { name: '📊 ARAM', value: `\`${aramStats.customWins}V / ${aramStats.customLosses}D\`\nWR: \`${aramWinRate}%\`\nStreak: \`${aramStats.winStreak || 0}\``, inline: true },
+      { name: '📊 ARAM 1x1', value: `\`${aram1x1Stats.customWins}V / ${aram1x1Stats.customLosses}D\`\nWR: \`${aram1x1WinRate}%\`\nStreak: \`${aram1x1Stats.winStreak || 0}\``, inline: true }
     )
+    .setFooter({ text: `${FOOTER_PREFIX} • Perfil` })
     .setTimestamp();
 }
 
@@ -1090,28 +1086,23 @@ async function postMatchHistoryLog(guild, payload) {
   }
 
   const summaryEmbed = new EmbedBuilder()
-    .setColor(payload.winningTeam === '1' ? 0x2ecc71 : 0xe67e22)
-    .setTitle('Historico de Partida')
+    .setColor(payload.winningTeam === '1' ? THEME.SUCCESS : THEME.WARNING)
+    .setTitle('📋 Histórico de Partida')
     .setDescription(
-      `**${payload.modeLabel} ${payload.formatLabel}** | Lobby **${payload.letter}**\nVencedor: **Equipe ${payload.winningTeam}** | Periodo: **${payload.periodLabel}**`
+      `**${payload.modeLabel} ${payload.formatLabel}** | Lobby **${payload.letter}**\nVencedor: **Equipe ${payload.winningTeam}**\nPeríodo: **${payload.periodLabel}**`
     )
     .addFields(
-      { name: 'Inicio da partida', value: `\`${formatDateTimeForHistory(payload.startedAt)}\``, inline: true },
-      { name: 'Resultado registrado', value: `\`${formatDateTimeForHistory(payload.finishedAt)}\``, inline: true },
-      { name: 'Diferenca de MMR no start', value: `\`${payload.initialDifference}\``, inline: true },
-      { name: 'MMR inicial Equipe 1', value: `\`${payload.teamOneMmr}\``, inline: true },
-      { name: 'MMR inicial Equipe 2', value: `\`${payload.teamTwoMmr}\``, inline: true },
-      {
-        name: 'Peso do formato',
-        value: payload.weightLabel,
-        inline: true
-      }
+      { name: 'Início', value: `\`${formatDateTimeForHistory(payload.startedAt)}\``, inline: true },
+      { name: 'Fim', value: `\`${formatDateTimeForHistory(payload.finishedAt)}\``, inline: true },
+      { name: 'Diferença MMR', value: `\`${payload.initialDifference}\``, inline: true }
     )
+    .setFooter({ text: `${FOOTER_PREFIX} • Histórico` })
     .setTimestamp(new Date(payload.finishedAt));
 
   const detailEmbed = new EmbedBuilder()
-    .setColor(0x5865f2)
-    .setTitle('Jogadores e Variacao de Rank')
+    .setColor(THEME.INFO)
+    .setTitle('⭐ Jogadores e Variação de Rank')
+    .setFooter({ text: `${FOOTER_PREFIX} • Detalhes` })
     .setTimestamp(new Date(payload.finishedAt));
 
   const winnerEntries = payload.winners.map((player, index) => {

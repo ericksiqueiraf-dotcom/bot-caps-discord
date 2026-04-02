@@ -147,23 +147,19 @@ async function handleEnterCommand(message, args) {
     }
 
     const successEmbed = new EmbedBuilder()
-      .setColor(0x5865f2)
-      .setTitle('Jogador adicionado na sala')
-      .setDescription(`<@${message.author.id}> entrou com sucesso na sala de espera.`)
+      .setColor(THEME.SUCCESS)
+      .setTitle('📥 Jogador Adicionado')
+      .setDescription(`<@${message.author.id}> entrou com sucesso na fila.`)
       .addFields(
-        { name: 'Lobby', value: lobby.letter, inline: true },
-        { name: 'Modo', value: formatQueueMode(selectedMode), inline: true },
-        { name: 'Formato', value: selectedFormat, inline: true },
-        { name: 'Nick', value: rankProfile.nickname, inline: true },
-        { name: 'Elo', value: formatRank(rankProfile), inline: true },
-        { name: `Historico ${formatQueueMode(selectedMode)}`, value: formatCustomRecord(storedModeStats), inline: true },
-        { name: 'Seed Riot', value: String(calculateSeedRating(rankProfile.mmr)), inline: true },
-        { name: 'Rank interno', value: String(hybridMmr), inline: true }
+        { name: 'Lobby', value: `\`${lobby.letter}\``, inline: true },
+        { name: 'Posição', value: `**#${lobby.players.length}**`, inline: true },
+        { name: 'Capacidade', value: `\`${lobby.players.length}/${lobby.requiredPlayers}\``, inline: true },
+        { name: 'Nick', value: `\`${rankProfile.nickname}\``, inline: true },
+        { name: 'Elo', value: `\`${formatRank(rankProfile)}\``, inline: true },
+        { name: 'Rank Interno', value: `**${getRankName(hybridMmr)}** (${hybridMmr} pts)`, inline: true }
       )
       .setFooter({
-        text: rankProfile.isFallbackUnranked
-          ? `Jogador sem SoloQ: usando base Gold IV | Sala ${lobby.letter}: ${lobby.players.length}/${lobby.requiredPlayers}`
-          : `Sala ${lobby.letter}: ${lobby.players.length}/${lobby.requiredPlayers}`
+        text: `${FOOTER_PREFIX} • ${rankProfile.isFallbackUnranked ? 'Usando base Gold IV' : 'Perfil validado'}`
       })
       .setTimestamp();
 
@@ -944,6 +940,8 @@ async function handleVictoryCommand(message, args) {
     const stored = getStoredPlayerStats(statsData, player);
     const modeStats = getModeStats(stored, matchMode, matchFormat);
     const totalGames = Number(modeStats.customWins || 0) + Number(modeStats.customLosses || 0);
+    const currentStreak = Number(modeStats.winStreak || 0) + 1;
+
     const beforeRank = calculateHybridMmr(
       modeStats.baseMmr ?? player.baseMmr ?? player.mmr,
       modeStats.customWins,
@@ -953,13 +951,15 @@ async function handleVictoryCommand(message, args) {
     const ratingDelta = shouldAffectRanking
       ? Math.round(calculateEloDelta(modeStats.internalRating, loserAverageRating, 1, totalGames) * aramWeight)
       : 0;
+
     upsertPlayerStats(statsData, player, {
       modes: {
         ...normalizePlayerModes(stored),
         [statsBucketKey]: {
           ...modeStats,
           customWins: shouldAffectRanking ? Number(modeStats.customWins || 0) + 1 : Number(modeStats.customWins || 0),
-          internalRating: Math.max(0, Number(modeStats.internalRating || 0) + ratingDelta)
+          internalRating: Math.max(0, Number(modeStats.internalRating || 0) + ratingDelta),
+          winStreak: currentStreak
         }
       }
     });
@@ -978,6 +978,8 @@ async function handleVictoryCommand(message, args) {
       nickname: player.nickname,
       beforeRank,
       afterRank,
+      ratingDelta,
+      winStreak: currentStreak,
       beforeRecord: formatCustomRecord(modeStats),
       afterRecord: formatCustomRecord(updatedModeStats)
     });
@@ -987,6 +989,7 @@ async function handleVictoryCommand(message, args) {
     const stored = getStoredPlayerStats(statsData, player);
     const modeStats = getModeStats(stored, matchMode, matchFormat);
     const totalGames = Number(modeStats.customWins || 0) + Number(modeStats.customLosses || 0);
+
     const beforeRank = calculateHybridMmr(
       modeStats.baseMmr ?? player.baseMmr ?? player.mmr,
       modeStats.customWins,
@@ -996,13 +999,15 @@ async function handleVictoryCommand(message, args) {
     const ratingDelta = shouldAffectRanking
       ? Math.round(calculateEloDelta(modeStats.internalRating, winnerAverageRating, 0, totalGames) * aramWeight)
       : 0;
+
     upsertPlayerStats(statsData, player, {
       modes: {
         ...normalizePlayerModes(stored),
         [statsBucketKey]: {
           ...modeStats,
           customLosses: shouldAffectRanking ? Number(modeStats.customLosses || 0) + 1 : Number(modeStats.customLosses || 0),
-          internalRating: Math.max(0, Number(modeStats.internalRating || 0) + ratingDelta)
+          internalRating: Math.max(0, Number(modeStats.internalRating || 0) + ratingDelta),
+          winStreak: 0
         }
       }
     });
@@ -1021,6 +1026,7 @@ async function handleVictoryCommand(message, args) {
       nickname: player.nickname,
       beforeRank,
       afterRank,
+      ratingDelta,
       beforeRecord: formatCustomRecord(modeStats),
       afterRecord: formatCustomRecord(updatedModeStats)
     });
@@ -1030,6 +1036,29 @@ async function handleVictoryCommand(message, args) {
   delete currentMatchData.matches[matchId];
   saveCurrentMatch(currentMatchData);
 
+  // MVP selection (Highest Win Streak among winners)
+  const mvp = winnerSnapshots.reduce((prev, current) => (prev.winStreak > current.winStreak ? prev : current), winnerSnapshots[0]);
+
+  const winnersText = winnerSnapshots
+    .map((p) => `- <@${p.discordId}>: **${p.afterRank} pts** (\`+${p.ratingDelta}\`) ${p.winStreak > 1 ? `🔥 ${p.winStreak} winstreak` : ''}`)
+    .join('\n');
+
+  const losersText = loserSnapshots
+    .map((p) => `- <@${p.discordId}>: **${p.afterRank} pts** (\`${p.ratingDelta}\`)`)
+    .join('\n');
+
+  const embed = new EmbedBuilder()
+    .setColor(THEME.SUCCESS)
+    .setTitle('⚔️ Resultado da Partida')
+    .setDescription(`🏆 **Equipe ${winningTeam} venceu!**\nLobby: \`${match.letter}\` | Modo: \`${statsBucketLabel}\``)
+    .addFields(
+      { name: '🔥 MVP (Maior Streak)', value: `<@${mvp.discordId}> com **${mvp.winStreak} vitórias seguidas!**` },
+      { name: '📈 Ganhos de elo', value: winnersText || 'Ninguém' },
+      { name: '💀 Perdas de elo', value: losersText || 'Ninguém' }
+    )
+    .setFooter({ text: `${FOOTER_PREFIX} • Resultado Final` })
+    .setTimestamp();
+
   const allPlayers = [...winningPlayers, ...losingPlayers];
   const baseQueueChannelId = getBaseQueueChannelIdByMode(matchMode);
   await movePlayersToVoiceChannel(message.guild, allPlayers, baseQueueChannelId);
@@ -1038,58 +1067,6 @@ async function handleVictoryCommand(message, args) {
     match.teamOneChannelId,
     match.teamTwoChannelId
   ]);
-
-  const winnersText = winningPlayers
-    .map((player) => {
-      const updated = getStoredPlayerStats(statsData, player);
-      const updatedModeStats = getModeStats(updated, matchMode, matchFormat);
-      const newMmr = calculateHybridMmr(
-        updatedModeStats.baseMmr ?? player.baseMmr ?? player.mmr,
-        updatedModeStats.customWins,
-        updatedModeStats.customLosses,
-        updatedModeStats.internalRating
-      );
-
-      return `- <@${player.discordId}> | ${statsBucketLabel}: ${formatCustomRecord(updatedModeStats)} | Rating: ${Math.round(updatedModeStats.internalRating)} | Rank: ${newMmr}`;
-    })
-    .join('\n');
-
-  const losersText = losingPlayers
-    .map((player) => {
-      const updated = getStoredPlayerStats(statsData, player);
-      const updatedModeStats = getModeStats(updated, matchMode, matchFormat);
-      const newMmr = calculateHybridMmr(
-        updatedModeStats.baseMmr ?? player.baseMmr ?? player.mmr,
-        updatedModeStats.customWins,
-        updatedModeStats.customLosses,
-        updatedModeStats.internalRating
-      );
-
-      return `- <@${player.discordId}> | ${statsBucketLabel}: ${formatCustomRecord(updatedModeStats)} | Rating: ${Math.round(updatedModeStats.internalRating)} | Rank: ${newMmr}`;
-    })
-    .join('\n');
-
-  const embed = new EmbedBuilder()
-    .setColor(0x2ecc71)
-    .setTitle('Resultado registrado')
-    .setDescription(`A **Equipe ${winningTeam}** foi declarada vencedora no lobby **${match.letter}** no modo **${statsBucketLabel}**.`)
-    .addFields(
-      {
-        name: 'Lobby',
-        value: `${match.letter} | ${statsBucketLabel} ${match.format || getAramFormatLabel(teamSize)}`
-      },
-      {
-        name: 'Peso do formato',
-        value:
-          matchMode === QUEUE_MODES.ARAM
-            ? `${getAramFormatLabel(teamSize)} | ${aramWeight === 0 ? 'nao pontua ranking' : `peso ${aramWeight}`}`
-            : 'CLASSIC 5x5 | peso 1.0'
-      },
-      { name: `Vencedores - Equipe ${winningTeam}`, value: winnersText || 'Sem jogadores' },
-      { name: `Derrotados - Equipe ${winningTeam === '1' ? '2' : '1'}`, value: losersText || 'Sem jogadores' }
-    )
-    .setFooter({ text: 'O rank interno foi recalculado com Elo por equipe e peso por experiencia.' })
-    .setTimestamp();
 
   await sendToMessageChannel(message, { embeds: [embed] });
 
@@ -1101,12 +1078,6 @@ async function handleVictoryCommand(message, args) {
     startedAt: match.createdAt || new Date().toISOString(),
     finishedAt: new Date().toISOString(),
     initialDifference: match.difference ?? 0,
-    teamOneMmr: match.teamOneMmr ?? 0,
-    teamTwoMmr: match.teamTwoMmr ?? 0,
-    weightLabel:
-      matchMode === QUEUE_MODES.ARAM
-        ? `${getAramFormatLabel(teamSize)} | ${aramWeight === 0 ? 'nao pontua ranking' : `peso ${aramWeight}`}`
-        : 'CLASSIC 5x5 | peso 1.0',
     periodLabel: getSeasonDisplayLabel(seasonMeta),
     winners: winnerSnapshots,
     losers: loserSnapshots
