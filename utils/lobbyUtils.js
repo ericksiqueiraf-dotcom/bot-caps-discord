@@ -1138,6 +1138,28 @@ async function postDailyRankUpdates() {
   });
 }
 
+async function postMvpAnnouncement(guild, mvpData) {
+  const channelId = config.textChannels.mvpAnnouncementsChannelId;
+  const channel = guild.channels.cache.get(channelId);
+  if (!channel) return;
+
+  const embed = new EmbedBuilder()
+    .setColor(THEME.RANK)
+    .setTitle('⭐ DESTAQUE DA PARTIDA ⭐')
+    .setDescription(`O jogador <@${mvpData.discordId}> foi o grande destaque da ultima rodada!`)
+    .addFields(
+      { name: '🔥 Win Streak', value: `\`${mvpData.winStreak}\` vitorias seguidas`, inline: true },
+      { name: '📊 Rank Atual', value: `**${mvpData.afterRank} pts**`, inline: true }
+    )
+    .setThumbnail('https://i.imgur.com/8Q9S8Xj.png') // Opcional: ícone de troféu ou medalha
+    .setFooter({ text: `${FOOTER_PREFIX} • MVP Hall of Fame` })
+    .setTimestamp();
+
+  await channel.send({ content: `Parabens <@${mvpData.discordId}>! 🏆`, embeds: [embed] }).catch(err => 
+    console.error('[MVP] Erro ao postar anuncio no canal de destaques:', err.message)
+  );
+}
+
 async function postMatchHistoryLog(guild, payload) {
   const channelId = config.textChannels?.matchHistoryChannelId;
 
@@ -1590,6 +1612,7 @@ module.exports = {
   getSaoPauloDateParts,
   postDailyRankUpdates,
   postMatchHistoryLog,
+  postMvpAnnouncement,
   startDailyRankScheduler,
   movePlayersToTeamChannels,
   movePlayersToVoiceChannel,

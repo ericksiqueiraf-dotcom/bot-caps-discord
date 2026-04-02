@@ -1049,6 +1049,7 @@ async function handleVictoryCommand(message, args) {
   // Sync MVP role
   if (mvp) {
     await syncMvpRole(message.guild, mvp.discordId);
+    await postMvpAnnouncement(message.guild, mvp);
   }
 
 

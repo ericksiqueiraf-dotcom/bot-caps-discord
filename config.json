@@ -6,8 +6,9 @@
     "aramQueueChannelId": "1489240459875455169"
   },
   "textChannels": {
-    "rankUpdatesChannelId": "1489237387103174767",
-    "matchHistoryChannelId": "1489237294241153144"
+    "rankUpdatesChannelId": "1489247981155651645",
+    "matchHistoryChannelId": "1489248090526449684",
+    "mvpAnnouncementsChannelId": "1489238507313696838"
   },
   "automation": {
     "dailyRankUpdatesHour": 8,
