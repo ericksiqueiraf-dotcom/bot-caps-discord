@@ -1,7 +1,6 @@
 const { ChannelType, EmbedBuilder } = require('discord.js');
 const db = require('../services/dataService');
-const config = require('../config.json');
-const { QUEUE_MODES } = require('../services/dataService');
+const { QUEUE_MODES, loadSystemMeta, saveSystemMeta } = require('../services/dataService');
 const { calculateSeedRating, calculateHybridMmr, calculateEloDelta } = require('../services/balanceService');
 
 const THEME = {
@@ -1151,12 +1150,52 @@ async function postMvpAnnouncement(guild, mvpData) {
       { name: '🔥 Win Streak', value: `\`${mvpData.winStreak}\` vitorias seguidas`, inline: true },
       { name: '📊 Rank Atual', value: `**${mvpData.afterRank} pts**`, inline: true }
     )
-    .setThumbnail('https://i.imgur.com/8Q9S8Xj.png') // Opcional: ícone de troféu ou medalha
+    .setThumbnail('https://i.imgur.com/8Q9S8Xj.png')
     .setFooter({ text: `${FOOTER_PREFIX} • MVP Hall of Fame` })
     .setTimestamp();
 
   await channel.send({ content: `Parabens <@${mvpData.discordId}>! 🏆`, embeds: [embed] }).catch(err => 
     console.error('[MVP] Erro ao postar anuncio no canal de destaques:', err.message)
+  );
+}
+
+async function updateQueueDashboard(guild) {
+  const channelId = config.textChannels.queueStatusChannelId;
+  const channel = guild.channels.cache.get(channelId);
+  if (!channel) return;
+
+  const queueData = db.loadQueue();
+  const systemMeta = loadSystemMeta();
+  const embed = buildQueueEmbed(queueData.lobbies);
+
+  try {
+    if (systemMeta.lastQueueMessageId) {
+      const lastMessage = await channel.messages.fetch(systemMeta.lastQueueMessageId).catch(() => null);
+      if (lastMessage) {
+        await lastMessage.edit({ embeds: [embed] });
+        return;
+      }
+    }
+
+    const newMessage = await channel.send({ embeds: [embed] });
+    systemMeta.lastQueueMessageId = newMessage.id;
+    saveSystemMeta(systemMeta);
+  } catch (err) {
+    console.error('[DASHBOARD] Erro ao atualizar painel de fila:', err.message);
+  }
+}
+
+async function sendMatchStartAnnouncement(guild, teams) {
+  const channelId = config.textChannels.matchOngoingChannelId;
+  const channel = guild.channels.cache.get(channelId);
+  if (!channel) return;
+
+  const embed = buildTeamsEmbed(teams);
+  await channel.send({ 
+    content: '⚔️ **Nova partida iniciada!** Preparem-se para a batalha.',
+    embeds: [embed] 
+  }).catch(err => 
+    console.error('[MATCH] Erro ao anunciar partida em andamento:', err.message)
   );
 }
 
@@ -1613,6 +1652,8 @@ module.exports = {
   postDailyRankUpdates,
   postMatchHistoryLog,
   postMvpAnnouncement,
+  updateQueueDashboard,
+  sendMatchStartAnnouncement,
   startDailyRankScheduler,
   movePlayersToTeamChannels,
   movePlayersToVoiceChannel,

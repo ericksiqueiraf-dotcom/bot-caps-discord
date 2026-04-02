@@ -6,6 +6,7 @@ const PLAYER_STATS_FILE_PATH = path.join(__dirname, '..', 'database', 'playerSta
 const CURRENT_MATCH_FILE_PATH = path.join(__dirname, '..', 'database', 'currentMatch.json');
 const SEASON_META_FILE_PATH = path.join(__dirname, '..', 'database', 'seasonMeta.json');
 const SEASON_HISTORY_FILE_PATH = path.join(__dirname, '..', 'database', 'seasonHistory.json');
+const SYSTEM_META_FILE_PATH = path.join(__dirname, '..', 'database', 'systemMeta.json');
 
 const QUEUE_MODES = {
   CLASSIC: 'classic',
@@ -40,8 +41,8 @@ function ensureDataFiles() {
     );
   }
 
-  if (!fs.existsSync(SEASON_HISTORY_FILE_PATH)) {
-    fs.writeFileSync(SEASON_HISTORY_FILE_PATH, JSON.stringify({ seasons: [] }, null, 2));
+  if (!fs.existsSync(SYSTEM_META_FILE_PATH)) {
+    fs.writeFileSync(SYSTEM_META_FILE_PATH, JSON.stringify({ lastQueueMessageId: null }, null, 2));
   }
 }
 
@@ -184,6 +185,19 @@ function saveSeasonHistory(history) {
   writeJsonFile(SEASON_HISTORY_FILE_PATH, history);
 }
 
+function loadSystemMeta() {
+  const parsed = readJsonFile(SYSTEM_META_FILE_PATH, { lastQueueMessageId: null });
+
+  return {
+    lastQueueMessageId: parsed.lastQueueMessageId || null,
+    ...parsed
+  };
+}
+
+function saveSystemMeta(meta) {
+  writeJsonFile(SYSTEM_META_FILE_PATH, meta);
+}
+
 module.exports = {
   ensureDataFiles,
   withQueueOperationLock,
@@ -197,5 +211,7 @@ module.exports = {
   saveSeasonMeta,
   loadSeasonHistory,
   saveSeasonHistory,
+  loadSystemMeta,
+  saveSystemMeta,
   QUEUE_MODES
 };
