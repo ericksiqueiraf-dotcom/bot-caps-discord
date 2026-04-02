@@ -191,6 +191,11 @@ function buildSlashCommands() {
     new SlashCommandBuilder().setName('reset').setDescription('Limpa todas as filas e partidas ativas.'),
     new SlashCommandBuilder().setName('resetgeral').setDescription('Arquiva a fase atual e inicia uma nova.'),
     new SlashCommandBuilder().setName('sincronizar-cargos').setDescription('Força a atualização dos cargos de todos os jogadores.'),
+    new SlashCommandBuilder().setName('onboarding').setDescription('Gera a mensagem de boas-vindas e guia do servidor.'),
+    new SlashCommandBuilder()
+      .setName('limpar')
+      .setDescription('Limpa mensagens do canal.')
+      .addIntegerOption((option) => option.setName('quantidade').setDescription('Quantidade de mensagens a limpar').setRequired(true)),
     new SlashCommandBuilder().setName('desfazerresettemporada').setDescription('Restaura o ultimo periodo arquivado com dados.'),
     new SlashCommandBuilder()
       .setName('restaurarperiodo')
@@ -343,6 +348,14 @@ async function processCommand(message, rawContent) {
       case 'p':
         await handlers.handlePlayerCardCommand(message);
         break;
+      case 'onboarding':
+      case 'inicio':
+        await handlers.handleOnboardingCommand(message);
+        break;
+      case 'limpar':
+      case 'clear':
+        await handlers.handleClearCommand(message, args);
+        break;
       case 'temporadas':
         await handlers.handleSeasonHistoryCommand(message, []);
         break;
@@ -483,6 +496,12 @@ client.on('interactionCreate', async (interaction) => {
         break;
       case 'remover':
         await handlers.handleRemoveCommand(context, targetUser);
+        break;
+      case 'limpar':
+        await handlers.handleClearCommand(context, [String(interaction.options.getInteger('quantidade'))]);
+        break;
+      case 'onboarding':
+        await handlers.handleOnboardingCommand(context);
         break;
       case 'limparsalas':
         await handlers.handleCleanupRoomsCommand(context);

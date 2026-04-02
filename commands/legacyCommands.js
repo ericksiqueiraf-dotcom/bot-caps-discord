@@ -1130,6 +1130,44 @@ async function handleSyncAllRolesCommand(message) {
   await sendToMessageChannel(message, `✅ Sincronizacao concluida! **${successCount}** contas revisadas e cargos atualizados.`);
 }
 
+async function handleOnboardingCommand(message) {
+  if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) return;
+  
+  const embed = new EmbedBuilder()
+    .setColor(THEME.INFO)
+    .setTitle('🏠 Bem-vindo ao Caps Bot Discord!')
+    .setDescription('Aqui a diversão e a competição se encontram. Siga os passos abaixo para começar sua jornada rumo ao topo!')
+    .addFields(
+      { name: '1️⃣ Como Entrar na Fila?', value: 'Use `!entrar <SuaTag#123>` no canal <#1489240283051856023> ou comandos barra `/entrar`.' },
+      { name: '2️⃣ Como Ver meu Rank?', value: 'Use `!perfil` ou `!p` para ver sua ficha completa com vitórias e derrotas.' },
+      { name: '3️⃣ Onde acompanho o Top 10?', value: 'As estatísticas atualizadas ficam no canal <#1489237387103174767>.' },
+      { name: '⭐ O que é o MVP?', value: 'O jogador que obtiver a maior sequência de vitórias em uma partida recebe um cargo exclusivo de destaque!' }
+    )
+    .setFooter({ text: `${FOOTER_PREFIX} • Onboarding` })
+    .setTimestamp();
+
+  await sendToMessageChannel(message, { embeds: [embed] });
+  if (message.deletable) await message.delete().catch(() => null);
+}
+
+async function handleClearCommand(message, args) {
+  if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+    return replyToMessage(message, 'Voce nao tem permissao para limpar mensagens.');
+  }
+
+  const amount = parseInt(args[0]) || 10;
+  if (amount < 1 || amount > 100) {
+    return replyToMessage(message, 'Informe um valor entre 1 e 100.');
+  }
+
+  // Detect context (Direct message vs Interaction)
+  const channel = message.channel || message;
+
+  await channel.bulkDelete(amount + 1, true).catch(err => {
+    replyToMessage(message, `Erro ao limpar: ${err.message}`);
+  });
+}
+
 module.exports = {
   handleEnterCommand,
   handleListCommand,
@@ -1150,5 +1188,7 @@ module.exports = {
   handleCancelStartCommand,
   handleStartCommand,
   handleSyncAllRolesCommand,
-  handleVictoryCommand
+  handleVictoryCommand,
+  handleOnboardingCommand,
+  handleClearCommand
 };
