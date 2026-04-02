@@ -302,7 +302,7 @@ const {
 const handlers = require('./commands/legacyCommands');
 
 
-client.once('clientReady', async () => {
+client.once('ready', async () => {
   ensureDataFiles();
   console.log(`Bot conectado como ${client.user.tag} | ${BOT_VERSION}`);
   await registerSlashCommands();
@@ -434,6 +434,9 @@ client.on('interactionCreate', async (interaction) => {
   if (!interaction.isChatInputCommand() || !interaction.guild) {
     return;
   }
+
+  // Defer early to avoid "The app did not respond" error due to 3s timeout
+  await interaction.deferReply().catch(() => null);
 
   const mode = interaction.options.getString('modo');
   const format = interaction.options.getString('formato');
