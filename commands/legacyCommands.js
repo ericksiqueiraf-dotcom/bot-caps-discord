@@ -453,7 +453,18 @@ async function handleVictoryCommand(message, args) {
 
     await replyToMessage(message, `Vitoria registrada para a Equipe ${winningTeam}!`);
     await updateQueueDashboard(message.guild);
-    await postMatchHistoryLog(message.guild, { winningTeam, modeLabel: match.mode, formatLabel: match.format, winners, losers, finishedAt: new Date().toISOString() });
+    await postMatchHistoryLog(message.guild, { 
+        winningTeam, 
+        modeLabel: match.mode, 
+        formatLabel: match.format, 
+        winners, 
+        losers, 
+        finishedAt: new Date().toISOString(),
+        startedAt: match.createdAt,
+        initialDifference: match.difference || 0,
+        letter: match.letter || '?',
+        periodLabel: getSeasonDisplayLabel(loadSeasonMeta())
+    });
   } catch (error) {
     console.error('[ERRO] !vitoria:', error);
     await replyToMessage(message, `❌ Erro ao processar resultado: \`${error.message}\`.`);

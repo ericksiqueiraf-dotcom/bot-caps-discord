@@ -49,7 +49,9 @@ function getSeasonDisplayLabel(seasonMeta) {
 }
 
 function formatDateTimeForHistory(dateInput) {
+  if (!dateInput) return 'N/A';
   const date = new Date(dateInput);
+  if (isNaN(date.getTime())) return 'N/A';
 
   return new Intl.DateTimeFormat('pt-BR', {
     timeZone: 'America/Sao_Paulo',
