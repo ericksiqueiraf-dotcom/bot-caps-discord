@@ -393,7 +393,6 @@ async function handleVictoryCommand(message, args) {
     const losingPlayers = winningTeam === '1' ? match.teamTwo : match.teamOne;
     const statsData = loadPlayerStats();
     
-    // Logic for MMR calculation and update (Re-implemented for security)
     const winners = []; const losers = [];
     for(const p of winningPlayers) {
         const s = getStoredPlayerStats(statsData, p);
@@ -423,6 +422,23 @@ async function handleVictoryCommand(message, args) {
     await postMatchHistoryLog(message.guild, { winningTeam, modeLabel: match.mode, formatLabel: match.format, winners, losers, finishedAt: new Date().toISOString() });
   } finally {
     if (message.deletable) await message.delete().catch(() => null);
+  }
+}
+
+async function handleSeasonHistoryCommand(message, args = []) {
+  const history = loadSeasonHistory();
+  if (args.length === 0) {
+    const embed = new EmbedBuilder()
+      .setColor(THEME.INFO)
+      .setTitle('📚 Histórico de Temporadas')
+      .setDescription(history.seasons.length > 0 ? history.seasons.map(s => `• Periodo #${s.seasonNumber} | ${s.label}`).join('\n') : 'Nenhuma temporada arquivada ainda.')
+      .setFooter({ text: `${FOOTER_PREFIX} • Historico` })
+      .setTimestamp();
+    await sendToMessageChannel(message, { embeds: [embed] });
+  } else {
+    const seasonNumber = parseInt(args[0]);
+    const embed = buildSeasonHistoryEmbed(history, seasonNumber);
+    await sendToMessageChannel(message, { embeds: [embed] });
   }
 }
 
