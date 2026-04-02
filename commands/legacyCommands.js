@@ -478,6 +478,11 @@ async function handleVictoryCommand(message, args) {
     for(const p of [...winners, ...losers]) await syncMemberRankRole(message.guild, p.discordId, p.afterRank);
     const mvp = winners.reduce((a, b) => a.winStreak > b.winStreak ? a : b, winners[0]);
     if(mvp) { await syncMvpRole(message.guild, mvp.discordId); await postMvpAnnouncement(message.guild, mvp); }
+    
+    // Mover jogadores de volta para o lobby principal antes de apagar as salas
+    const baseLobbyChannelId = getBaseQueueChannelIdByMode(match.mode);
+    await movePlayersToVoiceChannel(message.guild, [...winners, ...losers], baseLobbyChannelId);
+
     await deleteManagedChannelsForLobby(message.guild, match.mode, match.format, match.letter, [
         match.teamOneChannelId, match.teamTwoChannelId, match.waitingChannelId
     ]);

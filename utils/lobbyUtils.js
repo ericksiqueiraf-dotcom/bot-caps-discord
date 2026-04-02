@@ -457,37 +457,42 @@ function normalizePlayerModes(player) {
   const legacyBaseMmr = Number(player.baseMmr || 0);
   const legacyWins = Number(player.customWins || 0);
   const legacyLosses = Number(player.customLosses || 0);
-  const modes = player.modes || {};
+  const rawModes = player.modes || {};
+  const normalized = {};
 
-  return {
-    classic: {
-      ...createEmptyModeStats(legacyBaseMmr),
-      ...(modes.classic || {}),
-      customWins: Number(modes.classic?.customWins ?? legacyWins),
-      customLosses: Number(modes.classic?.customLosses ?? legacyLosses),
-      baseMmr: Number(modes.classic?.baseMmr ?? legacyBaseMmr),
-      internalRating: Number(modes.classic?.internalRating ?? calculateSeedRating(legacyBaseMmr)),
-      winStreak: Number(modes.classic?.winStreak ?? 0)
-    },
-    aram: {
-      ...createEmptyModeStats(legacyBaseMmr),
-      ...(modes.aram || {}),
-      customWins: Number(modes.aram?.customWins ?? 0),
-      customLosses: Number(modes.aram?.customLosses ?? 0),
-      baseMmr: Number(modes.aram?.baseMmr ?? legacyBaseMmr),
-      internalRating: Number(modes.aram?.internalRating ?? calculateSeedRating(legacyBaseMmr)),
-      winStreak: Number(modes.aram?.winStreak ?? 0)
-    },
-    aram1x1: {
-      ...createEmptyModeStats(legacyBaseMmr),
-      ...(modes.aram1x1 || {}),
-      customWins: Number(modes.aram1x1?.customWins ?? 0),
-      customLosses: Number(modes.aram1x1?.customLosses ?? 0),
-      baseMmr: Number(modes.aram1x1?.baseMmr ?? legacyBaseMmr),
-      internalRating: Number(modes.aram1x1?.internalRating ?? calculateSeedRating(legacyBaseMmr)),
-      winStreak: Number(modes.aram1x1?.winStreak ?? 0)
+  // Lista de modos sugeridos para garantir que sempre existam no objeto
+  const coreModes = ['classic', 'aram', 'aram1x1'];
+  const allKeys = new Set([...coreModes, ...Object.keys(rawModes)]);
+
+  for (const key of allKeys) {
+    const m = rawModes[key] || {};
+    
+    // Tratamento especial para o 'classic' que pode herdar campos do topo do objeto (legado)
+    if (key === 'classic') {
+       normalized[key] = {
+         ...createEmptyModeStats(legacyBaseMmr),
+         ...m,
+         customWins: Number(m.customWins ?? legacyWins),
+         customLosses: Number(m.customLosses ?? legacyLosses),
+         baseMmr: Number(m.baseMmr ?? legacyBaseMmr),
+         internalRating: Number(m.internalRating ?? calculateSeedRating(legacyBaseMmr)),
+         winStreak: Number(m.winStreak ?? 0)
+       };
+    } else {
+       // Outros modos usam seus próprios dados ou valores padrão do jogador
+       normalized[key] = {
+         ...createEmptyModeStats(legacyBaseMmr),
+         ...m,
+         customWins: Number(m.customWins ?? 0),
+         customLosses: Number(m.customLosses ?? 0),
+         baseMmr: Number(m.baseMmr ?? legacyBaseMmr),
+         internalRating: Number(m.internalRating ?? calculateSeedRating(legacyBaseMmr)),
+         winStreak: Number(m.winStreak ?? 0)
+       };
     }
-  };
+  }
+
+  return normalized;
 }
 
 function getModeStats(player, mode, format = null) {
@@ -584,20 +589,28 @@ function getStoredPlayerStats(statsData, player) {
 function upsertPlayerStats(statsData, player, updates = {}) {
   const key = getPlayerStatsKey(player);
   const previous = getStoredPlayerStats(statsData, player);
-
-  statsData.players[key] = {
+  
+  const merged = {
     ...previous,
     discordId: player.discordId,
     nickname: player.nickname,
     puuid: player.puuid || previous.puuid || null,
-    customWins: Number(previous.customWins || 0),
-    customLosses: Number(previous.customLosses || 0),
-    baseMmr: Number(previous.baseMmr || 0),
-    internalRating: Number(previous.internalRating || calculateSeedRating(previous.baseMmr || 0)),
-    modes: normalizePlayerModes(previous),
     ...updates
   };
 
+  // Garante que o objeto 'modes' esteja sempre normalizado e dinâmico
+  merged.modes = normalizePlayerModes(merged);
+
+  // Sincroniza campos legados (topo do objeto) com o modo 'classic'
+  if (merged.modes.classic) {
+    const c = merged.modes.classic;
+    merged.customWins = Number(c.customWins || 0);
+    merged.customLosses = Number(c.customLosses || 0);
+    merged.baseMmr = Number(c.baseMmr || 0);
+    merged.internalRating = Number(c.internalRating || calculateSeedRating(c.baseMmr || 0));
+  }
+
+  statsData.players[key] = merged;
   return statsData.players[key];
 }
 
@@ -1057,43 +1070,48 @@ function archiveCurrentSeason(statsData, seasonMeta) {
 }
 
 function buildPlayerCardEmbed(playerStats, targetUser) {
-  const classicStats = getModeStats(playerStats, QUEUE_MODES.CLASSIC);
-  const aramStats = getModeStats(playerStats, QUEUE_MODES.ARAM);
-  const aram1x1Stats = getModeStats(playerStats, QUEUE_MODES.ARAM, '1x1');
-  const classicGames = Number(classicStats.customWins || 0) + Number(classicStats.customLosses || 0);
-  const aramGames = Number(aramStats.customWins || 0) + Number(aramStats.customLosses || 0);
-  const aram1x1Games = Number(aram1x1Stats.customWins || 0) + Number(aram1x1Stats.customLosses || 0);
-  const classicWinRate = classicGames > 0 ? ((Number(classicStats.customWins || 0) / classicGames) * 100).toFixed(1) : '0.0';
-  const aramWinRate = aramGames > 0 ? ((Number(aramStats.customWins || 0) / aramGames) * 100).toFixed(1) : '0.0';
-  const aram1x1WinRate = aram1x1Games > 0 ? ((Number(aram1x1Stats.customWins || 0) / aram1x1Games) * 100).toFixed(1) : '0.0';
+  const modes = normalizePlayerModes(playerStats);
+  const classicStats = modes.classic;
   const classicMmr = calculateHybridMmr(
     classicStats.baseMmr,
     classicStats.customWins,
     classicStats.customLosses,
     classicStats.internalRating
   );
-  const aramMmr = calculateHybridMmr(aramStats.baseMmr, aramStats.customWins, aramStats.customLosses, aramStats.internalRating);
-  const aram1x1Mmr = calculateHybridMmr(
-    aram1x1Stats.baseMmr,
-    aram1x1Stats.customWins,
-    aram1x1Stats.customLosses,
-    aram1x1Stats.internalRating
-  );
 
-  return new EmbedBuilder()
+  const embed = new EmbedBuilder()
     .setColor(THEME.INFO)
     .setTitle('👤 Ficha do Jogador')
     .setDescription(targetUser ? `${targetUser}` : `\`${playerStats.nickname}\``)
     .addFields(
       { name: 'Nick', value: `\`${playerStats.nickname || 'Nao identificado'}\``, inline: true },
       { name: 'Rank Principal', value: `**${getRankName(classicMmr)}** (${classicMmr} pts)`, inline: true },
-      { name: '\u200B', value: '\u200B', inline: true },
-      { name: '📊 CLASSIC', value: `\`${classicStats.customWins}V / ${classicStats.customLosses}D\`\nWR: \`${classicWinRate}%\`\nStreak: \`${classicStats.winStreak || 0}\``, inline: true },
-      { name: '📊 ARAM', value: `\`${aramStats.customWins}V / ${aramStats.customLosses}D\`\nWR: \`${aramWinRate}%\`\nStreak: \`${aramStats.winStreak || 0}\``, inline: true },
-      { name: '📊 ARAM 1x1', value: `\`${aram1x1Stats.customWins}V / ${aram1x1Stats.customLosses}D\`\nWR: \`${aram1x1WinRate}%\`\nStreak: \`${aram1x1Stats.winStreak || 0}\``, inline: true }
-    )
-    .setFooter({ text: `${FOOTER_PREFIX} • Perfil` })
-    .setTimestamp();
+      { name: '\u200B', value: '\u200B', inline: true }
+    );
+
+  // Adicionar campos para cada modo que tenha pelo menos 1 partida jogada
+  for (const [key, stats] of Object.entries(modes)) {
+    const totalGames = Number(stats.customWins || 0) + Number(stats.customLosses || 0);
+    if (totalGames === 0 && key !== 'classic') continue;
+
+    const winRate = totalGames > 0 ? ((Number(stats.customWins || 0) / totalGames) * 100).toFixed(1) : '0.0';
+    
+    // Gerar um label amigável baseado na chave (ex: aram5x5 -> ARAM 5x5)
+    let label = key.toUpperCase();
+    if (key.startsWith('aram') && key.length > 4) {
+       const format = key.slice(4);
+       label = `ARAM ${format.slice(0, 1)}x${format.slice(1)}`;
+    }
+
+    embed.addFields({
+      name: `📊 ${label}`,
+      value: `\`${stats.customWins}V / ${stats.customLosses}D\`\nWR: \`${winRate}%\`\nStreak: \`${stats.winStreak || 0}\``,
+      inline: true
+    });
+  }
+
+  embed.setFooter({ text: `${FOOTER_PREFIX} • Perfil` }).setTimestamp();
+  return embed;
 }
 
 function getSaoPauloDateParts(date = new Date()) {
