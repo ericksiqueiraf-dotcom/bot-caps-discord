@@ -351,6 +351,7 @@ async function processCommand(message, rawContent) {
         break;
       case 'onboarding':
       case 'inicio':
+      case 'setup':
         await handlers.handleOnboardingCommand(message);
         break;
       case 'limpar':

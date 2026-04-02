@@ -219,14 +219,15 @@ async function handlePlayerCardCommand(message, targetUser = null) {
 async function handleHelpCommand(message) {
   const embed = new EmbedBuilder()
     .setColor(THEME.INFO)
-    .setTitle('📚 Guia de Comandos')
-    .setDescription('Lista de comandos principais para membros e staff.')
+    .setTitle('📚 Guia Completo de Comandos')
+    .setDescription('Aqui estao os comandos para gerenciar a Arena Caps.')
     .addFields(
-      { name: '🕹️ Jogador', value: '`!entrar [nick]`, `!sair`, `!perfil`, `!top10`' },
-      { name: '🛠️ Staff', value: '`!remover @u`, `!limpar [qnt]`, `!sync`, `!onboarding`' },
-      { name: '⚙️ Partida', value: '`!start [lobby]`, `!vitoria [1|2]`, `!cancelarstart`' }
+      { name: '🕹️ Jogador', value: '`!entrar [nick]`, `!sair`, `!perfil`, `!lista`, `!top10`' },
+      { name: '🛠️ Staff Gerais', value: '`!remover @u`, `!limpar [qnt]`, `!sync`, `!onboarding`, `!setup`' },
+      { name: '⚙️ Gerenciar Partida', value: '`!start [lobby]`, `!vitoria [1|2]`, `!cancelar`' },
+      { name: '📊 Temporada', value: '`!temporadas`, `!resetgeral` (Admin)' }
     )
-    .setFooter({ text: `${FOOTER_PREFIX} • Ajuda` })
+    .setFooter({ text: `${FOOTER_PREFIX} • Ajuda Atualizada` })
     .setTimestamp();
   await sendToMessageChannel(message, { embeds: [embed] });
 }
