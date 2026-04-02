@@ -113,11 +113,10 @@ function formatQueueMode(mode) {
 }
 
 function getStatsBucketKey(mode, format = null) {
-  if (mode === QUEUE_MODES.ARAM) {
-    return format === '1x1' ? 'aram1x1' : 'aram';
+  if (mode === QUEUE_MODES.ARAM && format) {
+    return `aram${format.toLowerCase()}`;
   }
-
-  return 'classic';
+  return mode;
 }
 
 function getStatsBucketLabel(mode, format = null) {
