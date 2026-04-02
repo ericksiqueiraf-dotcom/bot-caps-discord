@@ -462,8 +462,13 @@ client.on('interactionCreate', async (interaction) => {
         const selectedFormat = interaction.options.getString('formato');
         const nickname = interaction.options.getString('nick');
         
-        const args = [selectedMode];
-        if (selectedFormat) args.push(selectedFormat);
+        const args = [];
+        // Se for ARAM, incluímos o modo e o formato para que a lógica saiba interpretar
+        if (selectedMode === QUEUE_MODES.ARAM) {
+          args.push(QUEUE_MODES.ARAM);
+          if (selectedFormat) args.push(selectedFormat);
+        }
+        // O último argumento é sempre o nick (ou o nick completo se for classic)
         args.push(nickname);
 
         await handlers.handleEnterCommand(context, args);
