@@ -10,7 +10,8 @@
     "matchHistoryChannelId": "1489248090526449684",
     "mvpAnnouncementsChannelId": "1489238507313696838",
     "queueStatusChannelId": "1489237001013297182",
-    "matchOngoingChannelId": "1489236955479937114"
+    "matchOngoingChannelId": "1489236955479937114",
+    "welcomeChannelId": "1489303816557035700"
   },
   "automation": {
     "dailyRankUpdatesHour": 8,

@@ -50,7 +50,8 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.GuildVoiceStates,
-    GatewayIntentBits.MessageContent
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMembers
   ]
 });
 
@@ -552,6 +553,29 @@ client.on('interactionCreate', async (interaction) => {
     // Se já foi adiado ou respondido, atualizamos a resposta original para tirar o "pensando"
     await interaction.editReply({ content: errorMessage }).catch(() => interaction.followUp({ content: errorMessage })).catch(() => null);
   }
+});
+
+client.on('guildMemberAdd', async (member) => {
+  const channelId = config.textChannels?.welcomeChannelId;
+  if (!channelId) return;
+
+  const channel = await member.guild.channels.fetch(channelId).catch(() => null);
+  if (!channel || !channel.isTextBased()) return;
+
+  const welcomeEmbed = new EmbedBuilder()
+    .setTitle(`🏠 Bem-vindo à Arena Caps, ${member.user.username}!`)
+    .setDescription(`Prepare-se para subir de elo nas nossas partidas personalizadas balanceadas! Aqui está o seu guia rápido para começar.`)
+    .addFields(
+      { name: '📜 Regras', value: 'Primeiro de tudo, leia as nossas regras no canal <#📜┃regras> (ou equivalente) para evitar punições.', inline: false },
+      { name: '🎮 Como Jogar', value: '1. Entre em um canal de voz de **Lobby**.\n2. Use o comando `!entrar SeuNick#TAG`.\n3. Aguarde o preenchimento da fila.', inline: false },
+      { name: '🕹️ Comandos Úteis', value: '`!perfil` • Veja seu MMR e elo\n`!ajuda` • Lista completa de comandos', inline: false }
+    )
+    .setColor(THEME ? THEME.PRIMARY : '#0099ff')
+    .setThumbnail(member.user.displayAvatarURL())
+    .setFooter({ text: `${FOOTER_PREFIX || 'Caps Bot'} • Arena de Personalizadas` })
+    .setTimestamp();
+
+  await channel.send({ content: `Seja bem-vindo, ${member}!`, embeds: [welcomeEmbed] }).catch((err) => console.error('[BOAS-VINDAS] Erro ao enviar mensagem:', err));
 });
 
 client.login(DISCORD_TOKEN);
