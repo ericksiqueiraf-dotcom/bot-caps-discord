@@ -247,7 +247,7 @@ async function handleSeasonHistoryCommand(message, args) {
 }
 
 async function handlePlayerCardCommand(message, targetUser = null) {
-  const selectedUser = targetUser || message.mentions.users.first();
+  const selectedUser = targetUser || message.mentions.users.first() || message.author;
 
   if (!selectedUser) {
     await replyToMessage(message, 'Use `!ficha @usuario` para ver a ficha de um jogador.');
@@ -283,8 +283,9 @@ async function handleHelpCommand(message) {
       { name: '!placar aram 1x1', value: 'Mostra o ranking interno das partidas ARAM 1x1.', inline: false },
       { name: '!top10', value: 'Mostra o top 10 atual do CLASSIC.', inline: false },
       { name: '!top10 aram', value: 'Mostra o top 10 atual do ARAM em equipe.', inline: false },
+      { name: '!perfil (ou !p)', value: 'Mostra o seu perfil completo com Rank e Win Streak.', inline: false },
+      { name: '!ficha @usuario', value: 'Mostra o perfil de outro jogador do servidor.', inline: false },
       { name: '!top10 aram 1x1', value: 'Mostra o top 10 atual da temporada em ARAM 1x1.', inline: false },
-      { name: '!ficha @usuario', value: 'Mostra o historico individual de um jogador.', inline: false },
       { name: '!temporadas', value: 'Lista fases de testes e temporadas arquivadas.', inline: false },
       { name: '!temporada <numero>', value: 'Mostra o resumo de uma temporada/fase arquivada.', inline: false },
       { name: '!desfazerresettemporada', value: 'Restaura o ultimo periodo arquivado que tenha dados validos.', inline: false },

@@ -180,6 +180,10 @@ function buildSlashCommands() {
       .setDescription('Mostra a ficha de um jogador.')
       .addUserOption((option) => option.setName('usuario').setDescription('Usuario desejado').setRequired(true)),
     new SlashCommandBuilder()
+      .setName('perfil')
+      .setDescription('Mostra o seu perfil de jogador.')
+      .addUserOption((option) => option.setName('usuario').setDescription('Usuario desejado (opcional)').setRequired(false)),
+    new SlashCommandBuilder()
       .setName('remover')
       .setDescription('Remove um usuario da fila.')
       .addUserOption((option) => option.setName('usuario').setDescription('Usuario a remover').setRequired(true)),
@@ -335,6 +339,8 @@ async function processCommand(message, rawContent) {
         await handlers.handleTopTenCommand(message, args);
         break;
       case 'ficha':
+      case 'perfil':
+      case 'p':
         await handlers.handlePlayerCardCommand(message);
         break;
       case 'temporadas':
@@ -467,6 +473,7 @@ client.on('interactionCreate', async (interaction) => {
       case 'top10':
         await handlers.handleTopTenCommand(context, [mode, format].filter(Boolean));
         break;
+      case 'perfil':
       case 'ficha':
         await handlers.handlePlayerCardCommand(context, targetUser);
         break;
