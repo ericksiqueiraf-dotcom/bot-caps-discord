@@ -1,36 +1,58 @@
 const { ChannelType, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
-const utils = require('../utils/lobbyUtils');
-const db = require('../services/dataService');
-const balance = require('../services/balanceService');
 const config = require('../config.json');
 
-const QUEUE_MODES = db.QUEUE_MODES;
+const { 
+  replyToMessage, sendToMessageChannel, getFormatFromArgs, 
+  getNicknameArgs, isMemberInQueueVoiceChannel, getQueueChannel, 
+  findLobbyByPlayer, getStoredPlayerStats, getModeStats, 
+  getOpenLobby, findReusableWaitingLobby, formatRank, 
+  formatQueueMode, updateQueueDashboard, movePlayersToVoiceChannel, 
+  deleteVoiceChannelIfExists, numberToLobbyLetter, getNextLobbyLetter, 
+  deleteManagedChannelsForLobby, isManagedDynamicChannel, 
+  syncMemberRankRole, buildQueueEmbed, buildTeamsEmbed, 
+  getStatsBucketKey, getAramFormatLabel, getAramWeightByTeamSize, 
+  getRequiredPlayersLabel, isValidQueueSize, getRequiredPlayersByModeAndFormat, 
+  getBaseQueueChannelIdByMode, findLobbyByChannelId, getActiveMatchEntry, 
+  findActiveMatchBySelector, getSaoPauloDateParts, getSeasonDisplayLabel, 
+  formatDateTimeForHistory, getArchivedSeasonLabel, splitEmbedFieldChunks,
+  THEME, FOOTER_PREFIX, createLobbyChannels, createTeamChannelsForLobby, 
+  findLobbyBySelector, buildLeaderboardEmbed, buildTopTenEmbed, 
+  getRankedPlayersByMode, archiveCurrentSeason, resetStatsForNewSeason, 
+  buildLobbyFromMatch
+} = require('../utils/lobbyUtils');
 
-// Re-map internal usages of client/riotService
+const { 
+  QUEUE_MODES, loadQueue, saveQueue, loadPlayerStats, 
+  savePlayerStats, loadCurrentMatch, saveCurrentMatch, 
+  loadSeasonMeta, saveSeasonMeta, loadSeasonHistory, 
+  saveSeasonHistory, loadSystemMeta, saveSystemMeta, 
+  withQueueOperationLock 
+} = require('../services/dataService');
+
+const { 
+  calculateSeedRating, calculateHybridMmr, calculateEloDelta, 
+  createBalancedTeams 
+} = require('../services/balanceService');
+
 const getRiotService = () => global.riotService;
 
-// Attach all utility functions to the module scope
-Object.assign(global, utils);
-Object.assign(global, db);
-Object.assign(global, balance);
-
 async function handleEnterCommand(message, args) {
-  const selectedMode = args[0]?.toLowerCase() === QUEUE_MODES.ARAM ? QUEUE_MODES.ARAM : QUEUE_MODES.CLASSIC;
-  const selectedFormat = getFormatFromArgs(selectedMode, args);
-  const nickname = getNicknameArgs(selectedMode, args, selectedFormat).join(' ').trim();
-
-  if (!nickname) {
-    await replyToMessage(message, 'Use `!entrar Nome#TAG` ou `!entrar aram 1x1 Nome#TAG`.');
-    return;
-  }
-
-  if (!isMemberInQueueVoiceChannel(message.member, selectedMode)) {
-    const expectedChannelName = selectedMode === QUEUE_MODES.ARAM ? 'Lista de espera - ARAM' : 'Lista de espera - CLASSIC';
-    await replyToMessage(message, `Voce precisa estar no canal de voz \`${expectedChannelName}\` para entrar nessa fila.`);
-    return;
-  }
-
   try {
+    const selectedMode = args[0]?.toLowerCase() === QUEUE_MODES.ARAM ? QUEUE_MODES.ARAM : QUEUE_MODES.CLASSIC;
+    const selectedFormat = getFormatFromArgs(selectedMode, args);
+    const nickname = getNicknameArgs(selectedMode, args, selectedFormat).join(' ').trim();
+
+    if (!nickname) {
+      await replyToMessage(message, 'Use `!entrar Nome#TAG` ou `!entrar aram 1x1 Nome#TAG`.');
+      return;
+    }
+
+    if (!isMemberInQueueVoiceChannel(message.member, selectedMode)) {
+      const expectedChannelName = selectedMode === QUEUE_MODES.ARAM ? 'Lobby ARAM' : 'Lobby Classic';
+      await replyToMessage(message, `Voce precisa estar no canal de voz \`${expectedChannelName}\` para entrar nessa fila.`).catch(() => null);
+      return;
+    }
+
     const rankProfile = await global.riotService.getPlayerRankProfile(nickname);
     const result = await withQueueOperationLock(`${message.guild.id}:${selectedMode}:${selectedFormat}`, async () => {
       const queueData = loadQueue();
@@ -114,6 +136,7 @@ async function handleEnterCommand(message, args) {
 
     await updateQueueDashboard(message.guild);
   } catch (error) {
+    console.error('[ERRO] !entrar:', error);
     await replyToMessage(message, `Erro ao entrar na fila: ${error.message}`);
   } finally {
     if (message.deletable) await message.delete().catch(() => null);
@@ -271,6 +294,10 @@ async function handleResetCommand(message) {
     saveQueue({ lobbies: {} });
     saveCurrentMatch({ matches: {} });
     await updateQueueDashboard(message.guild);
+    await replyToMessage(message, '⚠️ Reset de fila e partidas concluído. Canais temporários removidos.');
+  } catch (error) {
+    console.error('[ERRO] !reset:', error);
+    await replyToMessage(message, `❌ Erro ao resetar filas: \`${error.message}\`.`);
   } finally {
     if (message.deletable) await message.delete().catch(() => null);
   }
@@ -367,11 +394,15 @@ async function handleStartCommand(message, args = []) {
       delete q.lobbies[lobby.id];
       saveQueue(q);
       saveCurrentMatch(m);
-      return { teams };
+      return { teams, chs, lobby };
     });
 
     await sendMatchStartAnnouncement(message.guild, result.teams);
     await updateQueueDashboard(message.guild);
+    await replyToMessage(message, { embeds: [buildTeamsEmbed(result.teams, result.chs, result.lobby)] });
+  } catch (error) {
+    console.error('[ERRO] !start:', error);
+    await replyToMessage(message, `❌ Erro ao iniciar partida: \`${error.message}\`.`);
   } finally {
     if (message.deletable) await message.delete().catch(() => null);
   }
@@ -420,6 +451,9 @@ async function handleVictoryCommand(message, args) {
     await replyToMessage(message, `Vitoria registrada para a Equipe ${winningTeam}!`);
     await updateQueueDashboard(message.guild);
     await postMatchHistoryLog(message.guild, { winningTeam, modeLabel: match.mode, formatLabel: match.format, winners, losers, finishedAt: new Date().toISOString() });
+  } catch (error) {
+    console.error('[ERRO] !vitoria:', error);
+    await replyToMessage(message, `❌ Erro ao processar resultado: \`${error.message}\`.`);
   } finally {
     if (message.deletable) await message.delete().catch(() => null);
   }
@@ -453,7 +487,21 @@ async function handleSyncAllRolesCommand(message) {
 
 async function handleOnboardingCommand(message) {
   if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) return;
-  const embed = new EmbedBuilder().setColor(THEME.INFO).setTitle('🏠 Bem-vindo ao Caps Bot!').setDescription('Use `!entrar` para jogar.').setTimestamp();
+  
+  const embed = new EmbedBuilder()
+    .setColor(THEME.INFO)
+    .setTitle('🏆 Bem-vindo ao Caps Bot - Arena de Personalizadas!')
+    .setDescription('Prepare-se para subir de elo nas nossas partidas personalizadas balanceadas! Aqui está o seu guia rápido para começar.')
+    .addFields(
+      { name: '📘 Como Jogar', value: '1. Entre em um canal de voz de **Lobby (Classic ou ARAM)**.\n2. Use o comando `!entrar SeuNick#TAG`.\n3. Aguarde o preenchimento da fila.' },
+      { name: '🎮 Canais de Operação', value: `• <#${config.textChannels.queueStatusChannelId}>: Acompanhe o status das filas.\n• <#${config.textChannels.matchOngoingChannelId}>: Veja as partidas em andamento.\n• <#${config.textChannels.mvpAnnouncementsChannelId}>: Destaques e MVPs.` },
+      { name: '🕹️ Comandos Úteis', value: '`!entrar [nick]` • Entra na fila\n`!sair` • Sai da fila\n`!perfil` • Veja seu MMR e elo\n`!top10` • Ranking do servidor' },
+      { name: '⚖️ Regras e Fair Play', value: 'Mantenha o respeito. Atitudes tóxicas resultam em banimento imediato do sistema de elo.' }
+    )
+    .setThumbnail(message.guild.iconURL({ dynamic: true }))
+    .setFooter({ text: `${FOOTER_PREFIX} • Onboarding` })
+    .setTimestamp();
+
   await sendToMessageChannel(message, { embeds: [embed] });
   if (message.deletable) await message.delete().catch(() => null);
 }

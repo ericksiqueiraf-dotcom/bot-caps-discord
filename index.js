@@ -406,8 +406,8 @@ async function processCommand(message, rawContent) {
         break;
     }
   } catch (error) {
-    console.error('Erro inesperado ao processar comando:', error);
-    await replyToMessage(message, 'Ocorreu um erro inesperado ao processar este comando.');
+    console.error(`[ERRO] Comando '${rawContent}':`, error);
+    await replyToMessage(message, `❌ Ocorreu um erro inesperado: \`${error.name}: ${error.message}\`. Por favor, relate ao desenvolvedor.`);
   }
 }
 

@@ -2092,6 +2092,102 @@
           "internalRating": 1000
         }
       }
+    },
+    "Jv_w9vYDqTxbkCq8fOldJSXjAIeBPGT-dXseZ_DWUXGn7WK0vdV7WqD2rSdwd_z1ADvq_aiYxVRtWg": {
+      "discordId": "860875184831332352",
+      "nickname": "BuGãO CAPS#BuGaO",
+      "puuid": "Jv_w9vYDqTxbkCq8fOldJSXjAIeBPGT-dXseZ_DWUXGn7WK0vdV7WqD2rSdwd_z1ADvq_aiYxVRtWg",
+      "customWins": 0,
+      "customLosses": 0,
+      "baseMmr": 1068,
+      "internalRating": 1000,
+      "modes": {
+        "classic": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 1068,
+          "internalRating": 1000,
+          "winStreak": 0
+        },
+        "aram": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 0,
+          "internalRating": 1000,
+          "winStreak": 0
+        },
+        "aram1x1": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 0,
+          "internalRating": 1000,
+          "winStreak": 0
+        }
+      }
+    },
+    "iIGHMgCU2NhMLDjcZ7jLjTczKh23naL0FTX-fSJY77sbZ8-Kb6dO6sw3K3VHt4oLAwA0E5yn-I9ABg": {
+      "discordId": "1175192777458466839",
+      "nickname": "Vuc Vuc#Eol",
+      "puuid": "iIGHMgCU2NhMLDjcZ7jLjTczKh23naL0FTX-fSJY77sbZ8-Kb6dO6sw3K3VHt4oLAwA0E5yn-I9ABg",
+      "customWins": 0,
+      "customLosses": 0,
+      "baseMmr": 1218,
+      "internalRating": 1000,
+      "modes": {
+        "classic": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 1218,
+          "internalRating": 1000,
+          "winStreak": 0
+        },
+        "aram": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 0,
+          "internalRating": 1000,
+          "winStreak": 0
+        },
+        "aram1x1": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 0,
+          "internalRating": 1000,
+          "winStreak": 0
+        }
+      }
+    },
+    "C2sjspVsceAi6C1hczqA0Z6YGW28HlouT1niQDNkTRbC0x0dF-9mJ_LnIpGiu5Eyb9uJnTCKYxArcw": {
+      "discordId": "1338194622912135279",
+      "nickname": "L Ê#666",
+      "puuid": "C2sjspVsceAi6C1hczqA0Z6YGW28HlouT1niQDNkTRbC0x0dF-9mJ_LnIpGiu5Eyb9uJnTCKYxArcw",
+      "customWins": 0,
+      "customLosses": 0,
+      "baseMmr": 1372,
+      "internalRating": 1000,
+      "modes": {
+        "classic": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 1372,
+          "internalRating": 1000,
+          "winStreak": 0
+        },
+        "aram": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 0,
+          "internalRating": 1000,
+          "winStreak": 0
+        },
+        "aram1x1": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 0,
+          "internalRating": 1000,
+          "winStreak": 0
+        }
+      }
     }
   }
 }

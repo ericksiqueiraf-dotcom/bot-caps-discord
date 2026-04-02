@@ -1,6 +1,11 @@
 const { ChannelType, EmbedBuilder } = require('discord.js');
 const db = require('../services/dataService');
-const { QUEUE_MODES, loadSystemMeta, saveSystemMeta } = require('../services/dataService');
+const config = require('../config.json');
+const { 
+  QUEUE_MODES, loadSystemMeta, saveSystemMeta, 
+  loadPlayerStats, savePlayerStats, loadSeasonMeta, 
+  loadSeasonHistory, saveSeasonHistory 
+} = require('../services/dataService');
 const { calculateSeedRating, calculateHybridMmr, calculateEloDelta } = require('../services/balanceService');
 
 const THEME = {
@@ -1118,7 +1123,7 @@ async function postDailyRankUpdates() {
     return;
   }
 
-  const channel = await client.channels.fetch(channelId).catch(() => null);
+  const channel = await global.discordClient.channels.fetch(channelId).catch(() => null);
 
   if (!channel || !channel.isTextBased()) {
     return;
@@ -1372,8 +1377,8 @@ function isManagedDynamicChannel(channel) {
   }
 
   return (
-    channel.name.startsWith('Sala de espera CLASSIC ') ||
-    channel.name.startsWith('Sala de espera ARAM ') ||
+    channel.name.startsWith('Lobby CLASSIC ') ||
+    channel.name.startsWith('Lobby ARAM ') ||
     channel.name.startsWith('CLASSIC 1 ') ||
     channel.name.startsWith('CLASSIC 2 ') ||
     /^ARAM\s[1-5]x[1-5]\s[12]\s[A-Z]+$/i.test(channel.name)
@@ -1381,7 +1386,7 @@ function isManagedDynamicChannel(channel) {
 }
 
 function getExpectedWaitingRoomName(mode, format, letter) {
-  return mode === QUEUE_MODES.ARAM ? `Sala de espera ARAM ${format} ${letter}` : `Sala de espera CLASSIC ${letter}`;
+  return mode === QUEUE_MODES.ARAM ? `Lobby ARAM ${format} ${letter}` : `Lobby CLASSIC ${letter}`;
 }
 
 function getExpectedTeamRoomNames(mode, format, letter) {
@@ -1567,28 +1572,20 @@ function createInteractionContext(interaction, overrides = {}) {
     async reply(payload) {
       const normalizedPayload = normalizeDiscordPayload(payload);
 
-      if (!interaction.deferred && !interaction.replied) {
-        await interaction.deferReply();
+      if (interaction.replied || interaction.deferred) {
+        return interaction.editReply(normalizedPayload).catch(() => interaction.followUp(normalizedPayload)).catch(() => null);
       }
 
-      if (interaction.deferred && !interaction.replied) {
-        return interaction.editReply(normalizedPayload).catch(() => null);
-      }
-
-      return interaction.followUp(normalizedPayload).catch(() => null);
+      return interaction.reply(normalizedPayload).catch(() => null);
     },
     async send(payload) {
       const normalizedPayload = normalizeDiscordPayload(payload);
 
-      if (!interaction.deferred && !interaction.replied) {
-        await interaction.deferReply();
+      if (interaction.replied || interaction.deferred) {
+        return interaction.editReply(normalizedPayload).catch(() => interaction.followUp(normalizedPayload)).catch(() => null);
       }
 
-      if (interaction.deferred && !interaction.replied) {
-        return interaction.editReply(normalizedPayload).catch(() => null);
-      }
-
-      return interaction.followUp(normalizedPayload).catch(() => null);
+      return interaction.reply(normalizedPayload).catch(() => null);
     }
   };
 }
@@ -1673,5 +1670,7 @@ module.exports = {
   createInteractionContext,
   RANK_ROLES_MAP,
   ALL_RANK_ROLE_NAMES,
-  MVP_ROLE_NAME
+  MVP_ROLE_NAME,
+  THEME,
+  FOOTER_PREFIX
 };

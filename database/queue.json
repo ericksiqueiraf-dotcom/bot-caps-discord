@@ -1,3 +1,34 @@
 {
-  "lobbies": {}
+  "lobbies": {
+    "aram-5x5-a": {
+      "id": "aram-5x5-a",
+      "mode": "aram",
+      "format": "5x5",
+      "letter": "A",
+      "waitingChannelId": "1489274418248290304",
+      "parentId": "1489239591729762494",
+      "requiredPlayers": 10,
+      "players": [
+        {
+          "discordId": "860875184831332352",
+          "discordUsername": "ericksiqueiraf",
+          "nickname": "BuGãO CAPS#BuGaO",
+          "tier": "SILVER",
+          "rank": "II",
+          "leaguePoints": 68,
+          "isFallbackUnranked": false,
+          "baseMmr": 1068,
+          "customWins": 0,
+          "customLosses": 0,
+          "mmr": 1023,
+          "puuid": "Jv_w9vYDqTxbkCq8fOldJSXjAIeBPGT-dXseZ_DWUXGn7WK0vdV7WqD2rSdwd_z1ADvq_aiYxVRtWg",
+          "summonerId": null,
+          "mode": "aram",
+          "format": "5x5",
+          "joinedAt": "2026-04-02T14:44:50.908Z"
+        }
+      ],
+      "status": "waiting"
+    }
+  }
 }
