@@ -1507,7 +1507,6 @@ module.exports = {
   splitEmbedFieldChunks,
   buildTeamsEmbed,
   buildLeaderboardEmbed,
-  buildModeLeaderboardEmbed,
   getRankedPlayersByMode,
   buildTopTenEmbed,
   buildSeasonHistoryEmbed,

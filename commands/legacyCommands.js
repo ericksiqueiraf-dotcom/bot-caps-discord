@@ -206,7 +206,7 @@ async function handleLeaderboardCommand(message, args = []) {
   const normalizedContent = message.content.toLowerCase();
   const mode = normalizedArgs.includes(QUEUE_MODES.ARAM) || normalizedContent.includes(' aram') ? QUEUE_MODES.ARAM : QUEUE_MODES.CLASSIC;
   const format = mode === QUEUE_MODES.ARAM && (normalizedArgs.includes('1x1') || normalizedContent.includes('1x1')) ? '1x1' : null;
-  const embed = mode === QUEUE_MODES.ARAM ? buildModeLeaderboardEmbed(statsData, mode, format) : buildLeaderboardEmbed(statsData);
+  const embed = buildLeaderboardEmbed(statsData, mode, format);
   await sendToMessageChannel(message, { embeds: [embed] });
 }
 
