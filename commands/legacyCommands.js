@@ -19,7 +19,7 @@ const {
   findLobbyBySelector, buildLeaderboardEmbed, buildTopTenEmbed, 
   getRankedPlayersByMode, archiveCurrentSeason, resetStatsForNewSeason, 
   buildLobbyFromMatch, upsertPlayerStats, normalizePlayerModes, 
-  movePlayersToTeamChannels, sendMatchStartAnnouncement, syncMvpRole, 
+  movePlayersToTeamChannels, sendMatchStartAnnouncement, syncMvpRole, clearMvpRoles,
   postMvpAnnouncement, postMatchHistoryLog, buildPlayerCardEmbed, 
   buildSeasonHistoryEmbed, formatCustomRecord
 } = require('../utils/lobbyUtils');
@@ -803,8 +803,13 @@ async function handleVictoryCommand(message, args) {
     for(const p of [...winners, ...losers]) await syncMemberRankRole(message.guild, p.discordId, p.afterRank);
 
     for(const p of [...winners, ...losers]) await syncMemberRankRole(message.guild, p.discordId, p.afterRank);
-    const mvp = winners.reduce((a, b) => a.winStreak > b.winStreak ? a : b, winners[0]);
-    if(mvp) { await syncMvpRole(message.guild, mvp.discordId); await postMvpAnnouncement(message.guild, mvp); }
+    const maxStreak = Math.max(...winners.map(p => p.winStreak || 0));
+    const mvps = maxStreak > 0 ? winners.filter(p => (p.winStreak || 0) === maxStreak) : [];
+    await clearMvpRoles(message.guild);
+    for (const mvp of mvps) {
+      await syncMvpRole(message.guild, mvp.discordId);
+      await postMvpAnnouncement(message.guild, mvp);
+    }
     
     // Mover jogadores de volta para o lobby principal antes de apagar as salas
     const baseLobbyChannelId = getBaseQueueChannelIdByMode(match.mode);

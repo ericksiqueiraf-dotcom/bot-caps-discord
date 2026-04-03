@@ -543,15 +543,7 @@ async function syncMvpRole(guild, mvpId) {
     const mvpRole = guild.roles.cache.find(r => r.name === MVP_ROLE_NAME);
     if (!mvpRole) return;
 
-    // Remove from previous holders
-    const previousHolders = mvpRole.members;
-    for (const [id, member] of previousHolders) {
-      if (id !== mvpId) {
-        await member.roles.remove(mvpRole).catch(() => null);
-      }
-    }
-
-    // Add to new MVP
+    // Add to new MVP (não remove dos outros — a remoção é feita no início da próxima partida)
     const newMvp = await guild.members.fetch(mvpId).catch(() => null);
     if (newMvp && !newMvp.roles.cache.has(mvpRole.id)) {
       await newMvp.roles.add(mvpRole).catch(err => 
@@ -560,6 +552,19 @@ async function syncMvpRole(guild, mvpId) {
     }
   } catch (err) {
     console.error(`[ROLES] Erro ao sincronizar cargo MVP:`, err.message);
+  }
+}
+
+async function clearMvpRoles(guild) {
+  if (!guild) return;
+  try {
+    const mvpRole = guild.roles.cache.find(r => r.name === MVP_ROLE_NAME);
+    if (!mvpRole) return;
+    for (const [, member] of mvpRole.members) {
+      await member.roles.remove(mvpRole).catch(() => null);
+    }
+  } catch (err) {
+    console.error(`[ROLES] Erro ao limpar cargos MVP:`, err.message);
   }
 }
 
@@ -1193,7 +1198,6 @@ async function postMvpAnnouncement(guild, mvpData) {
     console.error('[MVP] Erro ao postar anuncio no canal de destaques:', err.message)
   );
 }
-
 async function updateQueueDashboard(guild) {
   const channelId = config.textChannels.queueStatusChannelId;
   const channel = guild.channels.cache.get(channelId);
@@ -1659,6 +1663,7 @@ module.exports = {
   getRankName,
   syncMemberRankRole,
   syncMvpRole,
+  clearMvpRoles,
   THEME,
   FOOTER_PREFIX,
   buildQueueEmbed,
