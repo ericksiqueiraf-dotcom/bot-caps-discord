@@ -207,7 +207,22 @@ function buildSlashCommands() {
     new SlashCommandBuilder()
       .setName('temporada')
       .setDescription('Mostra o resumo de um periodo arquivado.')
-      .addIntegerOption((option) => option.setName('numero').setDescription('Numero da temporada').setRequired(true))
+      .addIntegerOption((option) => option.setName('numero').setDescription('Numero da temporada').setRequired(true)),
+    new SlashCommandBuilder()
+      .setName('cadastrar')
+      .setDescription('Vincula sua conta Riot ao Discord (feito uma unica vez).')
+      .addStringOption((option) => option.setName('nick').setDescription('Seu Nick#TAG da Riot, ex: FakerBR#BR1').setRequired(true)),
+    new SlashCommandBuilder()
+      .setName('nick')
+      .setDescription('Atualiza seu nick da Riot cadastrado.')
+      .addStringOption((option) => option.setName('nick').setDescription('Novo Nick#TAG, ex: FakerBR#BR2').setRequired(true)),
+    new SlashCommandBuilder()
+      .setName('votar')
+      .setDescription('Vota no time vencedor da sua partida ativa.')
+      .addIntegerOption((option) =>
+        option.setName('time').setDescription('Time vencedor').setRequired(true)
+          .addChoices({ name: 'Time 1', value: 1 }, { name: 'Time 2', value: 2 })
+      )
   ].map((command) => command.toJSON());
 }
 
@@ -388,12 +403,35 @@ async function processCommand(message, rawContent) {
       case 'restaurarperiodo':
         await handlers.handleRestoreArchivedPeriodCommand(message, args);
         break;
+      case 'cancelarstart':
+      case 'cancelar': {
+        // Cancela auto-start pendente se existir
+        const { pendingAutoStarts } = handlers;
+        const tempQueueData = loadQueue();
+        const tempLobby = handlers.findLobbyBySelector
+          ? null
+          : null; // seletor resolvido dentro do handler
+        // Cancela qualquer auto-start ativo para todos os lobbies com esse seletor
+        for (const [lobbyId, timeoutId] of pendingAutoStarts.entries()) {
+          if (args.length === 0 || lobbyId.includes(args.join('-').toLowerCase())) {
+            clearTimeout(timeoutId);
+            pendingAutoStarts.delete(lobbyId);
+          }
+        }
+        await handlers.handleCancelStartCommand(message, args);
+        break;
+      }
       case 'start':
         await handlers.handleStartCommand(message, args);
         break;
-      case 'cancelarstart':
-      case 'cancelar':
-        await handlers.handleCancelStartCommand(message, args);
+      case 'cadastrar':
+        await handlers.handleRegisterCommand(message, args);
+        break;
+      case 'nick':
+        await handlers.handleNickUpdateCommand(message, args);
+        break;
+      case 'votar':
+        await handlers.handleVoteCommand(message, args);
         break;
       case 'vitoria':
       case 'resultado':
@@ -537,6 +575,21 @@ client.on('interactionCreate', async (interaction) => {
       case 'temporada':
         await handlers.handleSeasonHistoryCommand(context, [String(seasonNumber)]);
         break;
+      case 'votar': {
+        const voteTeam = interaction.options.getInteger('time');
+        await handlers.handleVoteCommand(context, [String(voteTeam)]);
+        break;
+      }
+      case 'cadastrar': {
+        const cadastrarNick = interaction.options.getString('nick');
+        await handlers.handleRegisterCommand(context, [cadastrarNick]);
+        break;
+      }
+      case 'nick': {
+        const updateNick = interaction.options.getString('nick');
+        await handlers.handleNickUpdateCommand(context, [updateNick]);
+        break;
+      }
       default:
         await interaction.editReply({ content: 'Comando slash nao reconhecido.' }).catch(() => null);
         break;

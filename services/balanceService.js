@@ -6,7 +6,8 @@ function calculateSeedRating(baseMmr = 1000) {
   const numericBase = Number(baseMmr || 1000);
 
   // Comprime o peso do elo da Riot para nao dominar o rank interno.
-  return Math.round(1000 + (numericBase - 1000) * 0.45);
+  // Ajustado de 0.45 para 0.25 para dar mais espaco ao merito das partidas do bot.
+  return Math.round(1000 + (numericBase - 1000) * 0.25);
 }
 
 function getExperienceWeight(totalGames = 0) {
@@ -17,14 +18,14 @@ function getExperienceWeight(totalGames = 0) {
   }
 
   if (games >= 10) {
-    return 0.75;
+    return 0.85; // Aumentado de 0.75
   }
 
   if (games >= 5) {
-    return 0.5;
+    return 0.65; // Aumentado de 0.5
   }
 
-  return 0.25;
+  return 0.40; // Aumentado de 0.25 para valorizar mais o bot desde o inicio
 }
 
 function calculateHybridMmr(baseMmr, customWins = 0, customLosses = 0, internalRating) {

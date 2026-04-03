@@ -35,6 +35,24 @@ const RANK_STEP = {
   I: 300
 };
 
+// Cache em memória: { [puuid]: { data, expiresAt } }
+const rankProfileCache = new Map();
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hora
+
+function getCachedProfile(puuid) {
+  const entry = rankProfileCache.get(puuid);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    rankProfileCache.delete(puuid);
+    return null;
+  }
+  return entry.data;
+}
+
+function setCachedProfile(puuid, data) {
+  rankProfileCache.set(puuid, { data, expiresAt: Date.now() + CACHE_TTL_MS });
+}
+
 function createRiotService(apiKey, region = DEFAULT_REGION) {
   if (!apiKey) {
     throw new Error('RIOT_API_KEY nao foi configurada no arquivo .env.');
@@ -178,13 +196,18 @@ function createRiotService(apiKey, region = DEFAULT_REGION) {
 
   async function getPlayerRankProfile(playerInput) {
     const summoner = await getSummonerByInput(playerInput);
+
+    // Verifica cache primeiro (evita chamada extra à API)
+    const cached = getCachedProfile(summoner.puuid);
+    if (cached) return cached;
+
     const soloQueue = await getSoloQueueRank({
       puuid: summoner.puuid,
       summonerId: summoner.summonerId
     });
     const mmr = convertRankToMmr(soloQueue);
 
-    return {
+    const profile = {
       puuid: summoner.puuid,
       summonerId: summoner.summonerId,
       nickname: summoner.displayName,
@@ -196,11 +219,19 @@ function createRiotService(apiKey, region = DEFAULT_REGION) {
       mmr,
       isFallbackUnranked: Boolean(soloQueue.isFallbackUnranked)
     };
+
+    setCachedProfile(summoner.puuid, profile);
+    return profile;
+  }
+
+  function invalidateCache(puuid) {
+    rankProfileCache.delete(puuid);
   }
 
   return {
     getPlayerRankProfile,
-    convertRankToMmr
+    convertRankToMmr,
+    invalidateCache
   };
 }
 

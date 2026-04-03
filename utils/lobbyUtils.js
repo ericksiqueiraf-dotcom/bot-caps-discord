@@ -809,7 +809,9 @@ function getRankedPlayersByMode(statsData, mode, format = null) {
   try {
     const seasonMeta = db.loadSeasonMeta();
     if (seasonMeta && seasonMeta.phase === 'official') {
-      minGames = 3;
+      minGames = 10;
+    } else {
+      minGames = 5;
     }
   } catch (e) {}
 

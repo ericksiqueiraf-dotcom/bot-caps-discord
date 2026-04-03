@@ -39,16 +39,98 @@ const {
 
 const getRiotService = () => global.riotService;
 
+// Armazena timeouts de auto-start pendentes: { [lobbyId]: timeoutId }
+const pendingAutoStarts = new Map();
+const VOTE_THRESHOLD = 3; // Fase de testes: 3 votos decidem
+
+async function triggerAutoStart(guild, lobbyId) {
+  try {
+    const queueData = loadQueue();
+    const lobby = queueData.lobbies[lobbyId];
+    if (!lobby || lobby.players.length < lobby.requiredPlayers) return;
+
+    // Busca o canal de texto para postar o anúncio
+    const statusChannelId = require('../config.json').textChannels?.matchOngoingChannelId;
+    const statusChannel = statusChannelId ? await guild.channels.fetch(statusChannelId).catch(() => null) : null;
+
+    if (statusChannel?.isTextBased()) {
+      const mentions = lobby.players.map(p => `<@${p.discordId}>`).join(' ');
+      await statusChannel.send(
+        `${mentions}\n⚡ Fila **${lobby.letter} (${lobby.mode.toUpperCase()})** completa! Iniciando em **5 segundos**...\n` +
+        `_(Staff: use \`!cancelarstart ${lobby.mode} ${lobby.letter}\` para cancelar)_`
+      ).catch(() => null);
+    }
+
+    const timeoutId = setTimeout(async () => {
+      pendingAutoStarts.delete(lobbyId);
+      const freshQueue = loadQueue();
+      const freshLobby = freshQueue.lobbies[lobbyId];
+      if (!freshLobby || freshLobby.players.length < freshLobby.requiredPlayers) return;
+
+      // Simula contexto mínimo para handleStartCommand
+      const fakeContext = {
+        guild,
+        member: { voice: { channel: null }, permissions: { has: () => true } },
+        channel: statusChannel,
+        author: { id: 'autostart', tag: 'AutoStart' },
+        deletable: false,
+        delete: async () => {},
+        _lobbyIdOverride: lobbyId
+      };
+      await handleStartCommandInternal(guild, freshLobby, statusChannel);
+    }, 5000);
+
+    pendingAutoStarts.set(lobbyId, timeoutId);
+  } catch (err) {
+    console.error('[AUTO-START] Erro:', err);
+  }
+}
+
+async function handleStartCommandInternal(guild, lobby, replyChannel) {
+  try {
+    const result = await withQueueOperationLock(`${guild.id}:start:${lobby.id}`, async () => {
+      const q = loadQueue();
+      const m = loadCurrentMatch();
+      if (!q.lobbies[lobby.id]) return null; // já foi iniciado ou cancelado
+      const teams = createBalancedTeams(lobby.players);
+      const chs = await createTeamChannelsForLobby(guild, lobby);
+      teams.mode = lobby.mode;
+      teams.format = lobby.format;
+      await movePlayersToTeamChannels(guild, teams, chs);
+      m.matches[lobby.id] = {
+        active: true,
+        votes: {},
+        match: {
+          ...lobby,
+          teamOne: teams.teamOne,
+          teamTwo: teams.teamTwo,
+          teamOneChannelId: chs.teamOneChannelId,
+          teamTwoChannelId: chs.teamTwoChannelId,
+          teamSize: teams.teamOne.length,
+          createdAt: new Date().toISOString()
+        }
+      };
+      delete q.lobbies[lobby.id];
+      saveQueue(q);
+      saveCurrentMatch(m);
+      return { teams, chs, lobby };
+    });
+    if (!result) return;
+    await sendMatchStartAnnouncement(guild, result.teams);
+    await updateQueueDashboard(guild);
+    if (replyChannel?.isTextBased()) {
+      await replyChannel.send({ embeds: [buildTeamsEmbed(result.teams)] }).catch(() => null);
+    }
+  } catch (err) {
+    console.error('[AUTO-START INTERNAL] Erro:', err);
+  }
+}
+
 async function handleEnterCommand(message, args) {
   try {
     const selectedMode = args[0]?.toLowerCase() === QUEUE_MODES.ARAM ? QUEUE_MODES.ARAM : QUEUE_MODES.CLASSIC;
     const selectedFormat = getFormatFromArgs(selectedMode, args);
-    const nickname = getNicknameArgs(selectedMode, args, selectedFormat).join(' ').trim();
-
-    if (!nickname) {
-      await replyToMessage(message, 'Use `!entrar Nome#TAG` ou `!entrar aram 1x1 Nome#TAG`.');
-      return;
-    }
+    const providedNick = getNicknameArgs(selectedMode, args, selectedFormat).join(' ').trim();
 
     if (!isMemberInQueueVoiceChannel(message.member, selectedMode)) {
       const expectedChannelName = selectedMode === QUEUE_MODES.ARAM ? 'Lobby ARAM' : 'Lobby Classic';
@@ -56,18 +138,51 @@ async function handleEnterCommand(message, args) {
       return;
     }
 
-    const rankProfile = await global.riotService.getPlayerRankProfile(nickname);
+    // --- Resolução do nick: banco ou argumento ---
+    const playerStats = loadPlayerStats();
+    const storedEntry = Object.values(playerStats.players || {}).find(p => p.discordId === message.author.id);
+    const registeredNick = storedEntry?.registeredNickname || null;
+
+    let rankProfile;
+    let usedApiCall = false;
+
+    if (providedNick) {
+      // Nick explícito → chama API e atualiza cadastro
+      rankProfile = await global.riotService.getPlayerRankProfile(providedNick);
+      usedApiCall = true;
+    } else if (registeredNick) {
+      // Sem nick, mas tem cadastro → usa dados salvos (sem API)
+      const storedModeStats = getModeStats(storedEntry, selectedMode, selectedFormat);
+      rankProfile = {
+        puuid: storedEntry.puuid,
+        summonerId: storedEntry.summonerId || null,
+        nickname: registeredNick,
+        tier: storedEntry.tier || 'GOLD',
+        rank: storedEntry.rank || 'IV',
+        leaguePoints: storedEntry.leaguePoints || 0,
+        mmr: storedEntry.baseMmr || storedModeStats.baseMmr || 1200,
+        isFallbackUnranked: Boolean(storedEntry.isFallbackUnranked)
+      };
+    } else {
+      // Sem nick e sem cadastro → orienta o usuário
+      await replyToMessage(message,
+        '❌ Voce ainda nao tem cadastro!\n' +
+        'Use `!cadastrar SeuNick#TAG` uma vez para vincular sua conta — depois e so dar `!entrar` 😊'
+      );
+      return;
+    }
+
     const result = await withQueueOperationLock(`${message.guild.id}:${selectedMode}:${selectedFormat}`, async () => {
       const queueData = loadQueue();
-      const playerStats = loadPlayerStats();
+      const freshStats = loadPlayerStats();
       const alreadyInQueue = findLobbyByPlayer(queueData, message.author.id);
 
       if (alreadyInQueue) return { alreadyInQueue };
 
-      const storedStats = getStoredPlayerStats(playerStats, { discordId: message.author.id, nickname: rankProfile.nickname, puuid: rankProfile.puuid });
+      const storedStats = getStoredPlayerStats(freshStats, { discordId: message.author.id, nickname: rankProfile.nickname, puuid: rankProfile.puuid });
       const storedModeStats = getModeStats(storedStats, selectedMode, selectedFormat);
       const hybridMmr = calculateHybridMmr(rankProfile.mmr, storedModeStats.customWins, storedModeStats.customLosses, storedModeStats.internalRating);
-      
+
       const duplicateNickname = Object.values(queueData.lobbies || {}).some(l => l.players.some(p => p.nickname.toLowerCase() === rankProfile.nickname.toLowerCase()));
       if (duplicateNickname) return { duplicateNickname: true };
 
@@ -109,10 +224,8 @@ async function handleEnterCommand(message, args) {
       });
       queueData.lobbies[lobby.id] = lobby;
 
-      upsertPlayerStats(playerStats, {
-        discordId: message.author.id,
-        nickname: rankProfile.nickname,
-        puuid: rankProfile.puuid,
+      // Atualiza stats E cadastro se veio com nick explícito
+      const updatedFields = {
         modes: {
           ...normalizePlayerModes(storedStats),
           [getStatsBucketKey(selectedMode, selectedFormat)]: {
@@ -121,10 +234,22 @@ async function handleEnterCommand(message, args) {
             internalRating: Number(getModeStats(storedStats, selectedMode, selectedFormat).internalRating || 0) || calculateSeedRating(rankProfile.mmr)
           }
         }
-      });
+      };
+      if (usedApiCall) {
+        updatedFields.registeredNickname = rankProfile.nickname;
+        updatedFields.registeredAt = new Date().toISOString();
+        updatedFields.tier = rankProfile.tier;
+        updatedFields.rank = rankProfile.rank;
+        updatedFields.leaguePoints = rankProfile.leaguePoints;
+        updatedFields.baseMmr = rankProfile.mmr;
+        updatedFields.puuid = rankProfile.puuid;
+        updatedFields.summonerId = rankProfile.summonerId;
+        updatedFields.isFallbackUnranked = Boolean(rankProfile.isFallbackUnranked);
+      }
+      upsertPlayerStats(freshStats, { discordId: message.author.id, nickname: rankProfile.nickname, puuid: rankProfile.puuid }, updatedFields);
 
       saveQueue(queueData);
-      savePlayerStats(playerStats);
+      savePlayerStats(freshStats);
       return { lobby };
     });
 
@@ -138,9 +263,158 @@ async function handleEnterCommand(message, args) {
     }
 
     await updateQueueDashboard(message.guild);
+
+    // --- Auto-start se a fila ficou completa ---
+    if (lobby.players.length >= lobby.requiredPlayers && !pendingAutoStarts.has(lobby.id)) {
+      await triggerAutoStart(message.guild, lobby.id);
+    }
   } catch (error) {
     console.error('[ERRO] !entrar:', error);
     await replyToMessage(message, `Erro ao entrar na fila: ${error.message}`);
+  } finally {
+    if (message.deletable) await message.delete().catch(() => null);
+  }
+}
+
+async function handleRegisterCommand(message, args) {
+  try {
+    const nickname = args.join(' ').trim();
+    if (!nickname) {
+      await replyToMessage(message, '❌ Use `!cadastrar SeuNick#TAG` para vincular sua conta Riot.');
+      return;
+    }
+    await replyToMessage(message, '⏳ Validando sua conta na Riot...');
+    const rankProfile = await global.riotService.getPlayerRankProfile(nickname);
+    const playerStats = loadPlayerStats();
+    const storedStats = getStoredPlayerStats(playerStats, { discordId: message.author.id, nickname: rankProfile.nickname, puuid: rankProfile.puuid });
+    upsertPlayerStats(playerStats, { discordId: message.author.id, nickname: rankProfile.nickname, puuid: rankProfile.puuid }, {
+      registeredNickname: rankProfile.nickname,
+      registeredAt: new Date().toISOString(),
+      tier: rankProfile.tier,
+      rank: rankProfile.rank,
+      leaguePoints: rankProfile.leaguePoints,
+      baseMmr: rankProfile.mmr,
+      puuid: rankProfile.puuid,
+      summonerId: rankProfile.summonerId,
+      isFallbackUnranked: Boolean(rankProfile.isFallbackUnranked),
+      modes: {
+        ...normalizePlayerModes(storedStats),
+        classic: { ...getModeStats(storedStats, QUEUE_MODES.CLASSIC), baseMmr: rankProfile.mmr }
+      }
+    });
+    savePlayerStats(playerStats);
+    const rankStr = rankProfile.isFallbackUnranked ? 'Unranked (base Gold IV)' : `${rankProfile.tier} ${rankProfile.rank} — ${rankProfile.leaguePoints} PDL`;
+    await replyToMessage(message,
+      `✅ Conta vinculada com sucesso!\n` +
+      `🎮 **${rankProfile.nickname}** · ${rankStr}\n` +
+      `Agora e so usar \`!entrar\` para entrar na fila rapidinho! 🚀`
+    );
+  } catch (error) {
+    console.error('[ERRO] !cadastrar:', error);
+    await replyToMessage(message, `❌ Erro ao cadastrar: ${error.message}`);
+  } finally {
+    if (message.deletable) await message.delete().catch(() => null);
+  }
+}
+
+async function handleNickUpdateCommand(message, args) {
+  try {
+    const nickname = args.join(' ').trim();
+    if (!nickname) {
+      await replyToMessage(message, '❌ Use `!nick SeuNovoNick#TAG` para atualizar seu cadastro.');
+      return;
+    }
+    await replyToMessage(message, '⏳ Verificando novo nick na Riot...');
+    if (global.riotService.invalidateCache) {
+      // Busca puuid atual para invalidar cache antigo
+      const playerStats = loadPlayerStats();
+      const storedEntry = Object.values(playerStats.players || {}).find(p => p.discordId === message.author.id);
+      if (storedEntry?.puuid) global.riotService.invalidateCache(storedEntry.puuid);
+    }
+    const rankProfile = await global.riotService.getPlayerRankProfile(nickname);
+    const playerStats = loadPlayerStats();
+    const storedStats = getStoredPlayerStats(playerStats, { discordId: message.author.id, nickname: rankProfile.nickname, puuid: rankProfile.puuid });
+    upsertPlayerStats(playerStats, { discordId: message.author.id, nickname: rankProfile.nickname, puuid: rankProfile.puuid }, {
+      registeredNickname: rankProfile.nickname,
+      registeredAt: new Date().toISOString(),
+      tier: rankProfile.tier,
+      rank: rankProfile.rank,
+      leaguePoints: rankProfile.leaguePoints,
+      baseMmr: rankProfile.mmr,
+      puuid: rankProfile.puuid,
+      summonerId: rankProfile.summonerId,
+      isFallbackUnranked: Boolean(rankProfile.isFallbackUnranked),
+    });
+    savePlayerStats(playerStats);
+    const rankStr = rankProfile.isFallbackUnranked ? 'Unranked (base Gold IV)' : `${rankProfile.tier} ${rankProfile.rank} — ${rankProfile.leaguePoints} PDL`;
+    await replyToMessage(message,
+      `✅ Nick atualizado!\n` +
+      `🎮 **${rankProfile.nickname}** · ${rankStr}`
+    );
+  } catch (error) {
+    console.error('[ERRO] !nick:', error);
+    await replyToMessage(message, `❌ Erro ao atualizar nick: ${error.message}`);
+  } finally {
+    if (message.deletable) await message.delete().catch(() => null);
+  }
+}
+
+async function handleVoteCommand(message, args) {
+  try {
+    const teamVote = args[args.length - 1];
+    if (!['1', '2'].includes(teamVote)) {
+      await replyToMessage(message, '❌ Use `!votar 1` ou `!votar 2` para votar no time vencedor.');
+      return;
+    }
+
+    const currentMatchData = loadCurrentMatch();
+    // Encontra a partida onde o jogador está
+    const matchEntry = Object.entries(currentMatchData.matches || {}).find(([, entry]) => {
+      if (!entry.active || !entry.match) return false;
+      const { teamOne = [], teamTwo = [] } = entry.match;
+      return [...teamOne, ...teamTwo].some(p => p.discordId === message.author.id);
+    });
+
+    if (!matchEntry) {
+      await replyToMessage(message, '❌ Voce nao esta em nenhuma partida ativa.');
+      return;
+    }
+
+    const [matchId, entry] = matchEntry;
+    if (!entry.votes) entry.votes = {};
+
+    if (entry.votes[message.author.id]) {
+      await replyToMessage(message, `⚠️ Voce ja votou no **Time ${entry.votes[message.author.id]}** nesta partida.`);
+      return;
+    }
+
+    entry.votes[message.author.id] = teamVote;
+
+    // Conta votos por time
+    const votesT1 = Object.values(entry.votes).filter(v => v === '1').length;
+    const votesT2 = Object.values(entry.votes).filter(v => v === '2').length;
+    const winnerTeam = votesT1 >= VOTE_THRESHOLD ? '1' : votesT2 >= VOTE_THRESHOLD ? '2' : null;
+
+    saveCurrentMatch(currentMatchData);
+
+    if (winnerTeam) {
+      await replyToMessage(message, `🗳️ **${VOTE_THRESHOLD} votos atingidos!** Registrando vitoria do **Time ${winnerTeam}** automaticamente...`);
+      // Reutiliza o handler de vitória passando os args corretos
+      await handleVictoryCommand(message, [winnerTeam]);
+    } else {
+      const total = votesT1 + votesT2;
+      const bar1 = '🟦'.repeat(votesT1) + '⬜'.repeat(VOTE_THRESHOLD - votesT1);
+      const bar2 = '🟥'.repeat(votesT2) + '⬜'.repeat(VOTE_THRESHOLD - votesT2);
+      await replyToMessage(message,
+        `🗳️ Voto registrado! Placar atual:\n` +
+        `Time 1: ${bar1} (${votesT1}/${VOTE_THRESHOLD})\n` +
+        `Time 2: ${bar2} (${votesT2}/${VOTE_THRESHOLD})\n` +
+        `_Precisa de ${VOTE_THRESHOLD} votos para confirmar. Total: ${total} votos._`
+      );
+    }
+  } catch (error) {
+    console.error('[ERRO] !votar:', error);
+    await replyToMessage(message, `❌ Erro ao votar: ${error.message}`);
   } finally {
     if (message.deletable) await message.delete().catch(() => null);
   }
@@ -222,9 +496,10 @@ async function handleHelpCommand(message) {
     .setTitle('📚 Guia Completo de Comandos')
     .setDescription('Aqui estao os comandos para gerenciar a Arena Caps.')
     .addFields(
-      { name: '🕹️ Jogador', value: '`!entrar [nick]`, `!sair`, `!perfil`, `!lista`, `!top10`' },
-      { name: '🛠️ Staff Gerais', value: '`!remover @u`, `!limpar [qnt]`, `!sync`, `!onboarding`, `!setup`' },
-      { name: '⚙️ Gerenciar Partida', value: '`!start [lobby]`, `!vitoria [1|2]`, `!cancelar`' },
+      { name: '🕹️ Cadastro (1x)', value: '`!cadastrar Nick#TAG` • Vincula sua conta Riot\n`!nick Nick#TAG` • Atualiza seu nick' },
+      { name: '🎮 Jogador', value: '`!entrar` • Fila Classic\n`!entrar aram` • Fila ARAM\n`!entrar aram 2x2` • ARAM formato\n`!sair` • Sai da fila\n`!votar 1/2` • Vota no vencedor\n`!perfil` • Seu MMR e Elo\n`!top10` • Ranking' },
+      { name: '🛠️ Staff', value: '`!remover @u`, `!limpar [qnt]`, `!sync`, `!onboarding`' },
+      { name: '⚙️ Partida (Staff)', value: '`!start [lobby]`, `!vitoria [1|2]`, `!cancelarstart`' },
       { name: '📊 Temporada', value: '`!temporadas`, `!resetgeral` (Admin)' }
     )
     .setFooter({ text: `${FOOTER_PREFIX} • Ajuda Atualizada` })
@@ -434,7 +709,11 @@ async function handleStartCommand(message, args = []) {
       teams.format = lobby.format;
       await movePlayersToTeamChannels(message.guild, teams, chs);
 
-      m.matches[lobby.id] = { active: true, match: { ...lobby, teamOne: teams.teamOne, teamTwo: teams.teamTwo, teamOneChannelId: chs.teamOneChannelId, teamTwoChannelId: chs.teamTwoChannelId, teamSize: teams.teamOne.length, createdAt: new Date().toISOString() } };
+      m.matches[lobby.id] = {
+        active: true,
+        votes: {},
+        match: { ...lobby, teamOne: teams.teamOne, teamTwo: teams.teamTwo, teamOneChannelId: chs.teamOneChannelId, teamTwoChannelId: chs.teamTwoChannelId, teamSize: teams.teamOne.length, createdAt: new Date().toISOString() }
+      };
       delete q.lobbies[lobby.id];
       saveQueue(q);
       saveCurrentMatch(m);
@@ -459,6 +738,11 @@ async function handleVictoryCommand(message, args) {
     }
     const winningTeam = args[args.length - 1];
     if (!['1', '2'].includes(winningTeam)) return await replyToMessage(message, 'Use !vitoria 1 ou 2.');
+    // Staff pode declarar vitória sem checar cargo de jogador
+    const isStaff = message.member.permissions.has(PermissionFlagsBits.MoveMembers);
+    if (!isStaff) {
+      return await replyToMessage(message, '❌ Voce nao tem permissao para declarar vitoria. Use `!votar 1/2` para votar.');
+    }
 
     const currentMatchData = loadCurrentMatch();
     const matchEntry = findActiveMatchBySelector(currentMatchData, args.slice(0, -1)) || getActiveMatchEntry(currentMatchData, message.member.voice?.channelId);
@@ -577,22 +861,67 @@ async function handleOnboardingCommand(message) {
   if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
     return await replyToMessage(message, '❌ Voce nao tem permissao para usar o onboarding.');
   }
-  
-  const embed = new EmbedBuilder()
-    .setColor(THEME.INFO)
-    .setTitle('🏆 Bem-vindo ao Caps Bot - Arena de Personalizadas!')
-    .setDescription('Prepare-se para subir de elo nas nossas partidas personalizadas balanceadas! Aqui está o seu guia rápido para começar.')
+
+  const embedGuia = new EmbedBuilder()
+    .setColor('#5865F2')
+    .setTitle('🎮 Arena Caps — Guia de Início Rápido')
+    .setDescription(
+      '> Bem-vindo à Arena de Personalizadas Balanceadas!\n' +
+      '> Aqui seu desempenho **dentro do servidor** conta mais que seu elo na Riot.\n\n' +
+      '**Siga os passos abaixo e entre em campo! 🏆**'
+    )
     .addFields(
-      { name: '📘 Como Jogar', value: '1. Entre em um canal de voz de **Lobby (Classic ou ARAM)**.\n2. Use o comando `!entrar SeuNick#TAG`.\n3. Aguarde o preenchimento da fila.' },
-      { name: '🎮 Canais de Operação', value: `• <#${config.textChannels.queueStatusChannelId}>: Acompanhe o status das filas.\n• <#${config.textChannels.matchOngoingChannelId}>: Veja as partidas em andamento.\n• <#${config.textChannels.mvpAnnouncementsChannelId}>: Destaques e MVPs.` },
-      { name: '🕹️ Comandos Úteis', value: '`!entrar [nick]` • Entra na fila\n`!sair` • Sai da fila\n`!perfil` • Veja seu MMR e elo\n`!top10` • Ranking do servidor' },
-      { name: '⚖️ Regras e Fair Play', value: 'Mantenha o respeito. Atitudes tóxicas resultam em banimento imediato do sistema de elo.' }
+      {
+        name: '⚡ PASSO 1 — Cadastre sua conta (uma única vez)',
+        value:
+          'Vincule seu Nick da Riot ao seu Discord:\n' +
+          '```\n!cadastrar SeuNick#TAG\n```\n' +
+          '✅ Após isso, você **nunca mais precisará digitar seu nick**.\n' +
+          '> Se trocar de nick na Riot: `!nick NovoNick#TAG`'
+      },
+      {
+        name: '🎯 PASSO 2 — Entre na fila',
+        value:
+          'Entre em um canal de voz de **Lobby** e use:\n' +
+          '```\n!entrar              → Fila Classic 5x5\n!entrar aram         → Fila ARAM 5x5\n!entrar aram 2x2     → Fila ARAM 2x2\n```\n' +
+          '⚡ A partida inicia **automaticamente** quando todos entram!'
+      },
+      {
+        name: '🗳️ PASSO 3 — Vote no vencedor',
+        value:
+          'Ao terminar a partida, vote no time que ganhou:\n' +
+          '```\n!votar 1   → Voto no Time 1\n!votar 2   → Voto no Time 2\n```\n' +
+          '> **3 votos** confirmam o resultado automaticamente.\n' +
+          '> Staff pode registrar com `!vitoria 1` ou `!vitoria 2` a qualquer momento.'
+      },
+      {
+        name: '📊 Canais Importantes',
+        value:
+          `• <#${config.textChannels.queueStatusChannelId}> — Status das filas em tempo real\n` +
+          `• <#${config.textChannels.matchOngoingChannelId}> — Partidas em andamento\n` +
+          `• <#${config.textChannels.mvpAnnouncementsChannelId}> — Destaques e MVPs`
+      },
+      {
+        name: '🕹️ Outros Comandos Úteis',
+        value:
+          '`!perfil` — Seu MMR e histórico\n' +
+          '`!top10` — Ranking do servidor\n' +
+          '`!sair` — Sair da fila\n' +
+          '`!ajuda` — Lista completa de comandos'
+      },
+      {
+        name: '⚖️ Regras e Fair Play',
+        value:
+          'Mantenha o respeito dentro e fora das partidas.\n' +
+          'Atitudes tóxicas resultam em **banimento do sistema de elo**.\n' +
+          '*Bom jogo e que vença o melhor! 🛡️*'
+      }
     )
     .setThumbnail(message.guild.iconURL({ dynamic: true }))
-    .setFooter({ text: `${FOOTER_PREFIX} • Onboarding` })
+    .setFooter({ text: `${FOOTER_PREFIX} • Guia Atualizado` })
     .setTimestamp();
 
-  await sendToMessageChannel(message, { embeds: [embed] });
+  await sendToMessageChannel(message, { embeds: [embedGuia] });
   if (message.deletable) await message.delete().catch(() => null);
 }
 
@@ -609,5 +938,6 @@ module.exports = {
   handleSeasonHistoryCommand, handlePlayerCardCommand, handleHelpCommand, handleLeaveCommand, handleRemoveCommand,
   handleResetCommand, handleCleanupRoomsCommand, handleSeasonResetCommand, handleOfficialSeasonStartCommand,
   handleUndoSeasonResetCommand, handleRestoreArchivedPeriodCommand, handleCancelStartCommand, handleStartCommand,
-  handleSyncAllRolesCommand, handleVictoryCommand, handleOnboardingCommand, handleClearCommand
+  handleSyncAllRolesCommand, handleVictoryCommand, handleOnboardingCommand, handleClearCommand,
+  handleRegisterCommand, handleNickUpdateCommand, handleVoteCommand, pendingAutoStarts
 };
