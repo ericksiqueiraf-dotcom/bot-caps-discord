@@ -538,8 +538,13 @@ client.on('interactionCreate', async (interaction) => {
         await handlers.handleSeasonHistoryCommand(context, [String(seasonNumber)]);
         break;
       default:
-        await interaction.reply({ content: 'Comando slash nao reconhecido.', ephemeral: true }).catch(() => null);
+        await interaction.editReply({ content: 'Comando slash nao reconhecido.' }).catch(() => null);
         break;
+    }
+
+    // Trava de seguranca: se o comando terminou e ainda esta "pensando", encerramos a interacao.
+    if (interaction.deferred && !interaction.replied) {
+      await interaction.editReply({ content: '✅ Comando processado.' }).catch(() => null);
     }
   } catch (error) {
     console.error(`[SLASH] Erro no comando '${interaction.commandName}':`, error);

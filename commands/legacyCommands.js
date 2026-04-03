@@ -267,7 +267,9 @@ async function handleLeaveCommand(message) {
 
 async function handleRemoveCommand(message, targetUserOverride = null) {
   try {
-    if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) return;
+    if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+      return await replyToMessage(message, '❌ Voce nao tem permissao para remover jogadores.');
+    }
     const targetUser = targetUserOverride || message.mentions.users.first();
     if (!targetUser) return await replyToMessage(message, 'Mencione um jogador.');
 
@@ -302,7 +304,9 @@ async function handleRemoveCommand(message, targetUserOverride = null) {
 
 async function handleResetCommand(message) {
   try {
-    if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) return;
+    if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+      return await replyToMessage(message, '❌ Voce nao tem permissao para resetar o sistema.');
+    }
     const queueData = loadQueue();
     const currentMatchData = loadCurrentMatch();
 
@@ -334,7 +338,9 @@ async function handleResetCommand(message) {
 }
 
 async function handleCleanupRoomsCommand(message) {
-  if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) return;
+  if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+    return await replyToMessage(message, '❌ Voce nao tem permissao para limpar salas.');
+  }
   const dynamicChannels = message.guild.channels.cache.filter(c => isManagedDynamicChannel(c));
   for (const channel of dynamicChannels.values()) await deleteVoiceChannelIfExists(message.guild, channel.id);
   saveQueue({ lobbies: {} });
@@ -344,7 +350,9 @@ async function handleCleanupRoomsCommand(message) {
 }
 
 async function handleSeasonResetCommand(message) {
-  if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) return;
+  if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
+    return await replyToMessage(message, '❌ Comando restrito a administradores.');
+  }
   const statsData = loadPlayerStats();
   const seasonMeta = loadSeasonMeta();
   archiveCurrentSeason(statsData, seasonMeta);
@@ -358,7 +366,9 @@ async function handleSeasonResetCommand(message) {
 }
 
 async function handleOfficialSeasonStartCommand(message) {
-  if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) return;
+  if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
+    return await replyToMessage(message, '❌ Comando restrito a administradores.');
+  }
   const seasonMeta = loadSeasonMeta();
   if (seasonMeta.phase === 'official') return await replyToMessage(message, 'Temporada oficial ja ativa.');
   saveSeasonMeta({ ...seasonMeta, phase: 'official', officialSeasonStarted: true, currentSeason: 1 });
@@ -366,7 +376,9 @@ async function handleOfficialSeasonStartCommand(message) {
 }
 
 async function handleUndoSeasonResetCommand(message) {
-  if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) return;
+  if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
+    return await replyToMessage(message, '❌ Comando restrito a administradores.');
+  }
   const history = loadSeasonHistory();
   if (history.seasons.length === 0) return await replyToMessage(message, 'Nao ha nada para restaurar.');
   // Logic to restore last history entry (simplified for safety here)
@@ -379,7 +391,9 @@ async function handleRestoreArchivedPeriodCommand(message, args = []) {
 
 async function handleCancelStartCommand(message, args = []) {
   try {
-    if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) return;
+    if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+      return await replyToMessage(message, '❌ Voce nao tem permissao para cancelar partidas.');
+    }
     const currentMatchData = loadCurrentMatch();
     const matchEntry = findActiveMatchBySelector(currentMatchData, args) || getActiveMatchEntry(currentMatchData, message.member.voice?.channelId);
     if (!matchEntry) return await replyToMessage(message, 'Nenhuma partida ativa encontrada.');
@@ -440,7 +454,9 @@ async function handleStartCommand(message, args = []) {
 
 async function handleVictoryCommand(message, args) {
   try {
-    if (!message.member.permissions.has(PermissionFlagsBits.MoveMembers)) return;
+    if (!message.member.permissions.has(PermissionFlagsBits.MoveMembers)) {
+      return await replyToMessage(message, '❌ Voce nao tem permissao para declarar vitoria.');
+    }
     const winningTeam = args[args.length - 1];
     if (!['1', '2'].includes(winningTeam)) return await replyToMessage(message, 'Use !vitoria 1 ou 2.');
 
@@ -547,7 +563,9 @@ async function handleSeasonHistoryCommand(message, args = []) {
 }
 
 async function handleSyncAllRolesCommand(message) {
-  if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) return;
+  if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
+    return await replyToMessage(message, '❌ Voce nao tem permissao para sincronizar cargos.');
+  }
   const statsData = loadPlayerStats();
   const players = Object.values(statsData.players || {});
   await replyToMessage(message, `Sincronizando ${players.length} jogadores...`);
@@ -556,7 +574,9 @@ async function handleSyncAllRolesCommand(message) {
 }
 
 async function handleOnboardingCommand(message) {
-  if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) return;
+  if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
+    return await replyToMessage(message, '❌ Voce nao tem permissao para usar o onboarding.');
+  }
   
   const embed = new EmbedBuilder()
     .setColor(THEME.INFO)
@@ -577,7 +597,9 @@ async function handleOnboardingCommand(message) {
 }
 
 async function handleClearCommand(message, args) {
-  if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) return;
+  if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+    return await replyToMessage(message, '❌ Voce nao tem permissao para limpar mensagens.');
+  }
   const amount = parseInt(args[0]) || 10;
   await (message.channel || message).bulkDelete(Math.min(amount + 1, 100), true);
 }
