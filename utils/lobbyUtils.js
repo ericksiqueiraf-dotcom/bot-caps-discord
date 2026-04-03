@@ -588,6 +588,15 @@ function getStoredPlayerStats(statsData, player) {
 function upsertPlayerStats(statsData, player, updates = {}) {
   const key = getPlayerStatsKey(player);
   const previous = getStoredPlayerStats(statsData, player);
+
+  // Remove entradas antigas com o mesmo discordId mas chave diferente (nick/puuid mudou)
+  if (player.discordId) {
+    for (const existingKey of Object.keys(statsData.players)) {
+      if (existingKey !== key && statsData.players[existingKey].discordId === player.discordId) {
+        delete statsData.players[existingKey];
+      }
+    }
+  }
   
   const merged = {
     ...previous,

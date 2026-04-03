@@ -140,7 +140,9 @@ async function handleEnterCommand(message, args) {
 
     // --- Resolução do nick: banco ou argumento ---
     const playerStats = loadPlayerStats();
-    const storedEntry = Object.values(playerStats.players || {}).find(p => p.discordId === message.author.id);
+    // Pega a entrada mais recente por registeredAt (evita pegar entradas antigas de nicks anteriores)
+    const allEntries = Object.values(playerStats.players || {}).filter(p => p.discordId === message.author.id);
+    const storedEntry = allEntries.sort((a, b) => new Date(b.registeredAt || 0) - new Date(a.registeredAt || 0))[0] || null;
     const registeredNick = storedEntry?.registeredNickname || null;
 
     let rankProfile;
@@ -286,6 +288,11 @@ async function handleRegisterCommand(message, args) {
     await replyToMessage(message, '⏳ Validando sua conta na Riot...');
     const rankProfile = await global.riotService.getPlayerRankProfile(nickname);
     const playerStats = loadPlayerStats();
+
+    // Busca entrada anterior do mesmo discordId para migrar o histórico de partidas
+    const previousEntries = Object.values(playerStats.players || {}).filter(p => p.discordId === message.author.id);
+    const previousEntry = previousEntries.sort((a, b) => new Date(b.registeredAt || 0) - new Date(a.registeredAt || 0))[0] || null;
+
     const storedStats = getStoredPlayerStats(playerStats, { discordId: message.author.id, nickname: rankProfile.nickname, puuid: rankProfile.puuid });
     upsertPlayerStats(playerStats, { discordId: message.author.id, nickname: rankProfile.nickname, puuid: rankProfile.puuid }, {
       registeredNickname: rankProfile.nickname,
@@ -298,8 +305,8 @@ async function handleRegisterCommand(message, args) {
       summonerId: rankProfile.summonerId,
       isFallbackUnranked: Boolean(rankProfile.isFallbackUnranked),
       modes: {
-        ...normalizePlayerModes(storedStats),
-        classic: { ...getModeStats(storedStats, QUEUE_MODES.CLASSIC), baseMmr: rankProfile.mmr }
+        ...normalizePlayerModes(previousEntry || storedStats),
+        classic: { ...getModeStats(previousEntry || storedStats, QUEUE_MODES.CLASSIC), baseMmr: rankProfile.mmr }
       }
     });
     savePlayerStats(playerStats);

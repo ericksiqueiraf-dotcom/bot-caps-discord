@@ -12,7 +12,7 @@
         "classic": {
           "customWins": 1,
           "customLosses": 0,
-          "baseMmr": 0,
+          "baseMmr": 1068,
           "internalRating": 1031
         },
         "aram": {
@@ -109,9 +109,9 @@
           "internalRating": 1310
         },
         "aram1x1": {
-          "customWins": 1,
-          "customLosses": 2,
-          "baseMmr": 0,
+          "customWins": 6,
+          "customLosses": 5,
+          "baseMmr": 2009,
           "internalRating": 971
         }
       }
@@ -132,14 +132,14 @@
           "internalRating": 1000
         },
         "aram": {
-          "customWins": 2,
-          "customLosses": 3,
+          "customWins": 3,
+          "customLosses": 5,
           "baseMmr": 1600,
           "internalRating": 956
         },
         "aram1x1": {
-          "customWins": 0,
-          "customLosses": 0,
+          "customWins": 5,
+          "customLosses": 6,
           "baseMmr": 0,
           "internalRating": 1000
         }
@@ -223,35 +223,6 @@
           "customLosses": 1,
           "baseMmr": 1025,
           "internalRating": 987
-        },
-        "aram1x1": {
-          "customWins": 0,
-          "customLosses": 0,
-          "baseMmr": 0,
-          "internalRating": 1000
-        }
-      }
-    },
-    "8lQ6V-_gCMq1hVZXQK22D9tqZLHMH8wYYJFkH86WOiN7F3Wl6Qft1XgnvHRGZ-539vM9FwdSe4ea4A": {
-      "discordId": "1243896407392518196",
-      "nickname": "ααtrox Editor#Edit",
-      "puuid": "8lQ6V-_gCMq1hVZXQK22D9tqZLHMH8wYYJFkH86WOiN7F3Wl6Qft1XgnvHRGZ-539vM9FwdSe4ea4A",
-      "customWins": 0,
-      "customLosses": 0,
-      "baseMmr": 0,
-      "internalRating": 1000,
-      "modes": {
-        "classic": {
-          "customWins": 0,
-          "customLosses": 0,
-          "baseMmr": 0,
-          "internalRating": 1000
-        },
-        "aram": {
-          "customWins": 1,
-          "customLosses": 2,
-          "baseMmr": 1687,
-          "internalRating": 1258
         },
         "aram1x1": {
           "customWins": 0,
@@ -522,29 +493,6 @@
         }
       }
     },
-    "S8VgIO4RV0KReEzbirv6vFL4LQ3VYsGn4MDt3ndB21s6i-v2uHHzitjghl5SlAdQxvXXjKSyAKTMJA": {
-      "discordId": "1243896407392518196",
-      "nickname": "Ollinaalanelja#BR1",
-      "puuid": "S8VgIO4RV0KReEzbirv6vFL4LQ3VYsGn4MDt3ndB21s6i-v2uHHzitjghl5SlAdQxvXXjKSyAKTMJA",
-      "customWins": 0,
-      "customLosses": 0,
-      "baseMmr": 0,
-      "internalRating": 1000,
-      "modes": {
-        "classic": {
-          "customWins": 0,
-          "customLosses": 0,
-          "baseMmr": 0,
-          "internalRating": 1000
-        },
-        "aram": {
-          "customWins": 0,
-          "customLosses": 0,
-          "baseMmr": 1200,
-          "internalRating": 1090
-        }
-      }
-    },
     "dIohfG5YsVZKwzv3KsF_b0b37VhJjQH-tCE0Obyy49fB1f5gRvuo3YxM0Gjq7aD9g5UF2bLxZnyxKA": {
       "discordId": "1338194622912135279",
       "nickname": "L Ê#666",
@@ -557,7 +505,7 @@
         "classic": {
           "customWins": 0,
           "customLosses": 0,
-          "baseMmr": 0,
+          "baseMmr": 1372,
           "internalRating": 1000
         },
         "aram": {
@@ -652,29 +600,6 @@
           "customLosses": 0,
           "baseMmr": 674,
           "internalRating": 853
-        }
-      }
-    },
-    "a1zlnGNGUHcxQyrI2xjK5V--EYnd4DnVTHxVraFF22_LTP8YLNu8vhJ381lOM87UTUuRUp-ILpGnwA": {
-      "discordId": "1243896407392518196",
-      "nickname": "TØji Fushiguro#0001",
-      "puuid": "a1zlnGNGUHcxQyrI2xjK5V--EYnd4DnVTHxVraFF22_LTP8YLNu8vhJ381lOM87UTUuRUp-ILpGnwA",
-      "customWins": 0,
-      "customLosses": 0,
-      "baseMmr": 0,
-      "internalRating": 1000,
-      "modes": {
-        "classic": {
-          "customWins": 0,
-          "customLosses": 0,
-          "baseMmr": 0,
-          "internalRating": 1000
-        },
-        "aram": {
-          "customWins": 0,
-          "customLosses": 0,
-          "baseMmr": 2346,
-          "internalRating": 1606
         }
       }
     },
@@ -834,8 +759,8 @@
         },
         "aram": {
           "customWins": 0,
-          "customLosses": 0,
-          "baseMmr": 0,
+          "customLosses": 1,
+          "baseMmr": 1538,
           "internalRating": 1000
         },
         "aram1x1": {
@@ -1078,35 +1003,6 @@
         }
       }
     },
-    "Q8zsLMUlDL4ovI0nrT_TtV65PRGOp4bwbWY62l018E61ZxrV3iuA0O6hto2j61pA3Z_6yuiU608zUQ": {
-      "discordId": "448299835733311491",
-      "nickname": "00TKDK00#Saa2",
-      "puuid": "Q8zsLMUlDL4ovI0nrT_TtV65PRGOp4bwbWY62l018E61ZxrV3iuA0O6hto2j61pA3Z_6yuiU608zUQ",
-      "customWins": 0,
-      "customLosses": 0,
-      "baseMmr": 0,
-      "internalRating": 1000,
-      "modes": {
-        "classic": {
-          "customWins": 0,
-          "customLosses": 0,
-          "baseMmr": 0,
-          "internalRating": 1000
-        },
-        "aram": {
-          "customWins": 0,
-          "customLosses": 1,
-          "baseMmr": 1538,
-          "internalRating": 973
-        },
-        "aram1x1": {
-          "customWins": 0,
-          "customLosses": 0,
-          "baseMmr": 0,
-          "internalRating": 1000
-        }
-      }
-    },
     "KZKVg4ZcJs3aiSNmvKATdiPkjn3p5Kw_-XVae2LTv93pHh_-vgIq3M115F7JayNd5iBRzd6UWcLh1g": {
       "discordId": "1456153626937528416",
       "nickname": "Golden#Age",
@@ -1322,7 +1218,7 @@
         "classic": {
           "customWins": 0,
           "customLosses": 2,
-          "baseMmr": 0,
+          "baseMmr": 1218,
           "internalRating": 954
         },
         "aram": {
@@ -1774,93 +1670,6 @@
         }
       }
     },
-    "H9lgQGcYgM0Yigw3PX1fbny5pTk_DqKFlLpph_6MvTrotCDA3aHiugC5bGMZzcUElK7JNnOPMNLdnA": {
-      "discordId": "1243896407392518196",
-      "nickname": "focus1kaynchall#666",
-      "puuid": "H9lgQGcYgM0Yigw3PX1fbny5pTk_DqKFlLpph_6MvTrotCDA3aHiugC5bGMZzcUElK7JNnOPMNLdnA",
-      "customWins": 0,
-      "customLosses": 0,
-      "baseMmr": 0,
-      "internalRating": 1000,
-      "modes": {
-        "classic": {
-          "customWins": 0,
-          "customLosses": 0,
-          "baseMmr": 0,
-          "internalRating": 1000
-        },
-        "aram": {
-          "customWins": 0,
-          "customLosses": 0,
-          "baseMmr": 1490,
-          "internalRating": 1000
-        },
-        "aram1x1": {
-          "customWins": 5,
-          "customLosses": 6,
-          "baseMmr": 0,
-          "internalRating": 993
-        }
-      }
-    },
-    "ftKXFdhj3KZ9AKk2I2LX85AbB4g_VbXqxgIB693scXzuC1Q-A1XJPgE4_yhSsjjsQRZ4GaiD4u_giQ": {
-      "discordId": "1481697075027509270",
-      "nickname": "我很好#sla",
-      "puuid": "ftKXFdhj3KZ9AKk2I2LX85AbB4g_VbXqxgIB693scXzuC1Q-A1XJPgE4_yhSsjjsQRZ4GaiD4u_giQ",
-      "customWins": 0,
-      "customLosses": 0,
-      "baseMmr": 0,
-      "internalRating": 1000,
-      "modes": {
-        "classic": {
-          "customWins": 0,
-          "customLosses": 0,
-          "baseMmr": 0,
-          "internalRating": 1000
-        },
-        "aram": {
-          "customWins": 0,
-          "customLosses": 0,
-          "baseMmr": 0,
-          "internalRating": 1000
-        },
-        "aram1x1": {
-          "customWins": 5,
-          "customLosses": 3,
-          "baseMmr": 2009,
-          "internalRating": 1047
-        }
-      }
-    },
-    "PNvwwy05-_eejHXPOB4hO76D4TANktviWqg64sH-80OtHZJYNzVEqNBxZKiMEU3dAaBoXjmu4Zc0yQ": {
-      "discordId": "1243896407392518196",
-      "nickname": "qiyanezedzed01#BR1",
-      "puuid": "PNvwwy05-_eejHXPOB4hO76D4TANktviWqg64sH-80OtHZJYNzVEqNBxZKiMEU3dAaBoXjmu4Zc0yQ",
-      "customWins": 0,
-      "customLosses": 0,
-      "baseMmr": 0,
-      "internalRating": 1000,
-      "modes": {
-        "classic": {
-          "customWins": 0,
-          "customLosses": 0,
-          "baseMmr": 0,
-          "internalRating": 1000
-        },
-        "aram": {
-          "customWins": 0,
-          "customLosses": 0,
-          "baseMmr": 1440,
-          "internalRating": 1000
-        },
-        "aram1x1": {
-          "customWins": 0,
-          "customLosses": 0,
-          "baseMmr": 0,
-          "internalRating": 1000
-        }
-      }
-    },
     "T8npeqnad2s3gSTswQH12Y_uV3x781QsaPH29YMl0RCwD_S6DKGQHEg5sjPisjMNy-RqN1bvkokQJA": {
       "discordId": "643549688787632148",
       "nickname": "VS2 Dallas#owo",
@@ -2090,102 +1899,6 @@
           "customLosses": 0,
           "baseMmr": 0,
           "internalRating": 1000
-        }
-      }
-    },
-    "Jv_w9vYDqTxbkCq8fOldJSXjAIeBPGT-dXseZ_DWUXGn7WK0vdV7WqD2rSdwd_z1ADvq_aiYxVRtWg": {
-      "discordId": "860875184831332352",
-      "nickname": "BuGãO CAPS#BuGaO",
-      "puuid": "Jv_w9vYDqTxbkCq8fOldJSXjAIeBPGT-dXseZ_DWUXGn7WK0vdV7WqD2rSdwd_z1ADvq_aiYxVRtWg",
-      "customWins": 0,
-      "customLosses": 0,
-      "baseMmr": 1068,
-      "internalRating": 1000,
-      "modes": {
-        "classic": {
-          "customWins": 0,
-          "customLosses": 0,
-          "baseMmr": 1068,
-          "internalRating": 1000,
-          "winStreak": 0
-        },
-        "aram": {
-          "customWins": 0,
-          "customLosses": 0,
-          "baseMmr": 0,
-          "internalRating": 1000,
-          "winStreak": 0
-        },
-        "aram1x1": {
-          "customWins": 0,
-          "customLosses": 0,
-          "baseMmr": 0,
-          "internalRating": 1000,
-          "winStreak": 0
-        }
-      }
-    },
-    "iIGHMgCU2NhMLDjcZ7jLjTczKh23naL0FTX-fSJY77sbZ8-Kb6dO6sw3K3VHt4oLAwA0E5yn-I9ABg": {
-      "discordId": "1175192777458466839",
-      "nickname": "Vuc Vuc#Eol",
-      "puuid": "iIGHMgCU2NhMLDjcZ7jLjTczKh23naL0FTX-fSJY77sbZ8-Kb6dO6sw3K3VHt4oLAwA0E5yn-I9ABg",
-      "customWins": 0,
-      "customLosses": 0,
-      "baseMmr": 1218,
-      "internalRating": 1000,
-      "modes": {
-        "classic": {
-          "customWins": 0,
-          "customLosses": 0,
-          "baseMmr": 1218,
-          "internalRating": 1000,
-          "winStreak": 0
-        },
-        "aram": {
-          "customWins": 0,
-          "customLosses": 0,
-          "baseMmr": 0,
-          "internalRating": 1000,
-          "winStreak": 0
-        },
-        "aram1x1": {
-          "customWins": 0,
-          "customLosses": 0,
-          "baseMmr": 0,
-          "internalRating": 1000,
-          "winStreak": 0
-        }
-      }
-    },
-    "C2sjspVsceAi6C1hczqA0Z6YGW28HlouT1niQDNkTRbC0x0dF-9mJ_LnIpGiu5Eyb9uJnTCKYxArcw": {
-      "discordId": "1338194622912135279",
-      "nickname": "L Ê#666",
-      "puuid": "C2sjspVsceAi6C1hczqA0Z6YGW28HlouT1niQDNkTRbC0x0dF-9mJ_LnIpGiu5Eyb9uJnTCKYxArcw",
-      "customWins": 0,
-      "customLosses": 0,
-      "baseMmr": 1372,
-      "internalRating": 1000,
-      "modes": {
-        "classic": {
-          "customWins": 0,
-          "customLosses": 0,
-          "baseMmr": 1372,
-          "internalRating": 1000,
-          "winStreak": 0
-        },
-        "aram": {
-          "customWins": 0,
-          "customLosses": 0,
-          "baseMmr": 0,
-          "internalRating": 1000,
-          "winStreak": 0
-        },
-        "aram1x1": {
-          "customWins": 0,
-          "customLosses": 0,
-          "baseMmr": 0,
-          "internalRating": 1000,
-          "winStreak": 0
         }
       }
     }
