@@ -842,13 +842,7 @@ function buildLeaderboardEmbed(statsData, mode = QUEUE_MODES.CLASSIC, format = n
 
 function getRankedPlayersByMode(statsData, mode, format = null, seasonMeta = null) {
   const players = Object.values(statsData.players || {});
-  let minGames = 1;
-
-  if (seasonMeta && seasonMeta.phase === 'official') {
-    minGames = 10;
-  } else {
-    minGames = 5;
-  }
+  const minGames = 1;
 
   return players
     .map((player) => {
@@ -1668,11 +1662,30 @@ function createInteractionContext(interaction, overrides = {}) {
 
 // ─── Task 2.1: getRankedPlayersByStreak ───────────────────────────────────────
 function getRankedPlayersByStreak(statsData, mode, format = null) {
-  return getRankedPlayersByMode(statsData, mode, format)
+  return Object.values(statsData.players || {})
+    .map((player) => {
+      const modeStats = getModeStats(player, mode, format);
+      const baseMmr = Number(modeStats.baseMmr || 0);
+      const customWins = Number(modeStats.customWins || 0);
+      const customLosses = Number(modeStats.customLosses || 0);
+      const totalGames = customWins + customLosses;
+
+      return {
+        ...player,
+        baseMmr,
+        customWins,
+        customLosses,
+        totalGames,
+        adjustedMmr: calculateHybridMmr(baseMmr, customWins, customLosses, modeStats.internalRating),
+        internalRating: Number(modeStats.internalRating || calculateSeedRating(baseMmr)),
+        winStreak: Number(modeStats.winStreak || 0)
+      };
+    })
     .filter(p => (p.winStreak || 0) >= 1)
     .sort((a, b) => {
       if (b.winStreak !== a.winStreak) return b.winStreak - a.winStreak;
-      return b.customWins - a.customWins;
+      if (b.customWins !== a.customWins) return b.customWins - a.customWins;
+      return b.adjustedMmr - a.adjustedMmr;
     })
     .slice(0, 10);
 }
