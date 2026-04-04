@@ -23,7 +23,6 @@ const {
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const RIOT_API_KEY = process.env.RIOT_API_KEY;
 const BOT_VERSION = 'v1.8.0';
-let lastDailyRankPostKey = null;
 
 const {
   ensureDataFiles,

@@ -17,6 +17,8 @@ const THEME = {
 
 const FOOTER_PREFIX = 'Caps Bot';
 
+let lastDailyRankPostKey = null;
+
 function getRankName(mmr) {
   const val = Number(mmr || 0);
   if (val < 900) return 'Ferro';
@@ -1186,8 +1188,8 @@ async function postDailyRankUpdates() {
 
 async function postMvpAnnouncement(guild, mvpData) {
   const channelId = config.textChannels.mvpAnnouncementsChannelId;
-  const channel = guild.channels.cache.get(channelId);
-  if (!channel) return;
+  const channel = await guild.channels.fetch(channelId).catch(() => null);
+  if (!channel || !channel.isTextBased()) return;
 
   const embed = new EmbedBuilder()
     .setColor(THEME.RANK)
@@ -1207,8 +1209,8 @@ async function postMvpAnnouncement(guild, mvpData) {
 }
 async function updateQueueDashboard(guild) {
   const channelId = config.textChannels.queueStatusChannelId;
-  const channel = guild.channels.cache.get(channelId);
-  if (!channel) return;
+  const channel = await guild.channels.fetch(channelId).catch(() => null);
+  if (!channel || !channel.isTextBased()) return;
 
   const queueData = await loadQueue();
   const systemMeta = await loadSystemMeta();
@@ -1233,8 +1235,8 @@ async function updateQueueDashboard(guild) {
 
 async function sendMatchStartAnnouncement(guild, teams) {
   const channelId = config.textChannels.matchOngoingChannelId;
-  const channel = guild.channels.cache.get(channelId);
-  if (!channel) return;
+  const channel = await guild.channels.fetch(channelId).catch(() => null);
+  if (!channel || !channel.isTextBased()) return;
 
   const embed = buildTeamsEmbed(teams);
   await channel.send({ 

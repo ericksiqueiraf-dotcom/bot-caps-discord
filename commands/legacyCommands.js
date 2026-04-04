@@ -512,7 +512,7 @@ async function handleHelpCommand(message) {
     .setDescription('Aqui estao os comandos para gerenciar a Arena Caps.')
     .addFields(
       { name: '🕹️ Cadastro (1x)', value: '`!cadastrar Nick#TAG` • Vincula sua conta Riot\n`!nick Nick#TAG` • Atualiza seu nick' },
-      { name: '🎮 Jogador', value: '`!entrar` • Fila Classic\n`!entrar aram` • Fila ARAM\n`!entrar aram 2x2` • ARAM formato\n`!sair` • Sai da fila\n`!votar 1/2` • Vota no vencedor\n`!perfil` • Seu MMR e Elo\n`!top10` • Ranking' },
+      { name: '🎮 Jogador', value: '`!entrar` • Fila Classic\n`!entrar aram` • Fila ARAM\n`!entrar aram 2x2` • ARAM formato\n`!sair` • Sai da fila\n`!votar 1/2` • Vota no vencedor\n`!perfil` • Seu MMR e Elo\n`!top10` • Ranking MMR\n`!topstreak` • Ranking Streak 🔥' },
       { name: '🛠️ Staff', value: '`!remover @u`, `!limpar [qnt]`, `!sync`, `!onboarding`' },
       { name: '⚙️ Partida (Staff)', value: '`!start [lobby]`, `!vitoria [1|2]`, `!cancelarstart`' },
       { name: '📊 Temporada', value: '`!temporadas`, `!resetgeral` (Admin)' }
@@ -969,11 +969,12 @@ async function handleOnboardingCommand(message) {
           `• <#${config.textChannels.matchOngoingChannelId}> — Partidas em andamento\n` +
           `• <#${config.textChannels.mvpAnnouncementsChannelId}> — Destaques e MVPs`
       },
-      {
-        name: '🕹️ Outros Comandos Úteis',
+      { name: '🕹️ Outros Comandos Úteis',
         value:
           '`!perfil` — Seu MMR e histórico\n' +
-          '`!top10` — Ranking do servidor\n' +
+          '`!top10` — Ranking Top 10 por MMR\n' +
+          '`!topstreak` — Top 10 maiores sequências de vitórias 🔥\n' +
+          '`!placar` — Ranking geral\n' +
           '`!sair` — Sair da fila\n' +
           '`!ajuda` — Lista completa de comandos'
       },
