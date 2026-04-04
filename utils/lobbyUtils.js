@@ -795,7 +795,7 @@ function buildLeaderboardEmbed(statsData, mode = QUEUE_MODES.CLASSIC, format = n
     return embed;
   }
 
-  const leaderboardEntries = rankedPlayers
+  const rawEntries = rankedPlayers
     .slice(0, 15)
     .map((player, index) => {
       const medal = medals[index] || `#${index + 1}`;
@@ -805,12 +805,18 @@ function buildLeaderboardEmbed(statsData, mode = QUEUE_MODES.CLASSIC, format = n
       return `${medal} ${label}\n**${rankName} (${player.adjustedMmr} pts)** • ${player.customWins}V / ${player.customLosses}D`;
     });
 
-  splitEmbedFieldChunks(leaderboardEntries).forEach((chunk, index) => {
+  const { decoratedEntries, streakFooter } = decorateWithLeaderIcons(rawEntries, rankedPlayers.slice(0, 15));
+
+  splitEmbedFieldChunks(decoratedEntries).forEach((chunk, index) => {
     embed.addFields({
       name: index === 0 ? `Top jogadores - ${modeLabel}` : `Top jogadores - ${modeLabel} (${index + 1})`,
       value: chunk
     });
   });
+
+  if (streakFooter) {
+    embed.addFields({ name: '\u200B', value: streakFooter });
+  }
 
   return embed;
 }
@@ -878,7 +884,7 @@ function buildTopTenEmbed(statsData, seasonMeta, mode, format = null) {
     return embed;
   }
 
-  const entries = rankedPlayers
+  const rawEntries = rankedPlayers
     .map(
       (player, index) => {
         const medal = medals[index] || `#${index + 1}`;
@@ -887,12 +893,18 @@ function buildTopTenEmbed(statsData, seasonMeta, mode, format = null) {
       }
     );
 
-  splitEmbedFieldChunks(entries).forEach((chunk, index) => {
+  const { decoratedEntries, streakFooter } = decorateWithLeaderIcons(rawEntries, rankedPlayers);
+
+  splitEmbedFieldChunks(decoratedEntries).forEach((chunk, index) => {
     embed.addFields({
       name: index === 0 ? `Top 10 ${modeLabel}` : `Top 10 ${modeLabel} (${index + 1})`,
       value: chunk
     });
   });
+
+  if (streakFooter) {
+    embed.addFields({ name: '\u200B', value: streakFooter });
+  }
 
   return embed;
 }
@@ -1619,6 +1631,184 @@ function createInteractionContext(interaction, overrides = {}) {
   };
 }
 
+// ─── Task 2.1: getRankedPlayersByStreak ───────────────────────────────────────
+function getRankedPlayersByStreak(statsData, mode, format = null) {
+  return getRankedPlayersByMode(statsData, mode, format)
+    .filter(p => (p.winStreak || 0) >= 1)
+    .sort((a, b) => {
+      if (b.winStreak !== a.winStreak) return b.winStreak - a.winStreak;
+      return b.customWins - a.customWins;
+    })
+    .slice(0, 10);
+}
+
+// ─── Task 2.3: decorateWithLeaderIcons ────────────────────────────────────────
+function decorateWithLeaderIcons(entries, rankedPlayers) {
+  if (!entries || entries.length === 0 || !rankedPlayers || rankedPlayers.length === 0) {
+    return { decoratedEntries: entries || [], streakFooter: null };
+  }
+
+  const maxStreak = Math.max(...rankedPlayers.map(p => p.winStreak || 0));
+  const streakLeaderIndices = maxStreak >= 1
+    ? rankedPlayers.map((p, i) => (p.winStreak || 0) === maxStreak ? i : -1).filter(i => i !== -1)
+    : [];
+
+  const decorated = entries.map((entry, index) => {
+    let icons = '';
+    if (index === 0) icons += '👑';
+    if (streakLeaderIndices.includes(index)) icons += '🔥';
+    return icons ? `${icons} ${entry}` : entry;
+  });
+
+  let streakFooter = null;
+  if (maxStreak >= 1) {
+    const leader = rankedPlayers[streakLeaderIndices[0]];
+    streakFooter = `🔥 Maior Streak Ativa: ${leader.nickname} (${maxStreak} vitórias seguidas)`;
+  }
+
+  return { decoratedEntries: decorated, streakFooter };
+}
+
+// ─── Task 5.1: buildTopStreakEmbed ────────────────────────────────────────────
+function buildTopStreakEmbed(statsData, mode, format = null) {
+  const players = getRankedPlayersByStreak(statsData, mode, format);
+  const modeLabel = getStatsBucketLabel(mode, format);
+  const medals = ['🥇', '🥈', '🥉'];
+
+  const embed = new EmbedBuilder()
+    .setColor(THEME.RANK)
+    .setTitle(`🔥 Top Streak - ${modeLabel}`)
+    .setDescription(`Maiores sequências de vitórias ativas em **${modeLabel}**.`)
+    .setFooter({ text: `${FOOTER_PREFIX} • Top Streak ${modeLabel}` })
+    .setTimestamp();
+
+  if (players.length === 0) {
+    embed.addFields({ name: 'Sem sequências ativas', value: 'Não há sequências ativas no momento.' });
+    return embed;
+  }
+
+  const entries = players.map((player, index) => {
+    const medal = medals[index] || `#${index + 1}`;
+    return `${medal} <@${player.discordId}> | \`${player.nickname}\`\n🔥 Streak: **${player.winStreak}** | ${player.customWins}V / ${player.customLosses}D`;
+  });
+
+  splitEmbedFieldChunks(entries).forEach((chunk, index) => {
+    embed.addFields({
+      name: index === 0 ? `Top Streak ${modeLabel}` : `Top Streak ${modeLabel} (${index + 1})`,
+      value: chunk
+    });
+  });
+
+  return embed;
+}
+
+// ─── Task 6.1: buildPlayerMatchLogEmbed ──────────────────────────────────────
+function buildPlayerMatchLogEmbed(player, delta, match) {
+  const isWin = delta.result === 'vitória';
+  const color = isWin ? THEME.SUCCESS : THEME.ERROR;
+  const resultLabel = isWin ? '✅ Vitória' : '❌ Derrota';
+  const modeLabel = getStatsBucketLabel(match.mode, match.format);
+  const timestamp = formatDateTimeForHistory(match.finishedAt || new Date().toISOString());
+
+  return new EmbedBuilder()
+    .setColor(color)
+    .setTitle(`📋 Log de Partida — ${modeLabel}`)
+    .setDescription(`<@${player.discordId}> | \`${player.nickname}\``)
+    .addFields(
+      { name: 'Resultado', value: resultLabel, inline: true },
+      { name: 'Modo', value: modeLabel, inline: true },
+      { name: 'Lobby', value: `\`${match.letter || '?'}\``, inline: true },
+      { name: 'MMR Antes', value: `\`${delta.mmrBefore}\``, inline: true },
+      { name: 'MMR Depois', value: `\`${delta.mmrAfter}\``, inline: true },
+      { name: 'Variação', value: `\`${delta.mmrAfter - delta.mmrBefore >= 0 ? '+' : ''}${delta.mmrAfter - delta.mmrBefore}\``, inline: true },
+      { name: 'Recorde W/D', value: `\`${delta.customWins}V / ${delta.customLosses}D\``, inline: true },
+      { name: '🔥 Streak', value: `\`${delta.winStreak}\``, inline: true },
+      { name: '🕐 Data/Hora', value: `\`${timestamp}\``, inline: true }
+    )
+    .setFooter({ text: `${FOOTER_PREFIX} • Player Log` })
+    .setTimestamp();
+}
+
+// ─── Task 6.3: postPlayerLogs ─────────────────────────────────────────────────
+async function postPlayerLogs(guild, matchResult, statsData) {
+  const channelId = config.textChannels?.playerLogChannelId;
+  if (!channelId) return;
+
+  const channel = await guild.channels.fetch(channelId).catch(() => null);
+  if (!channel || !channel.isTextBased()) return;
+
+  const { match, playerDeltas } = matchResult;
+  for (const [discordId, delta] of Object.entries(playerDeltas)) {
+    const player = { discordId, nickname: delta.nickname || discordId };
+    const embed = buildPlayerMatchLogEmbed(player, delta, match);
+    await channel.send({ embeds: [embed] }).catch(() => null);
+  }
+}
+
+// ─── Task 7.1: postMatchSummaryToSeasonLog ────────────────────────────────────
+async function postMatchSummaryToSeasonLog(guild, matchResult) {
+  const channelId = config.textChannels?.seasonLogChannelId;
+  if (!channelId) return;
+
+  const channel = await guild.channels.fetch(channelId).catch(() => null);
+  if (!channel || !channel.isTextBased()) return;
+
+  const { match, winnerTeam, teamOneAvgDelta, teamTwoAvgDelta } = matchResult;
+  const modeLabel = getStatsBucketLabel(match.mode, match.format);
+
+  const teamOneNames = (match.teamOne || []).map(p => p.nickname).join(', ') || 'N/A';
+  const teamTwoNames = (match.teamTwo || []).map(p => p.nickname).join(', ') || 'N/A';
+
+  const embed = new EmbedBuilder()
+    .setColor(THEME.SUCCESS)
+    .setTitle(`📊 Resumo de Partida — ${modeLabel}`)
+    .setDescription(`Lobby **${match.letter || '?'}** | Vencedor: **Time ${winnerTeam}**`)
+    .addFields(
+      { name: 'Modo', value: modeLabel, inline: true },
+      { name: 'Lobby', value: `\`${match.letter || '?'}\``, inline: true },
+      { name: 'Vencedor', value: `**Time ${winnerTeam}**`, inline: true },
+      { name: 'Time 1', value: teamOneNames, inline: false },
+      { name: 'Time 2', value: teamTwoNames, inline: false },
+      { name: 'Δ MMR Médio Time 1', value: `\`${teamOneAvgDelta >= 0 ? '+' : ''}${teamOneAvgDelta}\``, inline: true },
+      { name: 'Δ MMR Médio Time 2', value: `\`${teamTwoAvgDelta >= 0 ? '+' : ''}${teamTwoAvgDelta}\``, inline: true }
+    )
+    .setFooter({ text: `${FOOTER_PREFIX} • Season Log` })
+    .setTimestamp();
+
+  await channel.send({ embeds: [embed] }).catch(() => null);
+}
+
+// ─── Task 7.3: postSeasonSummaryToSeasonLog ───────────────────────────────────
+async function postSeasonSummaryToSeasonLog(guild, archivedSeason) {
+  const channelId = config.textChannels?.seasonLogChannelId;
+  if (!channelId) return;
+
+  const channel = await guild.channels.fetch(channelId).catch(() => null);
+  if (!channel || !channel.isTextBased()) return;
+
+  const label = archivedSeason.label || `Temporada #${archivedSeason.seasonNumber}`;
+  const totalMatches = archivedSeason.totalMatches || 0;
+
+  const formatTop5 = (list) => (list || []).slice(0, 5)
+    .map((p, i) => `**${i + 1}.** ${p.nickname} — ${p.adjustedMmr} pts (${p.customWins}V/${p.customLosses}D)`)
+    .join('\n') || 'Sem dados';
+
+  const embed = new EmbedBuilder()
+    .setColor(THEME.RANK)
+    .setTitle(`🏆 Resumo de Temporada — ${label}`)
+    .setDescription(`Início: \`${formatDateTimeForHistory(archivedSeason.startedAt)}\`\nEncerramento: \`${formatDateTimeForHistory(archivedSeason.endedAt)}\``)
+    .addFields(
+      { name: '🎮 Total de Partidas', value: `\`${totalMatches}\``, inline: true },
+      { name: 'Top 5 CLASSIC', value: formatTop5(archivedSeason.topClassic), inline: false },
+      { name: 'Top 5 ARAM', value: formatTop5(archivedSeason.topAram), inline: false },
+      { name: 'Top 5 ARAM 1x1', value: formatTop5(archivedSeason.topAram1x1), inline: false }
+    )
+    .setFooter({ text: `${FOOTER_PREFIX} • Season Log` })
+    .setTimestamp();
+
+  await channel.send({ embeds: [embed] }).catch(() => null);
+}
+
 module.exports = {
   getSeasonDisplayLabel,
   formatDateTimeForHistory,
@@ -1666,7 +1856,10 @@ module.exports = {
   buildTeamsEmbed,
   buildLeaderboardEmbed,
   getRankedPlayersByMode,
+  getRankedPlayersByStreak,
+  decorateWithLeaderIcons,
   buildTopTenEmbed,
+  buildTopStreakEmbed,
   buildSeasonHistoryEmbed,
   resetStatsForNewSeason,
   deepClone,
@@ -1675,6 +1868,10 @@ module.exports = {
   inferSeasonMetaFromArchive,
   archiveCurrentSeason,
   buildPlayerCardEmbed,
+  buildPlayerMatchLogEmbed,
+  postPlayerLogs,
+  postMatchSummaryToSeasonLog,
+  postSeasonSummaryToSeasonLog,
   getSaoPauloDateParts,
   postDailyRankUpdates,
   postMatchHistoryLog,

@@ -11,7 +11,9 @@
     "mvpAnnouncementsChannelId": "1489238507313696838",
     "queueStatusChannelId": "1489237001013297182",
     "matchOngoingChannelId": "1489236955479937114",
-    "welcomeChannelId": "1489303816557035700"
+    "welcomeChannelId": "1489303816557035700",
+    "playerLogChannelId": "1489810297832210654",
+    "seasonLogChannelId": "1489810341809487966"
   },
   "automation": {
     "dailyRankUpdatesHour": 8,

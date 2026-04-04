@@ -16,12 +16,13 @@ const {
   findActiveMatchBySelector, getSaoPauloDateParts, getSeasonDisplayLabel, 
   formatDateTimeForHistory, getArchivedSeasonLabel, splitEmbedFieldChunks,
   THEME, FOOTER_PREFIX, createLobbyChannels, createTeamChannelsForLobby, 
-  findLobbyBySelector, buildLeaderboardEmbed, buildTopTenEmbed, 
+  findLobbyBySelector, buildLeaderboardEmbed, buildTopTenEmbed, buildTopStreakEmbed,
   getRankedPlayersByMode, archiveCurrentSeason, resetStatsForNewSeason, 
   buildLobbyFromMatch, upsertPlayerStats, normalizePlayerModes, 
   movePlayersToTeamChannels, sendMatchStartAnnouncement, syncMvpRole, clearMvpRoles,
   postMvpAnnouncement, postMatchHistoryLog, buildPlayerCardEmbed, 
-  buildSeasonHistoryEmbed, formatCustomRecord
+  buildSeasonHistoryEmbed, formatCustomRecord,
+  postPlayerLogs, postMatchSummaryToSeasonLog, postSeasonSummaryToSeasonLog
 } = require('../utils/lobbyUtils');
 
 const { 
@@ -487,6 +488,15 @@ async function handleTopTenCommand(message, args = []) {
   await sendToMessageChannel(message, { embeds: [embed] });
 }
 
+async function handleTopStreakCommand(message, args = []) {
+  const statsData = await loadPlayerStats();
+  const normalizedArgs = args.map(a => String(a).toLowerCase());
+  const mode = normalizedArgs.includes(QUEUE_MODES.ARAM) ? QUEUE_MODES.ARAM : QUEUE_MODES.CLASSIC;
+  const format = mode === QUEUE_MODES.ARAM && normalizedArgs.includes('1x1') ? '1x1' : null;
+  const embed = buildTopStreakEmbed(statsData, mode, format);
+  await sendToMessageChannel(message, { embeds: [embed] });
+}
+
 async function handlePlayerCardCommand(message, targetUser = null) {
   const selectedUser = targetUser || message.mentions.users.first() || message.author;
   const statsData = await loadPlayerStats();
@@ -646,6 +656,7 @@ async function handleSeasonResetCommand(message) {
   await saveSeasonMeta(nextMeta);
   await updateQueueDashboard(message.guild);
   await replyToMessage(message, 'Temporada resetada com sucesso.');
+  await postSeasonSummaryToSeasonLog(message.guild, archivedSeason);
 }
 
 async function handleOfficialSeasonStartCommand(message) {
@@ -822,18 +833,62 @@ async function handleVictoryCommand(message, args) {
 
     await replyToMessage(message, `Vitoria registrada para a Equipe ${winningTeam}!`);
     await updateQueueDashboard(message.guild);
+    const finishedAt = new Date().toISOString();
     await postMatchHistoryLog(message.guild, { 
         winningTeam, 
         modeLabel: match.mode, 
         formatLabel: match.format, 
         winners, 
         losers, 
-        finishedAt: new Date().toISOString(),
+        finishedAt,
         startedAt: match.createdAt,
         initialDifference: match.difference || 0,
         letter: match.letter || '?',
         periodLabel: getSeasonDisplayLabel(await loadSeasonMeta())
     });
+
+    // Build matchResult for player logs and season log
+    const playerDeltas = {};
+    for (const p of winners) {
+      playerDeltas[p.discordId] = {
+        nickname: p.nickname,
+        mmrBefore: p.beforeRank,
+        mmrAfter: p.afterRank,
+        result: 'vitória',
+        winStreak: p.winStreak || 0,
+        customWins: (p.customWins || 0) + 1,
+        customLosses: p.customLosses || 0
+      };
+    }
+    for (const p of losers) {
+      playerDeltas[p.discordId] = {
+        nickname: p.nickname,
+        mmrBefore: p.beforeRank,
+        mmrAfter: p.afterRank,
+        result: 'derrota',
+        winStreak: 0,
+        customWins: p.customWins || 0,
+        customLosses: (p.customLosses || 0) + 1
+      };
+    }
+    const teamOneAvgDelta = winners.length > 0
+      ? Math.round(winners.reduce((sum, p) => sum + (p.afterRank - p.beforeRank), 0) / winners.length)
+      : 0;
+    const teamTwoAvgDelta = losers.length > 0
+      ? Math.round(losers.reduce((sum, p) => sum + (p.afterRank - p.beforeRank), 0) / losers.length)
+      : 0;
+    const matchResult = {
+      match: { ...match, finishedAt },
+      winnerTeam: winningTeam,
+      playerDeltas,
+      teamOneAvgDelta: winningTeam === '1' ? teamOneAvgDelta : teamTwoAvgDelta,
+      teamTwoAvgDelta: winningTeam === '1' ? teamTwoAvgDelta : teamOneAvgDelta
+    };
+    const freshStats = await loadPlayerStats();
+    await Promise.all([
+      postPlayerLogs(message.guild, matchResult, freshStats),
+      postMatchSummaryToSeasonLog(message.guild, matchResult)
+    ]);
   } catch (error) {
     console.error('[ERRO] !vitoria:', error);
     await replyToMessage(message, `❌ Erro ao processar resultado: \`${error.message}\`.`);
@@ -948,7 +1003,7 @@ async function handleClearCommand(message, args) {
 
 module.exports = {
   handleEnterCommand, handleListCommand, handlePingCommand, handleLeaderboardCommand, handleTopTenCommand,
-  handleSeasonHistoryCommand, handlePlayerCardCommand, handleHelpCommand, handleLeaveCommand, handleRemoveCommand,
+  handleTopStreakCommand, handleSeasonHistoryCommand, handlePlayerCardCommand, handleHelpCommand, handleLeaveCommand, handleRemoveCommand,
   handleResetCommand, handleCleanupRoomsCommand, handleSeasonResetCommand, handleOfficialSeasonStartCommand,
   handleUndoSeasonResetCommand, handleRestoreArchivedPeriodCommand, handleCancelStartCommand, handleStartCommand,
   handleSyncAllRolesCommand, handleVictoryCommand, handleOnboardingCommand, handleClearCommand,

@@ -222,6 +222,26 @@ function buildSlashCommands() {
       .addIntegerOption((option) =>
         option.setName('time').setDescription('Time vencedor').setRequired(true)
           .addChoices({ name: 'Time 1', value: 1 }, { name: 'Time 2', value: 2 })
+      ),
+    new SlashCommandBuilder()
+      .setName('topstreak')
+      .setDescription('Mostra o top 10 de maiores sequências de vitórias ativas.')
+      .addStringOption((option) =>
+        option
+          .setName('modo')
+          .setDescription('Modo desejado')
+          .setRequired(false)
+          .addChoices(
+            { name: 'CLASSIC', value: 'classic' },
+            { name: 'ARAM', value: 'aram' }
+          )
+      )
+      .addStringOption((option) =>
+        option
+          .setName('formato')
+          .setDescription('Formato do ARAM')
+          .setRequired(false)
+          .addChoices({ name: '1x1', value: '1x1' })
       )
   ].map((command) => command.toJSON());
 }
@@ -358,6 +378,9 @@ async function processCommand(message, rawContent) {
         break;
       case 'top10':
         await handlers.handleTopTenCommand(message, args);
+        break;
+      case 'topstreak':
+        await handlers.handleTopStreakCommand(message, args);
         break;
       case 'ficha':
       case 'perfil':
@@ -528,6 +551,9 @@ client.on('interactionCreate', async (interaction) => {
         break;
       case 'top10':
         await handlers.handleTopTenCommand(context, [mode, format].filter(Boolean));
+        break;
+      case 'topstreak':
+        await handlers.handleTopStreakCommand(context, [mode, format].filter(Boolean));
         break;
       case 'perfil':
       case 'ficha':
