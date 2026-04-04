@@ -1341,6 +1341,7 @@ function startDailyRankScheduler() {
 async function movePlayersToTeamChannels(guild, teams, teamChannelIds) {
   const teamOneChannel = await guild.channels.fetch(teamChannelIds.teamOneChannelId).catch(() => null);
   const teamTwoChannel = await guild.channels.fetch(teamChannelIds.teamTwoChannelId).catch(() => null);
+  const announceChannel = await guild.channels.fetch(config.textChannels.matchOngoingChannelId).catch(() => null);
 
   if (
     !teamOneChannel ||
@@ -1357,13 +1358,26 @@ async function movePlayersToTeamChannels(guild, teams, teamChannelIds) {
     ...teams.teamTwo.map((player) => ({ ...player, channel: teamTwoChannel }))
   ];
 
+  const notInVoice = [];
+
   for (const player of allPlayers) {
     const member = await guild.members.fetch(player.discordId).catch(() => null);
-    if (member?.voice?.channel) {
-      await member.voice.setChannel(player.channel).catch(err =>
-        console.warn(`[MOVE] Não foi possível mover ${player.nickname}:`, err.message)
-      );
+    if (!member?.voice?.channel) {
+      notInVoice.push(player);
+      continue;
     }
+
+    await member.voice.setChannel(player.channel).catch(err =>
+      console.warn(`[MOVE] Não foi possível mover ${player.nickname}:`, err.message)
+    );
+  }
+
+  if (notInVoice.length > 0 && announceChannel?.isTextBased()) {
+    const mentions = notInVoice.map((p) => `<@${p.discordId}>`).join(' ');
+    await announceChannel.send({
+      content: `⚠️ Não consegui mover ${mentions} porque não estavam em call. Entrem no lobby para divisão automática.`
+    }).catch(() => null);
+    console.warn('[MOVE] Jogadores sem canal de voz:', notInVoice.map((p) => p.nickname || p.discordId).join(', '));
   }
 }
 

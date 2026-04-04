@@ -92,7 +92,8 @@ async function handleStartCommandInternal(guild, lobby, replyChannel) {
     const result = await withQueueOperationLock(`${guild.id}:start:${lobby.id}`, async () => {
       const q = await loadQueue();
       const m = await loadCurrentMatch();
-      if (!q.lobbies[lobby.id]) return null;
+      // Evita disparos duplicados se a partida já estiver ativa ou o lobby não existir mais
+      if (!q.lobbies[lobby.id] || m.matches[lobby.id]?.active) return null;
       const teams = createBalancedTeams(lobby.players);
       const chs = await createTeamChannelsForLobby(guild, lobby);
       teams.mode = lobby.mode;
@@ -721,6 +722,8 @@ async function handleStartCommand(message, args = []) {
     const result = await withQueueOperationLock(`${message.guild.id}:start:${lobby.id}`, async () => {
       const q = await loadQueue();
       const m = await loadCurrentMatch();
+      // Skip se o lobby já não está na fila ou já existe match ativo para ele
+      if (!q.lobbies[lobby.id] || m.matches[lobby.id]?.active) return null;
       const teams = createBalancedTeams(lobby.players);
       const chs = await createTeamChannelsForLobby(message.guild, lobby);
       
@@ -738,6 +741,16 @@ async function handleStartCommand(message, args = []) {
       await saveCurrentMatch(m);
       return { teams, chs, lobby };
     });
+    if (!result) {
+      return await replyToMessage(message, 'Partida já iniciada ou lobby não encontrado.');
+    }
+
+    // Cancela auto-start pendente deste lobby, se existir, para evitar anúncios duplicados
+    const pendingTimeout = pendingAutoStarts.get(lobby.id);
+    if (pendingTimeout) {
+      clearTimeout(pendingTimeout);
+      pendingAutoStarts.delete(lobby.id);
+    }
 
     await sendMatchStartAnnouncement(message.guild, result.teams);
     await updateQueueDashboard(message.guild);
@@ -771,6 +784,8 @@ async function handleVictoryCommand(message, args) {
     const match = entry.match;
     const winningPlayers = winningTeam === '1' ? match.teamOne : match.teamTwo;
     const losingPlayers = winningTeam === '1' ? match.teamTwo : match.teamOne;
+    const avgWinnerOppMmr = Math.round(losingPlayers.reduce((sum, p) => sum + Number(p.mmr || 1200), 0) / (losingPlayers.length || 1));
+    const avgLoserOppMmr = Math.round(winningPlayers.reduce((sum, p) => sum + Number(p.mmr || 1200), 0) / (winningPlayers.length || 1));
     await withQueueOperationLock(`${message.guild.id}:victory:${matchId}`, async () => {
         const currentMatchData = await loadCurrentMatch();
         const matchEntryStatus = currentMatchData.matches[matchId];
@@ -784,7 +799,7 @@ async function handleVictoryCommand(message, args) {
             const m = getModeStats(s, match.mode, match.format);
             const beforeRank = m.internalRating || 0;
             const beforeRecord = formatCustomRecord(m);
-            const delta = Math.round(calculateEloDelta(beforeRank, 1200, 1, 0) * (match.mode === QUEUE_MODES.ARAM ? 0.5 : 1));
+            const delta = Math.round(calculateEloDelta(beforeRank, avgWinnerOppMmr, 1, (m.customWins || 0) + (m.customLosses || 0)) * (match.mode === QUEUE_MODES.ARAM ? 0.5 : 1));
             const afterRank = beforeRank + delta;
             const updatedModes = { ...normalizePlayerModes(s), [getStatsBucketKey(match.mode, match.format)]: { ...m, customWins: (m.customWins || 0) + 1, internalRating: afterRank, winStreak: (m.winStreak || 0) + 1 } };
             upsertPlayerStats(statsData, p, { modes: updatedModes });
@@ -795,7 +810,7 @@ async function handleVictoryCommand(message, args) {
             const m = getModeStats(s, match.mode, match.format);
             const beforeRank = m.internalRating || 0;
             const beforeRecord = formatCustomRecord(m);
-            const delta = Math.round(calculateEloDelta(beforeRank, 1200, 0, 0) * (match.mode === QUEUE_MODES.ARAM ? 0.5 : 1));
+            const delta = Math.round(calculateEloDelta(beforeRank, avgLoserOppMmr, 0, (m.customWins || 0) + (m.customLosses || 0)) * (match.mode === QUEUE_MODES.ARAM ? 0.5 : 1));
             const afterRank = Math.max(0, beforeRank + delta);
             const updatedModes = { ...normalizePlayerModes(s), [getStatsBucketKey(match.mode, match.format)]: { ...m, customLosses: (m.customLosses || 0) + 1, internalRating: afterRank, winStreak: 0 } };
             upsertPlayerStats(statsData, p, { modes: updatedModes });
