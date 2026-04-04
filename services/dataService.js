@@ -1,15 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 const { MongoClient } = require('mongodb');
+const { QUEUE_MODES } = require('../domain/constants/queueModes');
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const DB_NAME = 'caps-bot';
 const DATA_DIR = path.join(__dirname, '..', 'database');
-
-const QUEUE_MODES = {
-  CLASSIC: 'classic',
-  ARAM: 'aram'
-};
 
 const LOCAL_FILES = {
   queue: { file: 'queue.json', fallback: { lobbies: {} } },

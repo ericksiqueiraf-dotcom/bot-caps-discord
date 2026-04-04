@@ -1,5 +1,15 @@
 const { ChannelType, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const config = require('../config.json');
+const { parseModeAndFormatArgs, shouldMirrorAramGroupedStats } = require('../domain/queue/selection');
+const { enterQueue } = require('../application/use-cases/enterQueue');
+const { startMatch } = require('../application/use-cases/startMatch');
+const { registerVictory } = require('../application/use-cases/registerVictory');
+const { resetSystem } = require('../application/use-cases/resetSystem');
+const { cancelActiveMatch } = require('../application/use-cases/cancelActiveMatch');
+const { castVictoryVote } = require('../application/use-cases/castVictoryVote');
+const { handleStartCommandFlow, handleVoteCommandFlow } = require('./handlers/matchCommandHandlers');
+const { handleEnterCommandFlow } = require('./handlers/queueCommandHandlers');
+const { handleVictoryCommandFlow } = require('./handlers/victoryCommandHandlers');
 
 const { 
   replyToMessage, sendToMessageChannel, getFormatFromArgs, 
@@ -44,8 +54,92 @@ const getRiotService = () => global.riotService;
 const pendingAutoStarts = new Map();
 const VOTE_THRESHOLD = 3; // Fase de testes: 3 votos decidem
 const RECENT_VICTORY_WINDOW_MS = 2 * 60 * 1000;
-const KNOWN_ARAM_FORMATS = ['1x1', '2x2', '3x3', '4x4', '5x5'];
-const GROUPED_ARAM_STREAK_FORMATS = new Set(['2x2', '3x3', '4x4']);
+
+function createEnterQueueDeps() {
+  return {
+    loadPlayerStats,
+    loadQueue,
+    saveQueue,
+    savePlayerStats,
+    withQueueOperationLock,
+    findLobbyByPlayer,
+    getStoredPlayerStats,
+    getModeStats,
+    getOpenLobby,
+    findReusableWaitingLobby,
+    getNextLobbyLetter,
+    createLobbyChannels,
+    getRequiredPlayersByModeAndFormat,
+    normalizePlayerModes,
+    getStatsBucketKey,
+    upsertPlayerStats,
+    calculateHybridMmr,
+    calculateSeedRating
+  };
+}
+
+function createStartMatchDeps() {
+  return {
+    withQueueOperationLock,
+    loadQueue,
+    loadCurrentMatch,
+    saveQueue,
+    saveCurrentMatch,
+    createBalancedTeams,
+    createTeamChannelsForLobby,
+    movePlayersToTeamChannels
+  };
+}
+
+function createRegisterVictoryDeps() {
+  return {
+    QUEUE_MODES,
+    withQueueOperationLock,
+    loadCurrentMatch,
+    loadPlayerStats,
+    savePlayerStats,
+    saveCurrentMatch,
+    getStoredPlayerStats,
+    getModeStats,
+    normalizePlayerModes,
+    getStatsBucketKey,
+    upsertPlayerStats,
+    shouldMirrorAramGroupedStats,
+    calculateEloDelta,
+    getAramWeightByTeamSize,
+    formatCustomRecord
+  };
+}
+
+function createResetSystemDeps() {
+  return {
+    loadQueue,
+    loadCurrentMatch,
+    deleteVoiceChannelIfExists,
+    movePlayersToVoiceChannel,
+    getBaseQueueChannelIdByMode,
+    deleteManagedChannelsForLobby,
+    saveQueue,
+    saveCurrentMatch
+  };
+}
+
+function createCancelActiveMatchDeps() {
+  return {
+    buildLobbyFromMatch,
+    movePlayersToVoiceChannel,
+    deleteManagedChannelsForLobby,
+    loadQueue,
+    saveQueue,
+    saveCurrentMatch
+  };
+}
+
+function createCastVictoryVoteDeps() {
+  return {
+    saveCurrentMatch
+  };
+}
 
 function getRecentVictoryForGuild(systemMeta, guildId) {
   const recentVictory = systemMeta?.recentVictory;
@@ -60,21 +154,6 @@ function getRecentVictoryForGuild(systemMeta, guildId) {
   }
 
   return Date.now() - finishedAtMs <= RECENT_VICTORY_WINDOW_MS ? recentVictory : null;
-}
-
-function parseModeAndFormatArgs(args = []) {
-  const normalizedArgs = args.map((arg) => String(arg || '').toLowerCase());
-  const detectedFormat = normalizedArgs.find((arg) => KNOWN_ARAM_FORMATS.includes(arg)) || null;
-  const mode = normalizedArgs.includes(QUEUE_MODES.ARAM) || Boolean(detectedFormat) ? QUEUE_MODES.ARAM : QUEUE_MODES.CLASSIC;
-
-  return {
-    mode,
-    format: mode === QUEUE_MODES.ARAM ? detectedFormat : null
-  };
-}
-
-function shouldMirrorAramGroupedStats(mode, format) {
-  return mode === QUEUE_MODES.ARAM && GROUPED_ARAM_STREAK_FORMATS.has(String(format || '').toLowerCase());
 }
 
 async function triggerAutoStart(guild, lobbyId) {
@@ -122,36 +201,14 @@ async function triggerAutoStart(guild, lobbyId) {
 
 async function handleStartCommandInternal(guild, lobby, replyChannel) {
   try {
-    const result = await withQueueOperationLock(`${guild.id}:start:${lobby.id}`, async () => {
-      const q = await loadQueue();
-      const m = await loadCurrentMatch();
-      // Evita disparos duplicados se a partida já estiver ativa ou o lobby não existir mais
-      if (!q.lobbies[lobby.id] || m.matches[lobby.id]?.active) return null;
-      const teams = createBalancedTeams(lobby.players);
-      const chs = await createTeamChannelsForLobby(guild, lobby);
-      teams.mode = lobby.mode;
-      teams.format = lobby.format;
-      await movePlayersToTeamChannels(guild, teams, chs);
-      m.matches[lobby.id] = {
-        active: true,
-        votes: {},
-        match: {
-          ...lobby,
-          teamOne: teams.teamOne,
-          teamTwo: teams.teamTwo,
-          teamOneChannelId: chs.teamOneChannelId,
-          teamTwoChannelId: chs.teamTwoChannelId,
-          teamSize: teams.teamOne.length,
-          createdAt: new Date().toISOString()
-        }
-      };
-      delete q.lobbies[lobby.id];
-      await saveQueue(q);
-      await saveCurrentMatch(m);
-      return { teams, chs, lobby };
+    const useCaseResult = await startMatch({
+      guild,
+      guildId: guild.id,
+      lobby,
+      deps: createStartMatchDeps()
     });
-    if (!result) return;
-    await sendMatchStartAnnouncement(guild, result.teams);
+    if (!useCaseResult) return;
+    await sendMatchStartAnnouncement(guild, useCaseResult.teams);
     await updateQueueDashboard(guild);
   } catch (err) {
     console.error('[AUTO-START INTERNAL] Erro:', err);
@@ -160,150 +217,22 @@ async function handleStartCommandInternal(guild, lobby, replyChannel) {
 
 async function handleEnterCommand(message, args) {
   try {
-    const normalizedArgs = args.map((arg) => String(arg || '').toLowerCase());
-    const selectedMode = normalizedArgs.includes(QUEUE_MODES.ARAM) || normalizedArgs.some((arg) => ['1x1', '2x2', '3x3', '4x4', '5x5'].includes(arg))
-      ? QUEUE_MODES.ARAM
-      : QUEUE_MODES.CLASSIC;
-    const selectedFormat = getFormatFromArgs(selectedMode, args);
-    const providedNick = getNicknameArgs(selectedMode, args, selectedFormat).join(' ').trim();
-
-    if (!isMemberInQueueVoiceChannel(message.member, selectedMode)) {
-      const expectedChannelName = selectedMode === QUEUE_MODES.ARAM ? 'Lobby ARAM' : 'Lobby Classic';
-      await replyToMessage(message, `Voce precisa estar no canal de voz \`${expectedChannelName}\` para entrar nessa fila.`).catch(() => null);
-      return;
-    }
-
-    // --- Resolução do nick: banco ou argumento ---
-    const playerStats = await loadPlayerStats();
-    const allEntries = Object.values(playerStats.players || {}).filter(p => p.discordId === message.author.id);
-    const storedEntry = allEntries.sort((a, b) => new Date(b.registeredAt || 0) - new Date(a.registeredAt || 0))[0] || null;
-    const registeredNick = storedEntry?.registeredNickname || null;
-
-    let rankProfile;
-    let usedApiCall = false;
-
-    if (providedNick) {
-      // Nick explícito → chama API e atualiza cadastro
-      rankProfile = await global.riotService.getPlayerRankProfile(providedNick);
-      usedApiCall = true;
-    } else if (registeredNick) {
-      // Sem nick, mas tem cadastro → usa dados salvos (sem API)
-      const storedModeStats = getModeStats(storedEntry, selectedMode, selectedFormat);
-      rankProfile = {
-        puuid: storedEntry.puuid,
-        summonerId: storedEntry.summonerId || null,
-        nickname: registeredNick,
-        tier: storedEntry.tier || 'GOLD',
-        rank: storedEntry.rank || 'IV',
-        leaguePoints: storedEntry.leaguePoints || 0,
-        mmr: storedModeStats.baseMmr || storedEntry.baseMmr || 1200,
-        isFallbackUnranked: Boolean(storedEntry.isFallbackUnranked)
-      };
-    } else {
-      // Sem nick e sem cadastro → orienta o usuário
-      await replyToMessage(message,
-        '❌ Voce ainda nao tem cadastro!\n' +
-        'Use `!cadastrar SeuNick#TAG` uma vez para vincular sua conta — depois e so dar `!entrar` 😊'
-      );
-      return;
-    }
-
-    const result = await withQueueOperationLock(`${message.guild.id}:${selectedMode}:${selectedFormat}`, async () => {
-      const queueData = await loadQueue();
-      const freshStats = await loadPlayerStats();
-      const alreadyInQueue = findLobbyByPlayer(queueData, message.author.id);
-
-      if (alreadyInQueue) return { alreadyInQueue };
-
-      const storedStats = getStoredPlayerStats(freshStats, { discordId: message.author.id, nickname: rankProfile.nickname, puuid: rankProfile.puuid });
-      const storedModeStats = getModeStats(storedStats, selectedMode, selectedFormat);
-      const hybridMmr = calculateHybridMmr(rankProfile.mmr, storedModeStats.customWins, storedModeStats.customLosses, storedModeStats.internalRating);
-
-      const duplicateNickname = Object.values(queueData.lobbies || {}).some(l => l.players.some(p => p.nickname.toLowerCase() === rankProfile.nickname.toLowerCase()));
-      if (duplicateNickname) return { duplicateNickname: true };
-
-      let lobby = getOpenLobby(queueData, selectedMode, selectedFormat) || findReusableWaitingLobby(message.guild, queueData, selectedMode, selectedFormat);
-
-      if (!lobby) {
-        const letter = getNextLobbyLetter(queueData, selectedMode, selectedFormat);
-        const createdLobby = await createLobbyChannels(message.guild, selectedMode, selectedFormat, letter);
-        lobby = {
-          id: `${selectedMode}-${selectedFormat}-${letter.toLowerCase()}`,
-          mode: selectedMode,
-          format: selectedFormat,
-          letter,
-          waitingChannelId: createdLobby.waitingChannelId,
-          parentId: createdLobby.parentId,
-          requiredPlayers: getRequiredPlayersByModeAndFormat(selectedMode, selectedFormat),
-          players: [],
-          status: 'waiting'
-        };
+    await handleEnterCommandFlow({
+      message,
+      args,
+      deps: {
+        QUEUE_MODES,
+        getFormatFromArgs,
+        getNicknameArgs,
+        isMemberInQueueVoiceChannel,
+        enterQueue,
+        createEnterQueueDeps,
+        replyToMessage,
+        updateQueueDashboard,
+        triggerAutoStart,
+        pendingAutoStarts
       }
-
-      lobby.players.push({
-        discordId: message.author.id,
-        discordUsername: message.author.username,
-        nickname: rankProfile.nickname,
-        tier: rankProfile.tier,
-        rank: rankProfile.rank,
-        leaguePoints: rankProfile.leaguePoints,
-        isFallbackUnranked: Boolean(rankProfile.isFallbackUnranked),
-        baseMmr: rankProfile.mmr,
-        customWins: storedModeStats.customWins || 0,
-        customLosses: storedModeStats.customLosses || 0,
-        mmr: hybridMmr,
-        puuid: rankProfile.puuid,
-        summonerId: rankProfile.summonerId,
-        mode: selectedMode,
-        format: selectedFormat,
-        joinedAt: new Date().toISOString()
-      });
-      queueData.lobbies[lobby.id] = lobby;
-
-      // Atualiza stats E cadastro se veio com nick explícito
-      const updatedFields = {
-        modes: {
-          ...normalizePlayerModes(storedStats),
-          [getStatsBucketKey(selectedMode, selectedFormat)]: {
-            ...getModeStats(storedStats, selectedMode, selectedFormat),
-            baseMmr: rankProfile.mmr,
-            internalRating: Number(getModeStats(storedStats, selectedMode, selectedFormat).internalRating || 0) || calculateSeedRating(rankProfile.mmr)
-          }
-        }
-      };
-      if (usedApiCall) {
-        updatedFields.registeredNickname = rankProfile.nickname;
-        updatedFields.registeredAt = new Date().toISOString();
-        updatedFields.tier = rankProfile.tier;
-        updatedFields.rank = rankProfile.rank;
-        updatedFields.leaguePoints = rankProfile.leaguePoints;
-        updatedFields.baseMmr = rankProfile.mmr;
-        updatedFields.puuid = rankProfile.puuid;
-        updatedFields.summonerId = rankProfile.summonerId;
-        updatedFields.isFallbackUnranked = Boolean(rankProfile.isFallbackUnranked);
-      }
-      upsertPlayerStats(freshStats, { discordId: message.author.id, nickname: rankProfile.nickname, puuid: rankProfile.puuid }, updatedFields);
-
-      await saveQueue(queueData);
-      await savePlayerStats(freshStats);
-      return { lobby };
     });
-
-    if (result.alreadyInQueue) return await replyToMessage(message, `Voce ja esta na sala ${result.alreadyInQueue.letter}.`);
-    if (result.duplicateNickname) return await replyToMessage(message, 'Ja existe um jogador com esse nick na fila.');
-
-    const { lobby } = result;
-    const waitingChannel = await message.guild.channels.fetch(lobby.waitingChannelId).catch(() => null);
-    if (waitingChannel && message.member.voice.channel) {
-      await message.member.voice.setChannel(waitingChannel).catch(() => null);
-    }
-
-    await updateQueueDashboard(message.guild);
-
-    // --- Auto-start se a fila ficou completa ---
-    if (lobby.players.length >= lobby.requiredPlayers && !pendingAutoStarts.has(lobby.id)) {
-      await triggerAutoStart(message.guild, lobby.id);
-    }
   } catch (error) {
     console.error('[ERRO] !entrar:', error);
     await replyToMessage(message, `Erro ao entrar na fila: ${error.message}`);
@@ -401,57 +330,18 @@ async function handleNickUpdateCommand(message, args) {
 
 async function handleVoteCommand(message, args) {
   try {
-    const teamVote = args[args.length - 1];
-    if (!['1', '2'].includes(teamVote)) {
-      await replyToMessage(message, '❌ Use `!votar 1` ou `!votar 2` para votar no time vencedor.');
-      return;
-    }
-
-    const currentMatchData = await loadCurrentMatch();
-    // Encontra a partida onde o jogador está
-    const matchEntry = Object.entries(currentMatchData.matches || {}).find(([, entry]) => {
-      if (!entry.active || !entry.match) return false;
-      const { teamOne = [], teamTwo = [] } = entry.match;
-      return [...teamOne, ...teamTwo].some(p => p.discordId === message.author.id);
+    await handleVoteCommandFlow({
+      message,
+      args,
+      deps: {
+        VOTE_THRESHOLD,
+        loadCurrentMatch,
+        castVictoryVote,
+        createCastVictoryVoteDeps,
+        replyToMessage,
+        handleVictoryCommand
+      }
     });
-
-    if (!matchEntry) {
-      await replyToMessage(message, '❌ Voce nao esta em nenhuma partida ativa.');
-      return;
-    }
-
-    const [matchId, entry] = matchEntry;
-    if (!entry.votes) entry.votes = {};
-
-    if (entry.votes[message.author.id]) {
-      await replyToMessage(message, `⚠️ Voce ja votou no **Time ${entry.votes[message.author.id]}** nesta partida.`);
-      return;
-    }
-
-    entry.votes[message.author.id] = teamVote;
-
-    // Conta votos por time
-    const votesT1 = Object.values(entry.votes).filter(v => v === '1').length;
-    const votesT2 = Object.values(entry.votes).filter(v => v === '2').length;
-    const winnerTeam = votesT1 >= VOTE_THRESHOLD ? '1' : votesT2 >= VOTE_THRESHOLD ? '2' : null;
-
-    await saveCurrentMatch(currentMatchData);
-
-    if (winnerTeam) {
-      await replyToMessage(message, `🗳️ **${VOTE_THRESHOLD} votos atingidos!** Registrando vitoria do **Time ${winnerTeam}** automaticamente...`);
-      // Reutiliza o handler de vitória passando os args corretos
-      await handleVictoryCommand(message, [winnerTeam]);
-    } else {
-      const total = votesT1 + votesT2;
-      const bar1 = '🟦'.repeat(votesT1) + '⬜'.repeat(VOTE_THRESHOLD - votesT1);
-      const bar2 = '🟥'.repeat(votesT2) + '⬜'.repeat(VOTE_THRESHOLD - votesT2);
-      await replyToMessage(message,
-        `🗳️ Voto registrado! Placar atual:\n` +
-        `Time 1: ${bar1} (${votesT1}/${VOTE_THRESHOLD})\n` +
-        `Time 2: ${bar2} (${votesT2}/${VOTE_THRESHOLD})\n` +
-        `_Precisa de ${VOTE_THRESHOLD} votos para confirmar. Total: ${total} votos._`
-      );
-    }
   } catch (error) {
     console.error('[ERRO] !votar:', error);
     await replyToMessage(message, `❌ Erro ao votar: ${error.message}`);
@@ -625,26 +515,10 @@ async function handleResetCommand(message) {
     if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
       return await replyToMessage(message, '❌ Voce nao tem permissao para resetar o sistema.');
     }
-    const queueData = await loadQueue();
-    const currentMatchData = await loadCurrentMatch();
-
-    for (const lobby of Object.values(queueData.lobbies || {})) {
-      await deleteVoiceChannelIfExists(message.guild, lobby.waitingChannelId);
-    }
-
-    for (const entry of Object.values(currentMatchData.matches || {})) {
-      const match = entry.match;
-      if (match) {
-        const players = [...(match.teamOne || []), ...(match.teamTwo || [])];
-        await movePlayersToVoiceChannel(message.guild, players, getBaseQueueChannelIdByMode(match.mode));
-        await deleteManagedChannelsForLobby(message.guild, match.mode, match.format, match.letter, [
-            match.waitingChannelId, match.teamOneChannelId, match.teamTwoChannelId
-        ]);
-      }
-    }
-
-    await saveQueue({ lobbies: {} });
-    await saveCurrentMatch({ matches: {} });
+    await resetSystem({
+      guild: message.guild,
+      deps: createResetSystemDeps()
+    });
     await updateQueueDashboard(message.guild);
     await replyToMessage(message, '⚠️ Reset de fila e partidas concluído. Canais temporários removidos.');
   } catch (error) {
@@ -720,20 +594,12 @@ async function handleCancelStartCommand(message, args = []) {
     const matchEntry = findActiveMatchBySelector(currentMatchData, args) || getActiveMatchEntry(currentMatchData, message.member.voice?.channelId);
     if (!matchEntry) return await replyToMessage(message, 'Nenhuma partida ativa encontrada.');
 
-    const [matchId, entry] = matchEntry;
-    const match = entry.match;
-    const restoredLobby = buildLobbyFromMatch(match);
-    
-    await movePlayersToVoiceChannel(message.guild, restoredLobby.players, match.waitingChannelId);
-    await deleteManagedChannelsForLobby(message.guild, match.mode, match.format, match.letter, [
-        match.teamOneChannelId, match.teamTwoChannelId
-    ]);
-
-    const queueData = await loadQueue();
-    queueData.lobbies[restoredLobby.id] = restoredLobby;
-    delete currentMatchData.matches[matchId];
-    await saveQueue(queueData);
-    await saveCurrentMatch(currentMatchData);
+    await cancelActiveMatch({
+      guild: message.guild,
+      currentMatchData,
+      matchEntry,
+      deps: createCancelActiveMatchDeps()
+    });
     await updateQueueDashboard(message.guild);
   } finally {
     if (message.deletable) await message.delete().catch(() => null);
@@ -742,49 +608,23 @@ async function handleCancelStartCommand(message, args = []) {
 
 async function handleStartCommand(message, args = []) {
   try {
-    const queueData = await loadQueue();
-    const lobby = findLobbyBySelector(queueData, args) || findLobbyByChannelId(queueData, message.member.voice?.channelId);
-    if (!lobby || lobby.players.length < lobby.requiredPlayers) return await replyToMessage(message, 'Fila incompleta ou lobby invalido.');
-
-    const result = await withQueueOperationLock(`${message.guild.id}:start:${lobby.id}`, async () => {
-      const q = await loadQueue();
-      const m = await loadCurrentMatch();
-      // Skip se o lobby já não está na fila ou já existe match ativo para ele
-      if (!q.lobbies[lobby.id] || m.matches[lobby.id]?.active) return null;
-      const teams = createBalancedTeams(lobby.players);
-      const chs = await createTeamChannelsForLobby(message.guild, lobby);
-      
-      teams.mode = lobby.mode;
-      teams.format = lobby.format;
-      await movePlayersToTeamChannels(message.guild, teams, chs);
-
-      m.matches[lobby.id] = {
-        active: true,
-        votes: {},
-        match: { ...lobby, teamOne: teams.teamOne, teamTwo: teams.teamTwo, teamOneChannelId: chs.teamOneChannelId, teamTwoChannelId: chs.teamTwoChannelId, teamSize: teams.teamOne.length, createdAt: new Date().toISOString() }
-      };
-      delete q.lobbies[lobby.id];
-      await saveQueue(q);
-      await saveCurrentMatch(m);
-      return { teams, chs, lobby };
+    await handleStartCommandFlow({
+      message,
+      args,
+      deps: {
+        loadQueue,
+        findLobbyBySelector,
+        findLobbyByChannelId,
+        startMatch,
+        createStartMatchDeps,
+        pendingAutoStarts,
+        sendMatchStartAnnouncement,
+        updateQueueDashboard,
+        buildTeamsEmbed,
+        replyToMessage,
+        config
+      }
     });
-    if (!result) {
-      return await replyToMessage(message, 'Partida já iniciada ou lobby não encontrado.');
-    }
-
-    // Cancela auto-start pendente deste lobby, se existir, para evitar anúncios duplicados
-    const pendingTimeout = pendingAutoStarts.get(lobby.id);
-    if (pendingTimeout) {
-      clearTimeout(pendingTimeout);
-      pendingAutoStarts.delete(lobby.id);
-    }
-
-    await sendMatchStartAnnouncement(message.guild, result.teams);
-    await updateQueueDashboard(message.guild);
-    const commandChannelId = message.channelId || message.channel?.id || null;
-    if (commandChannelId !== config.textChannels.matchOngoingChannelId) {
-      await replyToMessage(message, { embeds: [buildTeamsEmbed(result.teams, result.chs, result.lobby)] });
-    }
   } catch (error) {
     console.error('[ERRO] !start:', error);
     await replyToMessage(message, `❌ Erro ao iniciar partida: \`${error.message}\`.`);
@@ -795,201 +635,37 @@ async function handleStartCommand(message, args = []) {
 
 async function handleVictoryCommand(message, args) {
   try {
-    if (!message.member.permissions.has(PermissionFlagsBits.MoveMembers)) {
-      return await replyToMessage(message, '❌ Voce nao tem permissao para declarar vitoria.');
-    }
-    const winningTeam = args[args.length - 1];
-    if (!['1', '2'].includes(winningTeam)) return await replyToMessage(message, 'Use !vitoria 1 ou 2.');
-    const currentMatchData = await loadCurrentMatch();
-    const matchEntry = findActiveMatchBySelector(currentMatchData, args.slice(0, -1)) || getActiveMatchEntry(currentMatchData, message.member.voice?.channelId);
-    if (!matchEntry) {
-      const systemMeta = await loadSystemMeta();
-      const recentVictory = getRecentVictoryForGuild(systemMeta, message.guild.id);
-
-      if (recentVictory && recentVictory.winnerTeam === winningTeam) {
-        const modeLabel = formatQueueMode(recentVictory.mode);
-        const formatLabel = recentVictory.mode === QUEUE_MODES.ARAM ? ` ${recentVictory.format || '5x5'}` : '';
-        const lobbyLabel = recentVictory.letter ? ` lobby ${recentVictory.letter}` : ' partida recente';
-        return await replyToMessage(
-          message,
-          `⚠️ Esse resultado ja foi registrado recentemente para o${lobbyLabel} (${modeLabel}${formatLabel}).`
-        );
-      }
-
-      return await replyToMessage(message, 'Partida nao encontrada.');
-    }
-
-    const [matchId, entry] = matchEntry;
-    const match = entry.match;
-    const winningPlayers = winningTeam === '1' ? match.teamOne : match.teamTwo;
-    const losingPlayers = winningTeam === '1' ? match.teamTwo : match.teamOne;
-    const mmrWeight = match.mode === QUEUE_MODES.ARAM ? getAramWeightByTeamSize(match.teamSize || Number(String(match.format || '5x5').split('x')[0])) : 1;
-    const avgWinnerOppMmr = Math.round(losingPlayers.reduce((sum, p) => sum + Number(p.mmr || 1200), 0) / (losingPlayers.length || 1));
-    const avgLoserOppMmr = Math.round(winningPlayers.reduce((sum, p) => sum + Number(p.mmr || 1200), 0) / (winningPlayers.length || 1));
-    await withQueueOperationLock(`${message.guild.id}:victory:${matchId}`, async () => {
-        const currentMatchData = await loadCurrentMatch();
-        const matchEntryStatus = currentMatchData.matches[matchId];
-        if (!matchEntryStatus) throw new Error('A partida ja foi finalizada ou nao existe mais.');
-
-        const statsData = await loadPlayerStats();
-        
-        const winners = []; const losers = [];
-        for(const p of winningPlayers) {
-            const s = getStoredPlayerStats(statsData, p);
-            const m = getModeStats(s, match.mode, match.format);
-            const beforeRank = m.internalRating || 0;
-            const beforeRecord = formatCustomRecord(m);
-            const delta = Math.round(calculateEloDelta(beforeRank, avgWinnerOppMmr, 1, (m.customWins || 0) + (m.customLosses || 0)) * mmrWeight);
-            const afterRank = beforeRank + delta;
-            const updatedModes = {
-              ...normalizePlayerModes(s),
-              [getStatsBucketKey(match.mode, match.format)]: {
-                ...m,
-                customWins: (m.customWins || 0) + 1,
-                internalRating: afterRank,
-                winStreak: (m.winStreak || 0) + 1
-              }
-            };
-            if (shouldMirrorAramGroupedStats(match.mode, match.format)) {
-              const groupedStats = getModeStats(s, QUEUE_MODES.ARAM, null);
-              updatedModes.aram = {
-                ...groupedStats,
-                customWins: (groupedStats.customWins || 0) + 1,
-                internalRating: afterRank,
-                winStreak: (groupedStats.winStreak || 0) + 1
-              };
-            }
-            upsertPlayerStats(statsData, p, { modes: updatedModes });
-            winners.push({ ...p, beforeRank, afterRank, beforeRecord, afterRecord: formatCustomRecord(updatedModes[getStatsBucketKey(match.mode, match.format)]), ratingDelta: delta, winStreak: (m.winStreak || 0) + 1 });
-        }
-        for(const p of losingPlayers) {
-            const s = getStoredPlayerStats(statsData, p);
-            const m = getModeStats(s, match.mode, match.format);
-            const beforeRank = m.internalRating || 0;
-            const beforeRecord = formatCustomRecord(m);
-            const delta = Math.round(calculateEloDelta(beforeRank, avgLoserOppMmr, 0, (m.customWins || 0) + (m.customLosses || 0)) * mmrWeight);
-            const afterRank = Math.max(0, beforeRank + delta);
-            const updatedModes = {
-              ...normalizePlayerModes(s),
-              [getStatsBucketKey(match.mode, match.format)]: {
-                ...m,
-                customLosses: (m.customLosses || 0) + 1,
-                internalRating: afterRank,
-                winStreak: 0
-              }
-            };
-            if (shouldMirrorAramGroupedStats(match.mode, match.format)) {
-              const groupedStats = getModeStats(s, QUEUE_MODES.ARAM, null);
-              updatedModes.aram = {
-                ...groupedStats,
-                customLosses: (groupedStats.customLosses || 0) + 1,
-                internalRating: afterRank,
-                winStreak: 0
-              };
-            }
-            upsertPlayerStats(statsData, p, { modes: updatedModes });
-            losers.push({ ...p, beforeRank, afterRank, beforeRecord, afterRecord: formatCustomRecord(updatedModes[getStatsBucketKey(match.mode, match.format)]), ratingDelta: delta });
-        }
-
-        await savePlayerStats(statsData);
-        delete currentMatchData.matches[matchId];
-        await saveCurrentMatch(currentMatchData);
-
-        // Export data for history log inside lock to ensure consistency
-        match.winners = winners;
-        match.losers = losers;
-    });
-
-    const { winners, losers } = match;
-    for(const p of [...winners, ...losers]) await syncMemberRankRole(message.guild, p.discordId, p.afterRank);
-    const maxStreak = Math.max(...winners.map(p => p.winStreak || 0));
-    const mvps = maxStreak > 0 ? winners.filter(p => (p.winStreak || 0) === maxStreak) : [];
-    await clearMvpRoles(message.guild);
-    for (const mvp of mvps) {
-      await syncMvpRole(message.guild, mvp.discordId);
-      await postMvpAnnouncement(message.guild, mvp);
-    }
-    
-    // Mover jogadores de volta para o lobby principal antes de apagar as salas
-    const baseLobbyChannelId = getBaseQueueChannelIdByMode(match.mode);
-    await movePlayersToVoiceChannel(message.guild, [...winners, ...losers], baseLobbyChannelId);
-
-    await deleteManagedChannelsForLobby(message.guild, match.mode, match.format, match.letter, [
-        match.teamOneChannelId, match.teamTwoChannelId, match.waitingChannelId
-    ]);
-
-    await replyToMessage(message, `Vitoria registrada para a Equipe ${winningTeam}!`);
-    await updateQueueDashboard(message.guild);
-    const finishedAt = new Date().toISOString();
-    const systemMeta = await loadSystemMeta();
-    await saveSystemMeta({
-      ...systemMeta,
-      recentVictory: {
-        guildId: message.guild.id,
-        matchId,
-        winnerTeam,
-        mode: match.mode,
-        format: match.format,
-        letter: match.letter || null,
-        finishedAt
+    await handleVictoryCommandFlow({
+      message,
+      args,
+      deps: {
+        QUEUE_MODES,
+        loadCurrentMatch,
+        findActiveMatchBySelector,
+        getActiveMatchEntry,
+        loadSystemMeta,
+        getRecentVictoryForGuild,
+        formatQueueMode,
+        replyToMessage,
+        registerVictory,
+        createRegisterVictoryDeps,
+        syncMemberRankRole,
+        clearMvpRoles,
+        syncMvpRole,
+        postMvpAnnouncement,
+        getBaseQueueChannelIdByMode,
+        movePlayersToVoiceChannel,
+        deleteManagedChannelsForLobby,
+        updateQueueDashboard,
+        saveSystemMeta,
+        postMatchHistoryLog,
+        getSeasonDisplayLabel,
+        loadSeasonMeta,
+        loadPlayerStats,
+        postPlayerLogs,
+        postMatchSummaryToSeasonLog
       }
     });
-
-    await postMatchHistoryLog(message.guild, { 
-        winningTeam, 
-        modeLabel: match.mode, 
-        formatLabel: match.format, 
-        winners, 
-        losers, 
-        finishedAt,
-        startedAt: match.createdAt,
-        initialDifference: match.difference || 0,
-        letter: match.letter || '?',
-        periodLabel: getSeasonDisplayLabel(await loadSeasonMeta())
-    });
-
-    // Build matchResult for player logs and season log
-    const playerDeltas = {};
-    for (const p of winners) {
-      playerDeltas[p.discordId] = {
-        nickname: p.nickname,
-        mmrBefore: p.beforeRank,
-        mmrAfter: p.afterRank,
-        result: 'vitória',
-        winStreak: p.winStreak || 0,
-        customWins: (p.customWins || 0) + 1,
-        customLosses: p.customLosses || 0
-      };
-    }
-    for (const p of losers) {
-      playerDeltas[p.discordId] = {
-        nickname: p.nickname,
-        mmrBefore: p.beforeRank,
-        mmrAfter: p.afterRank,
-        result: 'derrota',
-        winStreak: 0,
-        customWins: p.customWins || 0,
-        customLosses: (p.customLosses || 0) + 1
-      };
-    }
-    const teamOneAvgDelta = winners.length > 0
-      ? Math.round(winners.reduce((sum, p) => sum + (p.afterRank - p.beforeRank), 0) / winners.length)
-      : 0;
-    const teamTwoAvgDelta = losers.length > 0
-      ? Math.round(losers.reduce((sum, p) => sum + (p.afterRank - p.beforeRank), 0) / losers.length)
-      : 0;
-    const matchResult = {
-      match: { ...match, finishedAt },
-      winnerTeam: winningTeam,
-      playerDeltas,
-      teamOneAvgDelta: winningTeam === '1' ? teamOneAvgDelta : teamTwoAvgDelta,
-      teamTwoAvgDelta: winningTeam === '1' ? teamTwoAvgDelta : teamOneAvgDelta
-    };
-    const freshStats = await loadPlayerStats();
-    await Promise.all([
-      postPlayerLogs(message.guild, matchResult, freshStats),
-      postMatchSummaryToSeasonLog(message.guild, matchResult)
-    ]);
   } catch (error) {
     console.error('[ERRO] !vitoria:', error);
     await replyToMessage(message, `❌ Erro ao processar resultado: \`${error.message}\`.`);
