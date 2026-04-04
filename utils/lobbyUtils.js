@@ -1339,8 +1339,8 @@ function startDailyRankScheduler() {
 }
 
 async function movePlayersToTeamChannels(guild, teams, teamChannelIds) {
-  const teamOneChannel = await guild.channels.fetch(teamChannelIds.teamOneChannelId);
-  const teamTwoChannel = await guild.channels.fetch(teamChannelIds.teamTwoChannelId);
+  const teamOneChannel = await guild.channels.fetch(teamChannelIds.teamOneChannelId).catch(() => null);
+  const teamTwoChannel = await guild.channels.fetch(teamChannelIds.teamTwoChannelId).catch(() => null);
 
   if (
     !teamOneChannel ||
@@ -1348,7 +1348,8 @@ async function movePlayersToTeamChannels(guild, teams, teamChannelIds) {
     teamOneChannel.type !== ChannelType.GuildVoice ||
     teamTwoChannel.type !== ChannelType.GuildVoice
   ) {
-    throw new Error('Os canais de voz das equipes nao foram encontrados no config.json.');
+    console.warn('[MOVE] Canais de equipe não encontrados, pulando movimentação.');
+    return;
   }
 
   const allPlayers = [
@@ -1357,10 +1358,11 @@ async function movePlayersToTeamChannels(guild, teams, teamChannelIds) {
   ];
 
   for (const player of allPlayers) {
-    const member = await guild.members.fetch(player.discordId);
-
-    if (member.voice?.channel) {
-      await member.voice.setChannel(player.channel);
+    const member = await guild.members.fetch(player.discordId).catch(() => null);
+    if (member?.voice?.channel) {
+      await member.voice.setChannel(player.channel).catch(err =>
+        console.warn(`[MOVE] Não foi possível mover ${player.nickname}:`, err.message)
+      );
     }
   }
 }
