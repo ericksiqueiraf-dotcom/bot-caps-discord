@@ -1,5 +1,4 @@
 const { ChannelType, EmbedBuilder } = require('discord.js');
-const db = require('../services/dataService');
 const config = require('../config.json');
 const { 
   QUEUE_MODES, loadSystemMeta, saveSystemMeta, 
@@ -816,18 +815,15 @@ function buildLeaderboardEmbed(statsData, mode = QUEUE_MODES.CLASSIC, format = n
   return embed;
 }
 
-function getRankedPlayersByMode(statsData, mode, format = null) {
+function getRankedPlayersByMode(statsData, mode, format = null, seasonMeta = null) {
   const players = Object.values(statsData.players || {});
   let minGames = 1;
 
-  try {
-    const seasonMeta = db.loadSeasonMeta();
-    if (seasonMeta && seasonMeta.phase === 'official') {
-      minGames = 10;
-    } else {
-      minGames = 5;
-    }
-  } catch (e) {}
+  if (seasonMeta && seasonMeta.phase === 'official') {
+    minGames = 10;
+  } else {
+    minGames = 5;
+  }
 
   return players
     .map((player) => {
@@ -862,7 +858,7 @@ function getRankedPlayersByMode(statsData, mode, format = null) {
 }
 
 function buildTopTenEmbed(statsData, seasonMeta, mode, format = null) {
-  const rankedPlayers = getRankedPlayersByMode(statsData, mode, format).slice(0, 10);
+  const rankedPlayers = getRankedPlayersByMode(statsData, mode, format, seasonMeta).slice(0, 10);
   const modeLabel = getStatsBucketLabel(mode, format);
   const medals = ['🥇', '🥈', '🥉'];
 
@@ -1074,9 +1070,9 @@ function archiveCurrentSeason(statsData, seasonMeta) {
         : `Fase de Testes #${Number(seasonMeta.testingCycle || seasonMeta.currentSeason || 1)}`,
     startedAt: seasonMeta.startedAt,
     endedAt: new Date().toISOString(),
-    topClassic: getRankedPlayersByMode(statsData, QUEUE_MODES.CLASSIC).slice(0, 10),
-    topAram: getRankedPlayersByMode(statsData, QUEUE_MODES.ARAM).slice(0, 10),
-    topAram1x1: getRankedPlayersByMode(statsData, QUEUE_MODES.ARAM, '1x1').slice(0, 10),
+    topClassic: getRankedPlayersByMode(statsData, QUEUE_MODES.CLASSIC, null, seasonMeta).slice(0, 10),
+    topAram: getRankedPlayersByMode(statsData, QUEUE_MODES.ARAM, null, seasonMeta).slice(0, 10),
+    topAram1x1: getRankedPlayersByMode(statsData, QUEUE_MODES.ARAM, '1x1', seasonMeta).slice(0, 10),
     playersSnapshot: deepClone(statsData),
     seasonMetaSnapshot: deepClone(seasonMeta)
   };
