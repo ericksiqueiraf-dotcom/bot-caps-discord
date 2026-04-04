@@ -44,6 +44,8 @@ const getRiotService = () => global.riotService;
 const pendingAutoStarts = new Map();
 const VOTE_THRESHOLD = 3; // Fase de testes: 3 votos decidem
 const RECENT_VICTORY_WINDOW_MS = 2 * 60 * 1000;
+const KNOWN_ARAM_FORMATS = ['1x1', '2x2', '3x3', '4x4', '5x5'];
+const GROUPED_ARAM_STREAK_FORMATS = new Set(['2x2', '3x3', '4x4']);
 
 function getRecentVictoryForGuild(systemMeta, guildId) {
   const recentVictory = systemMeta?.recentVictory;
@@ -58,6 +60,21 @@ function getRecentVictoryForGuild(systemMeta, guildId) {
   }
 
   return Date.now() - finishedAtMs <= RECENT_VICTORY_WINDOW_MS ? recentVictory : null;
+}
+
+function parseModeAndFormatArgs(args = []) {
+  const normalizedArgs = args.map((arg) => String(arg || '').toLowerCase());
+  const detectedFormat = normalizedArgs.find((arg) => KNOWN_ARAM_FORMATS.includes(arg)) || null;
+  const mode = normalizedArgs.includes(QUEUE_MODES.ARAM) || Boolean(detectedFormat) ? QUEUE_MODES.ARAM : QUEUE_MODES.CLASSIC;
+
+  return {
+    mode,
+    format: mode === QUEUE_MODES.ARAM ? detectedFormat : null
+  };
+}
+
+function shouldMirrorAramGroupedStats(mode, format) {
+  return mode === QUEUE_MODES.ARAM && GROUPED_ARAM_STREAK_FORMATS.has(String(format || '').toLowerCase());
 }
 
 async function triggerAutoStart(guild, lobbyId) {
@@ -179,7 +196,7 @@ async function handleEnterCommand(message, args) {
         tier: storedEntry.tier || 'GOLD',
         rank: storedEntry.rank || 'IV',
         leaguePoints: storedEntry.leaguePoints || 0,
-        mmr: storedEntry.baseMmr || storedModeStats.baseMmr || 1200,
+        mmr: storedModeStats.baseMmr || storedEntry.baseMmr || 1200,
         isFallbackUnranked: Boolean(storedEntry.isFallbackUnranked)
       };
     } else {
@@ -488,9 +505,7 @@ async function handlePingCommand(message) {
 
 async function handleLeaderboardCommand(message, args = []) {
   const statsData = await loadPlayerStats();
-  const normalizedArgs = args.map(a => String(a).toLowerCase());
-  const mode = normalizedArgs.includes(QUEUE_MODES.ARAM) ? QUEUE_MODES.ARAM : QUEUE_MODES.CLASSIC;
-  const format = mode === QUEUE_MODES.ARAM && normalizedArgs.includes('1x1') ? '1x1' : null;
+  const { mode, format } = parseModeAndFormatArgs(args);
   const embed = buildLeaderboardEmbed(statsData, mode, format);
   await sendToMessageChannel(message, { embeds: [embed] });
 }
@@ -498,18 +513,14 @@ async function handleLeaderboardCommand(message, args = []) {
 async function handleTopTenCommand(message, args = []) {
   const statsData = await loadPlayerStats();
   const seasonMeta = await loadSeasonMeta();
-  const normalizedArgs = args.map(a => String(a).toLowerCase());
-  const mode = normalizedArgs.includes(QUEUE_MODES.ARAM) ? QUEUE_MODES.ARAM : QUEUE_MODES.CLASSIC;
-  const format = mode === QUEUE_MODES.ARAM && normalizedArgs.includes('1x1') ? '1x1' : null;
+  const { mode, format } = parseModeAndFormatArgs(args);
   const embed = buildTopTenEmbed(statsData, seasonMeta, mode, format);
   await sendToMessageChannel(message, { embeds: [embed] });
 }
 
 async function handleTopStreakCommand(message, args = []) {
   const statsData = await loadPlayerStats();
-  const normalizedArgs = args.map(a => String(a).toLowerCase());
-  const mode = normalizedArgs.includes(QUEUE_MODES.ARAM) ? QUEUE_MODES.ARAM : QUEUE_MODES.CLASSIC;
-  const format = mode === QUEUE_MODES.ARAM && normalizedArgs.includes('1x1') ? '1x1' : null;
+  const { mode, format } = parseModeAndFormatArgs(args);
   const embed = buildTopStreakEmbed(statsData, mode, format);
   await sendToMessageChannel(message, { embeds: [embed] });
 }
@@ -770,7 +781,10 @@ async function handleStartCommand(message, args = []) {
 
     await sendMatchStartAnnouncement(message.guild, result.teams);
     await updateQueueDashboard(message.guild);
-    await replyToMessage(message, { embeds: [buildTeamsEmbed(result.teams, result.chs, result.lobby)] });
+    const commandChannelId = message.channelId || message.channel?.id || null;
+    if (commandChannelId !== config.textChannels.matchOngoingChannelId) {
+      await replyToMessage(message, { embeds: [buildTeamsEmbed(result.teams, result.chs, result.lobby)] });
+    }
   } catch (error) {
     console.error('[ERRO] !start:', error);
     await replyToMessage(message, `❌ Erro ao iniciar partida: \`${error.message}\`.`);
@@ -809,6 +823,7 @@ async function handleVictoryCommand(message, args) {
     const match = entry.match;
     const winningPlayers = winningTeam === '1' ? match.teamOne : match.teamTwo;
     const losingPlayers = winningTeam === '1' ? match.teamTwo : match.teamOne;
+    const mmrWeight = match.mode === QUEUE_MODES.ARAM ? getAramWeightByTeamSize(match.teamSize || Number(String(match.format || '5x5').split('x')[0])) : 1;
     const avgWinnerOppMmr = Math.round(losingPlayers.reduce((sum, p) => sum + Number(p.mmr || 1200), 0) / (losingPlayers.length || 1));
     const avgLoserOppMmr = Math.round(winningPlayers.reduce((sum, p) => sum + Number(p.mmr || 1200), 0) / (winningPlayers.length || 1));
     await withQueueOperationLock(`${message.guild.id}:victory:${matchId}`, async () => {
@@ -824,9 +839,26 @@ async function handleVictoryCommand(message, args) {
             const m = getModeStats(s, match.mode, match.format);
             const beforeRank = m.internalRating || 0;
             const beforeRecord = formatCustomRecord(m);
-            const delta = Math.round(calculateEloDelta(beforeRank, avgWinnerOppMmr, 1, (m.customWins || 0) + (m.customLosses || 0)) * (match.mode === QUEUE_MODES.ARAM ? 0.5 : 1));
+            const delta = Math.round(calculateEloDelta(beforeRank, avgWinnerOppMmr, 1, (m.customWins || 0) + (m.customLosses || 0)) * mmrWeight);
             const afterRank = beforeRank + delta;
-            const updatedModes = { ...normalizePlayerModes(s), [getStatsBucketKey(match.mode, match.format)]: { ...m, customWins: (m.customWins || 0) + 1, internalRating: afterRank, winStreak: (m.winStreak || 0) + 1 } };
+            const updatedModes = {
+              ...normalizePlayerModes(s),
+              [getStatsBucketKey(match.mode, match.format)]: {
+                ...m,
+                customWins: (m.customWins || 0) + 1,
+                internalRating: afterRank,
+                winStreak: (m.winStreak || 0) + 1
+              }
+            };
+            if (shouldMirrorAramGroupedStats(match.mode, match.format)) {
+              const groupedStats = getModeStats(s, QUEUE_MODES.ARAM, null);
+              updatedModes.aram = {
+                ...groupedStats,
+                customWins: (groupedStats.customWins || 0) + 1,
+                internalRating: afterRank,
+                winStreak: (groupedStats.winStreak || 0) + 1
+              };
+            }
             upsertPlayerStats(statsData, p, { modes: updatedModes });
             winners.push({ ...p, beforeRank, afterRank, beforeRecord, afterRecord: formatCustomRecord(updatedModes[getStatsBucketKey(match.mode, match.format)]), ratingDelta: delta, winStreak: (m.winStreak || 0) + 1 });
         }
@@ -835,9 +867,26 @@ async function handleVictoryCommand(message, args) {
             const m = getModeStats(s, match.mode, match.format);
             const beforeRank = m.internalRating || 0;
             const beforeRecord = formatCustomRecord(m);
-            const delta = Math.round(calculateEloDelta(beforeRank, avgLoserOppMmr, 0, (m.customWins || 0) + (m.customLosses || 0)) * (match.mode === QUEUE_MODES.ARAM ? 0.5 : 1));
+            const delta = Math.round(calculateEloDelta(beforeRank, avgLoserOppMmr, 0, (m.customWins || 0) + (m.customLosses || 0)) * mmrWeight);
             const afterRank = Math.max(0, beforeRank + delta);
-            const updatedModes = { ...normalizePlayerModes(s), [getStatsBucketKey(match.mode, match.format)]: { ...m, customLosses: (m.customLosses || 0) + 1, internalRating: afterRank, winStreak: 0 } };
+            const updatedModes = {
+              ...normalizePlayerModes(s),
+              [getStatsBucketKey(match.mode, match.format)]: {
+                ...m,
+                customLosses: (m.customLosses || 0) + 1,
+                internalRating: afterRank,
+                winStreak: 0
+              }
+            };
+            if (shouldMirrorAramGroupedStats(match.mode, match.format)) {
+              const groupedStats = getModeStats(s, QUEUE_MODES.ARAM, null);
+              updatedModes.aram = {
+                ...groupedStats,
+                customLosses: (groupedStats.customLosses || 0) + 1,
+                internalRating: afterRank,
+                winStreak: 0
+              };
+            }
             upsertPlayerStats(statsData, p, { modes: updatedModes });
             losers.push({ ...p, beforeRank, afterRank, beforeRecord, afterRecord: formatCustomRecord(updatedModes[getStatsBucketKey(match.mode, match.format)]), ratingDelta: delta });
         }

@@ -16,6 +16,8 @@ const THEME = {
 };
 
 const FOOTER_PREFIX = 'Caps Bot';
+const KNOWN_ARAM_FORMATS = ['1x1', '2x2', '3x3', '4x4', '5x5'];
+const GROUPED_ARAM_STREAK_FORMATS = new Set(['2x2', '3x3', '4x4']);
 
 let lastDailyRankPostKey = null;
 
@@ -122,7 +124,12 @@ function getStatsBucketKey(mode, format = null) {
 
 function getStatsBucketLabel(mode, format = null) {
   if (mode === QUEUE_MODES.ARAM) {
-    return format === '1x1' ? 'ARAM 1x1' : 'ARAM';
+    const normalizedFormat = String(format || '').toLowerCase();
+    if (GROUPED_ARAM_STREAK_FORMATS.has(normalizedFormat)) {
+      return 'ARAM 2X2/3X3/4X4';
+    }
+
+    return normalizedFormat && normalizedFormat !== '5x5' ? `ARAM ${normalizedFormat}`.toUpperCase() : 'ARAM';
   }
 
   return 'CLASSIC';
@@ -191,7 +198,7 @@ function getFormatFromArgs(mode, args) {
   }
 
   const normalizedArgs = args.map((arg) => String(arg || '').toLowerCase());
-  const detectedFormat = normalizedArgs.find((arg) => ['1x1', '2x2', '3x3', '4x4', '5x5'].includes(arg));
+  const detectedFormat = normalizedArgs.find((arg) => KNOWN_ARAM_FORMATS.includes(arg));
 
   if (detectedFormat) {
     return detectedFormat;
@@ -478,7 +485,7 @@ function normalizePlayerModes(player) {
   const normalized = {};
 
   // Lista de modos sugeridos para garantir que sempre existam no objeto
-  const coreModes = ['classic', 'aram', 'aram1x1'];
+  const coreModes = ['classic', 'aram', 'aram1x1', 'aram2x2', 'aram3x3', 'aram4x4', 'aram5x5'];
   const allKeys = new Set([...coreModes, ...Object.keys(rawModes)]);
 
   for (const key of allKeys) {
@@ -517,6 +524,25 @@ function getModeStats(player, mode, format = null) {
   const bucketKey = getStatsBucketKey(mode, format);
 
   return modes[bucketKey] || createEmptyModeStats(player.baseMmr || 0);
+}
+
+function getTopStreakModeStats(player, mode, format = null) {
+  if (mode !== QUEUE_MODES.ARAM) {
+    return getModeStats(player, mode, format);
+  }
+
+  const normalizedPlayer = normalizePlayerModes(player);
+  const normalizedFormat = String(format || '').toLowerCase();
+
+  if (normalizedFormat === '1x1') {
+    return normalizedPlayer.aram1x1 || createEmptyModeStats(player.baseMmr || 0);
+  }
+
+  if (GROUPED_ARAM_STREAK_FORMATS.has(normalizedFormat) || normalizedFormat === '' || normalizedFormat === '5x5' || !normalizedFormat) {
+    return normalizedPlayer.aram || createEmptyModeStats(player.baseMmr || 0);
+  }
+
+  return getModeStats(player, mode, format);
 }
 async function syncMemberRankRole(guild, discordId, mmr) {
   if (!guild || !discordId) return;
@@ -842,7 +868,7 @@ function buildLeaderboardEmbed(statsData, mode = QUEUE_MODES.CLASSIC, format = n
 
 function getRankedPlayersByMode(statsData, mode, format = null, seasonMeta = null) {
   const players = Object.values(statsData.players || {});
-  const minGames = 1;
+  const minGames = seasonMeta?.phase === 'official' ? 10 : 5;
 
   return players
     .map((player) => {
@@ -966,35 +992,24 @@ function resetStatsForNewSeason(statsData) {
 
   for (const [key, player] of Object.entries(statsData.players || {})) {
     const modes = normalizePlayerModes(player);
-    const classicSeed = calculateSeedRating(modes.classic.baseMmr);
-    const aramSeed = calculateSeedRating(modes.aram.baseMmr);
-    const aram1x1Seed = calculateSeedRating(modes.aram1x1.baseMmr);
+    const resetModes = {};
+
+    for (const [modeKey, modeStats] of Object.entries(modes)) {
+      resetModes[modeKey] = {
+        customWins: 0,
+        customLosses: 0,
+        baseMmr: Number(modeStats.baseMmr || 0),
+        internalRating: calculateSeedRating(modeStats.baseMmr || 0),
+        winStreak: 0
+      };
+    }
 
     nextPlayers[key] = {
       ...player,
       customWins: 0,
       customLosses: 0,
-      internalRating: classicSeed,
-      modes: {
-        classic: {
-          customWins: 0,
-          customLosses: 0,
-          baseMmr: modes.classic.baseMmr,
-          internalRating: classicSeed
-        },
-        aram: {
-          customWins: 0,
-          customLosses: 0,
-          baseMmr: modes.aram.baseMmr,
-          internalRating: aramSeed
-        },
-        aram1x1: {
-          customWins: 0,
-          customLosses: 0,
-          baseMmr: modes.aram1x1.baseMmr,
-          internalRating: aram1x1Seed
-        }
-      }
+      internalRating: resetModes.classic?.internalRating || calculateSeedRating(modes.classic.baseMmr || 0),
+      modes: resetModes
     };
   }
 
@@ -1664,7 +1679,7 @@ function createInteractionContext(interaction, overrides = {}) {
 function getRankedPlayersByStreak(statsData, mode, format = null) {
   return Object.values(statsData.players || {})
     .map((player) => {
-      const modeStats = getModeStats(player, mode, format);
+      const modeStats = getTopStreakModeStats(player, mode, format);
       const baseMmr = Number(modeStats.baseMmr || 0);
       const customWins = Number(modeStats.customWins || 0);
       const customLosses = Number(modeStats.customLosses || 0);
@@ -1687,7 +1702,7 @@ function getRankedPlayersByStreak(statsData, mode, format = null) {
       if (b.customWins !== a.customWins) return b.customWins - a.customWins;
       return b.adjustedMmr - a.adjustedMmr;
     })
-    .slice(0, 10);
+    .slice(0, 5);
 }
 
 // ─── Task 2.3: decorateWithLeaderIcons ────────────────────────────────────────

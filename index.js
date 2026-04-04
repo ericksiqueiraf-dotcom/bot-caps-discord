@@ -153,7 +153,12 @@ function buildSlashCommands() {
           .setName('formato')
           .setDescription('Formato do ARAM')
           .setRequired(false)
-          .addChoices({ name: '1x1', value: '1x1' })
+          .addChoices(
+            { name: '1x1', value: '1x1' },
+            { name: '2x2', value: '2x2' },
+            { name: '3x3', value: '3x3' },
+            { name: '4x4', value: '4x4' }
+          )
       ),
     new SlashCommandBuilder()
       .setName('top10')
@@ -173,7 +178,12 @@ function buildSlashCommands() {
           .setName('formato')
           .setDescription('Formato do ARAM')
           .setRequired(false)
-          .addChoices({ name: '1x1', value: '1x1' })
+          .addChoices(
+            { name: '1x1', value: '1x1' },
+            { name: '2x2', value: '2x2' },
+            { name: '3x3', value: '3x3' },
+            { name: '4x4', value: '4x4' }
+          )
       ),
     new SlashCommandBuilder()
       .setName('ficha')
@@ -240,7 +250,12 @@ function buildSlashCommands() {
           .setName('formato')
           .setDescription('Formato do ARAM')
           .setRequired(false)
-          .addChoices({ name: '1x1', value: '1x1' })
+          .addChoices(
+            { name: '1x1', value: '1x1' },
+            { name: '2x2', value: '2x2' },
+            { name: '3x3', value: '3x3' },
+            { name: '4x4', value: '4x4' }
+          )
       )
   ].map((command) => command.toJSON());
 }
