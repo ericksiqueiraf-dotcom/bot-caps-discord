@@ -190,10 +190,11 @@ function getFormatFromArgs(mode, args) {
     return '5x5';
   }
 
-  const maybeFormat = String(args[1] || '').toLowerCase();
+  const normalizedArgs = args.map((arg) => String(arg || '').toLowerCase());
+  const detectedFormat = normalizedArgs.find((arg) => ['1x1', '2x2', '3x3', '4x4', '5x5'].includes(arg));
 
-  if (['1x1', '2x2', '3x3', '4x4', '5x5'].includes(maybeFormat)) {
-    return maybeFormat;
+  if (detectedFormat) {
+    return detectedFormat;
   }
 
   return '5x5';
@@ -201,9 +202,25 @@ function getFormatFromArgs(mode, args) {
 
 function getNicknameArgs(mode, args, format) {
   if (mode === QUEUE_MODES.ARAM) {
-    const hasExplicitFormat = ['1x1', '2x2', '3x3', '4x4', '5x5'].includes(String(args[1] || '').toLowerCase());
-    const startIndex = hasExplicitFormat ? 2 : 1;
-    return args.slice(startIndex);
+    const normalizedFormat = String(format || '').toLowerCase();
+    let removedAram = false;
+    let removedFormat = false;
+
+    return args.filter((arg) => {
+      const normalizedArg = String(arg || '').toLowerCase();
+
+      if (!removedAram && normalizedArg === QUEUE_MODES.ARAM) {
+        removedAram = true;
+        return false;
+      }
+
+      if (!removedFormat && normalizedArg === normalizedFormat) {
+        removedFormat = true;
+        return false;
+      }
+
+      return true;
+    });
   }
 
   return args;

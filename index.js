@@ -330,7 +330,9 @@ const {
   sendToMessageChannel,
   replyToMessage,
   normalizeDiscordPayload,
-  createInteractionContext
+  createInteractionContext,
+  THEME,
+  FOOTER_PREFIX
 } = require('./utils/lobbyUtils');
 
 
@@ -657,4 +659,3 @@ client.on('guildMemberAdd', async (member) => {
 });
 
 client.login(DISCORD_TOKEN);
-

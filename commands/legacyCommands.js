@@ -43,6 +43,22 @@ const getRiotService = () => global.riotService;
 // Armazena timeouts de auto-start pendentes: { [lobbyId]: timeoutId }
 const pendingAutoStarts = new Map();
 const VOTE_THRESHOLD = 3; // Fase de testes: 3 votos decidem
+const RECENT_VICTORY_WINDOW_MS = 2 * 60 * 1000;
+
+function getRecentVictoryForGuild(systemMeta, guildId) {
+  const recentVictory = systemMeta?.recentVictory;
+
+  if (!recentVictory || recentVictory.guildId !== guildId || !recentVictory.finishedAt) {
+    return null;
+  }
+
+  const finishedAtMs = new Date(recentVictory.finishedAt).getTime();
+  if (Number.isNaN(finishedAtMs)) {
+    return null;
+  }
+
+  return Date.now() - finishedAtMs <= RECENT_VICTORY_WINDOW_MS ? recentVictory : null;
+}
 
 async function triggerAutoStart(guild, lobbyId) {
   try {
@@ -120,9 +136,6 @@ async function handleStartCommandInternal(guild, lobby, replyChannel) {
     if (!result) return;
     await sendMatchStartAnnouncement(guild, result.teams);
     await updateQueueDashboard(guild);
-    if (replyChannel?.isTextBased()) {
-      await replyChannel.send({ embeds: [buildTeamsEmbed(result.teams)] }).catch(() => null);
-    }
   } catch (err) {
     console.error('[AUTO-START INTERNAL] Erro:', err);
   }
@@ -130,7 +143,10 @@ async function handleStartCommandInternal(guild, lobby, replyChannel) {
 
 async function handleEnterCommand(message, args) {
   try {
-    const selectedMode = args[0]?.toLowerCase() === QUEUE_MODES.ARAM ? QUEUE_MODES.ARAM : QUEUE_MODES.CLASSIC;
+    const normalizedArgs = args.map((arg) => String(arg || '').toLowerCase());
+    const selectedMode = normalizedArgs.includes(QUEUE_MODES.ARAM) || normalizedArgs.some((arg) => ['1x1', '2x2', '3x3', '4x4', '5x5'].includes(arg))
+      ? QUEUE_MODES.ARAM
+      : QUEUE_MODES.CLASSIC;
     const selectedFormat = getFormatFromArgs(selectedMode, args);
     const providedNick = getNicknameArgs(selectedMode, args, selectedFormat).join(' ').trim();
 
@@ -770,15 +786,24 @@ async function handleVictoryCommand(message, args) {
     }
     const winningTeam = args[args.length - 1];
     if (!['1', '2'].includes(winningTeam)) return await replyToMessage(message, 'Use !vitoria 1 ou 2.');
-    // Staff pode declarar vitória sem checar cargo de jogador
-    const isStaff = message.member.permissions.has(PermissionFlagsBits.MoveMembers);
-    if (!isStaff) {
-      return await replyToMessage(message, '❌ Voce nao tem permissao para declarar vitoria. Use `!votar 1/2` para votar.');
-    }
-
     const currentMatchData = await loadCurrentMatch();
     const matchEntry = findActiveMatchBySelector(currentMatchData, args.slice(0, -1)) || getActiveMatchEntry(currentMatchData, message.member.voice?.channelId);
-    if (!matchEntry) return await replyToMessage(message, 'Partida nao encontrada.');
+    if (!matchEntry) {
+      const systemMeta = await loadSystemMeta();
+      const recentVictory = getRecentVictoryForGuild(systemMeta, message.guild.id);
+
+      if (recentVictory && recentVictory.winnerTeam === winningTeam) {
+        const modeLabel = formatQueueMode(recentVictory.mode);
+        const formatLabel = recentVictory.mode === QUEUE_MODES.ARAM ? ` ${recentVictory.format || '5x5'}` : '';
+        const lobbyLabel = recentVictory.letter ? ` lobby ${recentVictory.letter}` : ' partida recente';
+        return await replyToMessage(
+          message,
+          `⚠️ Esse resultado ja foi registrado recentemente para o${lobbyLabel} (${modeLabel}${formatLabel}).`
+        );
+      }
+
+      return await replyToMessage(message, 'Partida nao encontrada.');
+    }
 
     const [matchId, entry] = matchEntry;
     const match = entry.match;
@@ -828,8 +853,6 @@ async function handleVictoryCommand(message, args) {
 
     const { winners, losers } = match;
     for(const p of [...winners, ...losers]) await syncMemberRankRole(message.guild, p.discordId, p.afterRank);
-
-    for(const p of [...winners, ...losers]) await syncMemberRankRole(message.guild, p.discordId, p.afterRank);
     const maxStreak = Math.max(...winners.map(p => p.winStreak || 0));
     const mvps = maxStreak > 0 ? winners.filter(p => (p.winStreak || 0) === maxStreak) : [];
     await clearMvpRoles(message.guild);
@@ -849,6 +872,20 @@ async function handleVictoryCommand(message, args) {
     await replyToMessage(message, `Vitoria registrada para a Equipe ${winningTeam}!`);
     await updateQueueDashboard(message.guild);
     const finishedAt = new Date().toISOString();
+    const systemMeta = await loadSystemMeta();
+    await saveSystemMeta({
+      ...systemMeta,
+      recentVictory: {
+        guildId: message.guild.id,
+        matchId,
+        winnerTeam,
+        mode: match.mode,
+        format: match.format,
+        letter: match.letter || null,
+        finishedAt
+      }
+    });
+
     await postMatchHistoryLog(message.guild, { 
         winningTeam, 
         modeLabel: match.mode, 
@@ -945,13 +982,21 @@ async function handleOnboardingCommand(message) {
     return await replyToMessage(message, '❌ Voce nao tem permissao para usar o onboarding.');
   }
 
+  const importantChannels = [
+    config.textChannels.queueStatusChannelId ? `• <#${config.textChannels.queueStatusChannelId}> — Status das filas` : null,
+    config.textChannels.matchOngoingChannelId ? `• <#${config.textChannels.matchOngoingChannelId}> — Auto-start, salas e partidas em andamento` : null,
+    config.textChannels.matchHistoryChannelId ? `• <#${config.textChannels.matchHistoryChannelId}> — Histórico das partidas finalizadas` : null,
+    config.textChannels.playerLogChannelId ? `• <#${config.textChannels.playerLogChannelId}> — Log individual de MMR e streak` : null,
+    config.textChannels.seasonLogChannelId ? `• <#${config.textChannels.seasonLogChannelId}> — Resumos de partidas e temporadas` : null,
+    config.textChannels.mvpAnnouncementsChannelId ? `• <#${config.textChannels.mvpAnnouncementsChannelId}> — MVPs e destaques` : null
+  ].filter(Boolean).join('\n');
+
   const embedGuia = new EmbedBuilder()
     .setColor('#5865F2')
     .setTitle('🎮 Arena Caps — Guia de Início Rápido')
     .setDescription(
-      '> Bem-vindo à Arena de Personalizadas Balanceadas!\n' +
-      '> Aqui seu desempenho **dentro do servidor** conta mais que seu elo na Riot.\n\n' +
-      '**Siga os passos abaixo e entre em campo! 🏆**'
+      'Partidas personalizadas com fila persistente, times balanceados por MMR interno e histórico completo de resultados.\n\n' +
+      '**Fluxo rápido: cadastrar, entrar na call, jogar, votar e acompanhar sua evolução.**'
     )
     .addFields(
       {
@@ -966,8 +1011,8 @@ async function handleOnboardingCommand(message) {
         name: '🎯 PASSO 2 — Entre na fila',
         value:
           'Entre em um canal de voz de **Lobby** e use:\n' +
-          '```\n!entrar              → Fila Classic 5x5\n!entrar aram         → Fila ARAM 5x5\n!entrar aram 2x2     → Fila ARAM 2x2\n```\n' +
-          '⚡ A partida inicia **automaticamente** quando todos entram!'
+          '```\n!entrar              → Classic 5x5\n!entrar aram         → ARAM 5x5\n!entrar aram 1x1     → ARAM 1x1\n!entrar aram 2x2     → ARAM 2x2\n```\n' +
+          '⚡ Quando a sala completa, o bot anuncia, cria os times e move a galera automaticamente.'
       },
       {
         name: '🗳️ PASSO 3 — Vote no vencedor',
@@ -978,19 +1023,24 @@ async function handleOnboardingCommand(message) {
           '> Staff pode registrar com `!vitoria 1` ou `!vitoria 2` a qualquer momento.'
       },
       {
-        name: '📊 Canais Importantes',
+        name: '📈 Acompanhe sua evolução',
         value:
-          `• <#${config.textChannels.queueStatusChannelId}> — Status das filas em tempo real\n` +
-          `• <#${config.textChannels.matchOngoingChannelId}> — Partidas em andamento\n` +
-          `• <#${config.textChannels.mvpAnnouncementsChannelId}> — Destaques e MVPs`
+          '`!perfil` — Seu card com MMR e histórico\n' +
+          '`!placar` — Ranking geral por modo\n' +
+          '`!top10` — Top 10 por MMR\n' +
+          '`!topstreak` — Maiores sequências de vitória ativas\n' +
+          '`!temporadas` — Períodos arquivados'
+      },
+      {
+        name: '📊 Canais Importantes',
+        value: importantChannels || 'Configure os canais de texto no `config.json` para exibir os logs do sistema.'
       },
       { name: '🕹️ Outros Comandos Úteis',
         value:
-          '`!perfil` — Seu MMR e histórico\n' +
-          '`!top10` — Ranking Top 10 por MMR\n' +
-          '`!topstreak` — Top 10 maiores sequências de vitórias 🔥\n' +
-          '`!placar` — Ranking geral\n' +
+          '`!lista` — Mostra filas e lobbies ativos\n' +
           '`!sair` — Sair da fila\n' +
+          '`!cancelarstart` — Cancela auto-start de lobby cheio\n' +
+          '`!start` / `!vitoria` — Controle manual da staff\n' +
           '`!ajuda` — Lista completa de comandos'
       },
       {
