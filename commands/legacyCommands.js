@@ -45,7 +45,7 @@ const VOTE_THRESHOLD = 3; // Fase de testes: 3 votos decidem
 
 async function triggerAutoStart(guild, lobbyId) {
   try {
-    const queueData = loadQueue();
+    const queueData = await loadQueue();
     const lobby = queueData.lobbies[lobbyId];
     if (!lobby || lobby.players.length < lobby.requiredPlayers) return;
 
@@ -63,7 +63,7 @@ async function triggerAutoStart(guild, lobbyId) {
 
     const timeoutId = setTimeout(async () => {
       pendingAutoStarts.delete(lobbyId);
-      const freshQueue = loadQueue();
+      const freshQueue = await loadQueue();
       const freshLobby = freshQueue.lobbies[lobbyId];
       if (!freshLobby || freshLobby.players.length < freshLobby.requiredPlayers) return;
 
@@ -89,9 +89,9 @@ async function triggerAutoStart(guild, lobbyId) {
 async function handleStartCommandInternal(guild, lobby, replyChannel) {
   try {
     const result = await withQueueOperationLock(`${guild.id}:start:${lobby.id}`, async () => {
-      const q = loadQueue();
-      const m = loadCurrentMatch();
-      if (!q.lobbies[lobby.id]) return null; // já foi iniciado ou cancelado
+      const q = await loadQueue();
+      const m = await loadCurrentMatch();
+      if (!q.lobbies[lobby.id]) return null;
       const teams = createBalancedTeams(lobby.players);
       const chs = await createTeamChannelsForLobby(guild, lobby);
       teams.mode = lobby.mode;
@@ -111,8 +111,8 @@ async function handleStartCommandInternal(guild, lobby, replyChannel) {
         }
       };
       delete q.lobbies[lobby.id];
-      saveQueue(q);
-      saveCurrentMatch(m);
+      await saveQueue(q);
+      await saveCurrentMatch(m);
       return { teams, chs, lobby };
     });
     if (!result) return;
@@ -139,8 +139,7 @@ async function handleEnterCommand(message, args) {
     }
 
     // --- Resolução do nick: banco ou argumento ---
-    const playerStats = loadPlayerStats();
-    // Pega a entrada mais recente por registeredAt (evita pegar entradas antigas de nicks anteriores)
+    const playerStats = await loadPlayerStats();
     const allEntries = Object.values(playerStats.players || {}).filter(p => p.discordId === message.author.id);
     const storedEntry = allEntries.sort((a, b) => new Date(b.registeredAt || 0) - new Date(a.registeredAt || 0))[0] || null;
     const registeredNick = storedEntry?.registeredNickname || null;
@@ -175,8 +174,8 @@ async function handleEnterCommand(message, args) {
     }
 
     const result = await withQueueOperationLock(`${message.guild.id}:${selectedMode}:${selectedFormat}`, async () => {
-      const queueData = loadQueue();
-      const freshStats = loadPlayerStats();
+      const queueData = await loadQueue();
+      const freshStats = await loadPlayerStats();
       const alreadyInQueue = findLobbyByPlayer(queueData, message.author.id);
 
       if (alreadyInQueue) return { alreadyInQueue };
@@ -250,8 +249,8 @@ async function handleEnterCommand(message, args) {
       }
       upsertPlayerStats(freshStats, { discordId: message.author.id, nickname: rankProfile.nickname, puuid: rankProfile.puuid }, updatedFields);
 
-      saveQueue(queueData);
-      savePlayerStats(freshStats);
+      await saveQueue(queueData);
+      await savePlayerStats(freshStats);
       return { lobby };
     });
 
@@ -287,7 +286,7 @@ async function handleRegisterCommand(message, args) {
     }
     await replyToMessage(message, '⏳ Validando sua conta na Riot...');
     const rankProfile = await global.riotService.getPlayerRankProfile(nickname);
-    const playerStats = loadPlayerStats();
+    const playerStats = await loadPlayerStats();
 
     // Busca entrada anterior do mesmo discordId para migrar o histórico de partidas
     const previousEntries = Object.values(playerStats.players || {}).filter(p => p.discordId === message.author.id);
@@ -309,7 +308,7 @@ async function handleRegisterCommand(message, args) {
         classic: { ...getModeStats(previousEntry || storedStats, QUEUE_MODES.CLASSIC), baseMmr: rankProfile.mmr }
       }
     });
-    savePlayerStats(playerStats);
+    await savePlayerStats(playerStats);
     const rankStr = rankProfile.isFallbackUnranked ? 'Unranked (base Gold IV)' : `${rankProfile.tier} ${rankProfile.rank} — ${rankProfile.leaguePoints} PDL`;
     await replyToMessage(message,
       `✅ Conta vinculada com sucesso!\n` +
@@ -333,13 +332,12 @@ async function handleNickUpdateCommand(message, args) {
     }
     await replyToMessage(message, '⏳ Verificando novo nick na Riot...');
     if (global.riotService.invalidateCache) {
-      // Busca puuid atual para invalidar cache antigo
-      const playerStats = loadPlayerStats();
+      const playerStats = await loadPlayerStats();
       const storedEntry = Object.values(playerStats.players || {}).find(p => p.discordId === message.author.id);
       if (storedEntry?.puuid) global.riotService.invalidateCache(storedEntry.puuid);
     }
     const rankProfile = await global.riotService.getPlayerRankProfile(nickname);
-    const playerStats = loadPlayerStats();
+    const playerStats = await loadPlayerStats();
     const storedStats = getStoredPlayerStats(playerStats, { discordId: message.author.id, nickname: rankProfile.nickname, puuid: rankProfile.puuid });
     upsertPlayerStats(playerStats, { discordId: message.author.id, nickname: rankProfile.nickname, puuid: rankProfile.puuid }, {
       registeredNickname: rankProfile.nickname,
@@ -352,7 +350,7 @@ async function handleNickUpdateCommand(message, args) {
       summonerId: rankProfile.summonerId,
       isFallbackUnranked: Boolean(rankProfile.isFallbackUnranked),
     });
-    savePlayerStats(playerStats);
+    await savePlayerStats(playerStats);
     const rankStr = rankProfile.isFallbackUnranked ? 'Unranked (base Gold IV)' : `${rankProfile.tier} ${rankProfile.rank} — ${rankProfile.leaguePoints} PDL`;
     await replyToMessage(message,
       `✅ Nick atualizado!\n` +
@@ -374,7 +372,7 @@ async function handleVoteCommand(message, args) {
       return;
     }
 
-    const currentMatchData = loadCurrentMatch();
+    const currentMatchData = await loadCurrentMatch();
     // Encontra a partida onde o jogador está
     const matchEntry = Object.entries(currentMatchData.matches || {}).find(([, entry]) => {
       if (!entry.active || !entry.match) return false;
@@ -402,7 +400,7 @@ async function handleVoteCommand(message, args) {
     const votesT2 = Object.values(entry.votes).filter(v => v === '2').length;
     const winnerTeam = votesT1 >= VOTE_THRESHOLD ? '1' : votesT2 >= VOTE_THRESHOLD ? '2' : null;
 
-    saveCurrentMatch(currentMatchData);
+    await saveCurrentMatch(currentMatchData);
 
     if (winnerTeam) {
       await replyToMessage(message, `🗳️ **${VOTE_THRESHOLD} votos atingidos!** Registrando vitoria do **Time ${winnerTeam}** automaticamente...`);
@@ -429,7 +427,7 @@ async function handleVoteCommand(message, args) {
 
 async function handleListCommand(message, args = []) {
   try {
-    const queueData = loadQueue();
+    const queueData = await loadQueue();
     const currentVoiceChannelId = message.member?.voice?.channelId || null;
     const lobbies = Object.values(queueData?.lobbies || {});
     
@@ -471,7 +469,7 @@ async function handlePingCommand(message) {
 }
 
 async function handleLeaderboardCommand(message, args = []) {
-  const statsData = loadPlayerStats();
+  const statsData = await loadPlayerStats();
   const normalizedArgs = args.map(a => String(a).toLowerCase());
   const mode = normalizedArgs.includes(QUEUE_MODES.ARAM) ? QUEUE_MODES.ARAM : QUEUE_MODES.CLASSIC;
   const format = mode === QUEUE_MODES.ARAM && normalizedArgs.includes('1x1') ? '1x1' : null;
@@ -480,8 +478,8 @@ async function handleLeaderboardCommand(message, args = []) {
 }
 
 async function handleTopTenCommand(message, args = []) {
-  const statsData = loadPlayerStats();
-  const seasonMeta = loadSeasonMeta();
+  const statsData = await loadPlayerStats();
+  const seasonMeta = await loadSeasonMeta();
   const normalizedArgs = args.map(a => String(a).toLowerCase());
   const mode = normalizedArgs.includes(QUEUE_MODES.ARAM) ? QUEUE_MODES.ARAM : QUEUE_MODES.CLASSIC;
   const format = mode === QUEUE_MODES.ARAM && normalizedArgs.includes('1x1') ? '1x1' : null;
@@ -491,7 +489,7 @@ async function handleTopTenCommand(message, args = []) {
 
 async function handlePlayerCardCommand(message, targetUser = null) {
   const selectedUser = targetUser || message.mentions.users.first() || message.author;
-  const statsData = loadPlayerStats();
+  const statsData = await loadPlayerStats();
   const playerStats = Object.values(statsData.players || {}).find(p => p.discordId === selectedUser.id);
   if (!playerStats) return await replyToMessage(message, 'Jogador nao registrado no sistema.');
   await sendToMessageChannel(message, { embeds: [buildPlayerCardEmbed(playerStats, selectedUser)] });
@@ -517,7 +515,7 @@ async function handleHelpCommand(message) {
 async function handleLeaveCommand(message) {
   try {
     await withQueueOperationLock(`${message.guild.id}:global:queue`, async () => {
-      const queueData = loadQueue();
+      const queueData = await loadQueue();
       const lobby = findLobbyByPlayer(queueData, message.author.id);
       if (!lobby) return await replyToMessage(message, 'Voce nao esta em nenhuma fila.');
 
@@ -536,7 +534,7 @@ async function handleLeaveCommand(message) {
         queueData.lobbies[lobby.id] = lobby;
       }
 
-      saveQueue(queueData);
+      await saveQueue(queueData);
     });
     await updateQueueDashboard(message.guild);
   } catch (error) {
@@ -556,7 +554,7 @@ async function handleRemoveCommand(message, targetUserOverride = null) {
     if (!targetUser) return await replyToMessage(message, 'Mencione um jogador.');
 
     await withQueueOperationLock(`${message.guild.id}:global:queue`, async () => {
-      const queueData = loadQueue();
+      const queueData = await loadQueue();
       const lobby = findLobbyByPlayer(queueData, targetUser.id);
       if (!lobby) return await replyToMessage(message, 'Jogador nao esta na fila.');
 
@@ -576,7 +574,7 @@ async function handleRemoveCommand(message, targetUserOverride = null) {
         queueData.lobbies[lobby.id] = lobby;
       }
 
-      saveQueue(queueData);
+      await saveQueue(queueData);
     });
     await updateQueueDashboard(message.guild);
   } finally {
@@ -589,8 +587,8 @@ async function handleResetCommand(message) {
     if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
       return await replyToMessage(message, '❌ Voce nao tem permissao para resetar o sistema.');
     }
-    const queueData = loadQueue();
-    const currentMatchData = loadCurrentMatch();
+    const queueData = await loadQueue();
+    const currentMatchData = await loadCurrentMatch();
 
     for (const lobby of Object.values(queueData.lobbies || {})) {
       await deleteVoiceChannelIfExists(message.guild, lobby.waitingChannelId);
@@ -607,8 +605,8 @@ async function handleResetCommand(message) {
       }
     }
 
-    saveQueue({ lobbies: {} });
-    saveCurrentMatch({ matches: {} });
+    await saveQueue({ lobbies: {} });
+    await saveCurrentMatch({ matches: {} });
     await updateQueueDashboard(message.guild);
     await replyToMessage(message, '⚠️ Reset de fila e partidas concluído. Canais temporários removidos.');
   } catch (error) {
@@ -625,8 +623,8 @@ async function handleCleanupRoomsCommand(message) {
   }
   const dynamicChannels = message.guild.channels.cache.filter(c => isManagedDynamicChannel(c));
   for (const channel of dynamicChannels.values()) await deleteVoiceChannelIfExists(message.guild, channel.id);
-  saveQueue({ lobbies: {} });
-  saveCurrentMatch({ matches: {} });
+  await saveQueue({ lobbies: {} });
+  await saveCurrentMatch({ matches: {} });
   await updateQueueDashboard(message.guild);
   await replyToMessage(message, 'Canais dinamicos e estados internos limpos.');
 }
@@ -635,14 +633,17 @@ async function handleSeasonResetCommand(message) {
   if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
     return await replyToMessage(message, '❌ Comando restrito a administradores.');
   }
-  const statsData = loadPlayerStats();
-  const seasonMeta = loadSeasonMeta();
-  archiveCurrentSeason(statsData, seasonMeta);
-  savePlayerStats(resetStatsForNewSeason(statsData));
-  saveQueue({ lobbies: {} });
-  saveCurrentMatch({ matches: {} });
+  const statsData = await loadPlayerStats();
+  const seasonMeta = await loadSeasonMeta();
+  const history = await loadSeasonHistory();
+  const archivedSeason = archiveCurrentSeason(statsData, seasonMeta);
+  history.seasons.push(archivedSeason);
+  await saveSeasonHistory(history);
+  await savePlayerStats(resetStatsForNewSeason(statsData));
+  await saveQueue({ lobbies: {} });
+  await saveCurrentMatch({ matches: {} });
   const nextMeta = { ...seasonMeta, currentSeason: seasonMeta.currentSeason + 1, startedAt: new Date().toISOString() };
-  saveSeasonMeta(nextMeta);
+  await saveSeasonMeta(nextMeta);
   await updateQueueDashboard(message.guild);
   await replyToMessage(message, 'Temporada resetada com sucesso.');
 }
@@ -651,9 +652,9 @@ async function handleOfficialSeasonStartCommand(message) {
   if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
     return await replyToMessage(message, '❌ Comando restrito a administradores.');
   }
-  const seasonMeta = loadSeasonMeta();
+  const seasonMeta = await loadSeasonMeta();
   if (seasonMeta.phase === 'official') return await replyToMessage(message, 'Temporada oficial ja ativa.');
-  saveSeasonMeta({ ...seasonMeta, phase: 'official', officialSeasonStarted: true, currentSeason: 1 });
+  await saveSeasonMeta({ ...seasonMeta, phase: 'official', officialSeasonStarted: true, currentSeason: 1 });
   await replyToMessage(message, 'Temporada Oficial #1 Iniciada!');
 }
 
@@ -661,7 +662,7 @@ async function handleUndoSeasonResetCommand(message) {
   if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
     return await replyToMessage(message, '❌ Comando restrito a administradores.');
   }
-  const history = loadSeasonHistory();
+  const history = await loadSeasonHistory();
   if (history.seasons.length === 0) return await replyToMessage(message, 'Nao ha nada para restaurar.');
   // Logic to restore last history entry (simplified for safety here)
   await replyToMessage(message, 'Funcao de desfazer aguardando revisao manual de dados.');
@@ -676,7 +677,7 @@ async function handleCancelStartCommand(message, args = []) {
     if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
       return await replyToMessage(message, '❌ Voce nao tem permissao para cancelar partidas.');
     }
-    const currentMatchData = loadCurrentMatch();
+    const currentMatchData = await loadCurrentMatch();
     const matchEntry = findActiveMatchBySelector(currentMatchData, args) || getActiveMatchEntry(currentMatchData, message.member.voice?.channelId);
     if (!matchEntry) return await replyToMessage(message, 'Nenhuma partida ativa encontrada.');
 
@@ -689,11 +690,11 @@ async function handleCancelStartCommand(message, args = []) {
         match.teamOneChannelId, match.teamTwoChannelId
     ]);
 
-    const queueData = loadQueue();
+    const queueData = await loadQueue();
     queueData.lobbies[restoredLobby.id] = restoredLobby;
     delete currentMatchData.matches[matchId];
-    saveQueue(queueData);
-    saveCurrentMatch(currentMatchData);
+    await saveQueue(queueData);
+    await saveCurrentMatch(currentMatchData);
     await updateQueueDashboard(message.guild);
   } finally {
     if (message.deletable) await message.delete().catch(() => null);
@@ -702,13 +703,13 @@ async function handleCancelStartCommand(message, args = []) {
 
 async function handleStartCommand(message, args = []) {
   try {
-    const queueData = loadQueue();
+    const queueData = await loadQueue();
     const lobby = findLobbyBySelector(queueData, args) || findLobbyByChannelId(queueData, message.member.voice?.channelId);
     if (!lobby || lobby.players.length < lobby.requiredPlayers) return await replyToMessage(message, 'Fila incompleta ou lobby invalido.');
 
     const result = await withQueueOperationLock(`${message.guild.id}:start:${lobby.id}`, async () => {
-      const q = loadQueue();
-      const m = loadCurrentMatch();
+      const q = await loadQueue();
+      const m = await loadCurrentMatch();
       const teams = createBalancedTeams(lobby.players);
       const chs = await createTeamChannelsForLobby(message.guild, lobby);
       
@@ -722,8 +723,8 @@ async function handleStartCommand(message, args = []) {
         match: { ...lobby, teamOne: teams.teamOne, teamTwo: teams.teamTwo, teamOneChannelId: chs.teamOneChannelId, teamTwoChannelId: chs.teamTwoChannelId, teamSize: teams.teamOne.length, createdAt: new Date().toISOString() }
       };
       delete q.lobbies[lobby.id];
-      saveQueue(q);
-      saveCurrentMatch(m);
+      await saveQueue(q);
+      await saveCurrentMatch(m);
       return { teams, chs, lobby };
     });
 
@@ -751,7 +752,7 @@ async function handleVictoryCommand(message, args) {
       return await replyToMessage(message, '❌ Voce nao tem permissao para declarar vitoria. Use `!votar 1/2` para votar.');
     }
 
-    const currentMatchData = loadCurrentMatch();
+    const currentMatchData = await loadCurrentMatch();
     const matchEntry = findActiveMatchBySelector(currentMatchData, args.slice(0, -1)) || getActiveMatchEntry(currentMatchData, message.member.voice?.channelId);
     if (!matchEntry) return await replyToMessage(message, 'Partida nao encontrada.');
 
@@ -760,11 +761,11 @@ async function handleVictoryCommand(message, args) {
     const winningPlayers = winningTeam === '1' ? match.teamOne : match.teamTwo;
     const losingPlayers = winningTeam === '1' ? match.teamTwo : match.teamOne;
     await withQueueOperationLock(`${message.guild.id}:victory:${matchId}`, async () => {
-        const currentMatchData = loadCurrentMatch();
+        const currentMatchData = await loadCurrentMatch();
         const matchEntryStatus = currentMatchData.matches[matchId];
         if (!matchEntryStatus) throw new Error('A partida ja foi finalizada ou nao existe mais.');
 
-        const statsData = loadPlayerStats();
+        const statsData = await loadPlayerStats();
         
         const winners = []; const losers = [];
         for(const p of winningPlayers) {
@@ -790,9 +791,9 @@ async function handleVictoryCommand(message, args) {
             losers.push({ ...p, beforeRank, afterRank, beforeRecord, afterRecord: formatCustomRecord(updatedModes[getStatsBucketKey(match.mode, match.format)]), ratingDelta: delta });
         }
 
-        savePlayerStats(statsData);
+        await savePlayerStats(statsData);
         delete currentMatchData.matches[matchId];
-        saveCurrentMatch(currentMatchData);
+        await saveCurrentMatch(currentMatchData);
 
         // Export data for history log inside lock to ensure consistency
         match.winners = winners;
@@ -831,7 +832,7 @@ async function handleVictoryCommand(message, args) {
         startedAt: match.createdAt,
         initialDifference: match.difference || 0,
         letter: match.letter || '?',
-        periodLabel: getSeasonDisplayLabel(loadSeasonMeta())
+        periodLabel: getSeasonDisplayLabel(await loadSeasonMeta())
     });
   } catch (error) {
     console.error('[ERRO] !vitoria:', error);
@@ -842,7 +843,7 @@ async function handleVictoryCommand(message, args) {
 }
 
 async function handleSeasonHistoryCommand(message, args = []) {
-  const history = loadSeasonHistory();
+  const history = await loadSeasonHistory();
   if (args.length === 0) {
     const embed = new EmbedBuilder()
       .setColor(THEME.INFO)
@@ -862,7 +863,7 @@ async function handleSyncAllRolesCommand(message) {
   if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
     return await replyToMessage(message, '❌ Voce nao tem permissao para sincronizar cargos.');
   }
-  const statsData = loadPlayerStats();
+  const statsData = await loadPlayerStats();
   const players = Object.values(statsData.players || {});
   await replyToMessage(message, `Sincronizando ${players.length} jogadores...`);
   for(const p of players) await syncMemberRankRole(message.guild, p.discordId, p.internalRating || 1200);

@@ -1062,7 +1062,8 @@ function inferSeasonMetaFromArchive(archivedSeason) {
 }
 
 function archiveCurrentSeason(statsData, seasonMeta) {
-  const history = loadSeasonHistory();
+  // Nota: esta função é chamada dentro de handlers async que já têm o history carregado
+  // A chamada a saveSeasonHistory foi movida para ser feita pelo caller com await
   const archivedSeason = {
     seasonNumber: seasonMeta.currentSeason,
     type: seasonMeta.phase === 'official' ? 'official' : 'testing',
@@ -1079,9 +1080,7 @@ function archiveCurrentSeason(statsData, seasonMeta) {
     playersSnapshot: deepClone(statsData),
     seasonMetaSnapshot: deepClone(seasonMeta)
   };
-
-  history.seasons.push(archivedSeason);
-  saveSeasonHistory(history);
+  return archivedSeason;
 }
 
 function buildPlayerCardEmbed(playerStats, targetUser) {
@@ -1164,8 +1163,8 @@ async function postDailyRankUpdates() {
     return;
   }
 
-  const statsData = loadPlayerStats();
-  const seasonMeta = loadSeasonMeta();
+  const statsData = await loadPlayerStats();
+  const seasonMeta = await loadSeasonMeta();
 
   await channel.send({
     content: `Atualizacao diaria de rankings | ${getSeasonDisplayLabel(seasonMeta)}`,
@@ -1203,9 +1202,9 @@ async function updateQueueDashboard(guild) {
   const channel = guild.channels.cache.get(channelId);
   if (!channel) return;
 
-  const queueData = db.loadQueue();
-  const systemMeta = loadSystemMeta();
-  const embed = buildQueueEmbed(queueData.lobbies);
+  const queueData = await loadQueue();
+  const systemMeta = await loadSystemMeta();
+  const embed = buildQueueEmbed(null, Object.values(queueData.lobbies || {}));
 
   try {
     if (systemMeta.lastQueueMessageId) {
@@ -1218,7 +1217,7 @@ async function updateQueueDashboard(guild) {
 
     const newMessage = await channel.send({ embeds: [embed] });
     systemMeta.lastQueueMessageId = newMessage.id;
-    saveSystemMeta(systemMeta);
+    await saveSystemMeta(systemMeta);
   } catch (err) {
     console.error('[DASHBOARD] Erro ao atualizar painel de fila:', err.message);
   }

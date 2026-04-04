@@ -319,7 +319,7 @@ const handlers = require('./commands/legacyCommands');
 
 
 client.once('ready', async () => {
-  ensureDataFiles();
+  await ensureDataFiles();
   console.log(`Bot conectado como ${client.user.tag} | ${BOT_VERSION}`);
   await registerSlashCommands();
   startDailyRankScheduler();
@@ -405,13 +405,7 @@ async function processCommand(message, rawContent) {
         break;
       case 'cancelarstart':
       case 'cancelar': {
-        // Cancela auto-start pendente se existir
         const { pendingAutoStarts } = handlers;
-        const tempQueueData = loadQueue();
-        const tempLobby = handlers.findLobbyBySelector
-          ? null
-          : null; // seletor resolvido dentro do handler
-        // Cancela qualquer auto-start ativo para todos os lobbies com esse seletor
         for (const [lobbyId, timeoutId] of pendingAutoStarts.entries()) {
           if (args.length === 0 || lobbyId.includes(args.join('-').toLowerCase())) {
             clearTimeout(timeoutId);

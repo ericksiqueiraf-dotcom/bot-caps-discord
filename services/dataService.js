@@ -1,163 +1,121 @@
-const fs = require('fs');
-const path = require('path');
+const { MongoClient } = require('mongodb');
 
-const QUEUE_FILE_PATH = path.join(__dirname, '..', 'database', 'queue.json');
-const PLAYER_STATS_FILE_PATH = path.join(__dirname, '..', 'database', 'playerStats.json');
-const CURRENT_MATCH_FILE_PATH = path.join(__dirname, '..', 'database', 'currentMatch.json');
-const SEASON_META_FILE_PATH = path.join(__dirname, '..', 'database', 'seasonMeta.json');
-const SEASON_HISTORY_FILE_PATH = path.join(__dirname, '..', 'database', 'seasonHistory.json');
-const SYSTEM_META_FILE_PATH = path.join(__dirname, '..', 'database', 'systemMeta.json');
+const MONGODB_URI = process.env.MONGODB_URI;
+const DB_NAME = 'caps-bot';
 
 const QUEUE_MODES = {
   CLASSIC: 'classic',
   ARAM: 'aram'
 };
 
+let client = null;
+let db = null;
+
+async function getDb() {
+  if (db) return db;
+  if (!MONGODB_URI) throw new Error('MONGODB_URI não foi configurada no arquivo .env.');
+  client = new MongoClient(MONGODB_URI);
+  await client.connect();
+  db = client.db(DB_NAME);
+  console.log('[DB] Conectado ao MongoDB Atlas.');
+  return db;
+}
+
+// Garante que os documentos base existem (equivalente ao ensureDataFiles)
+async function ensureDataFiles() {
+  const database = await getDb();
+  const col = database.collection('data');
+
+  const defaults = [
+    { _id: 'queue',         data: { lobbies: {} } },
+    { _id: 'playerStats',   data: { players: {} } },
+    { _id: 'currentMatch',  data: { matches: {} } },
+    { _id: 'seasonMeta',    data: { currentSeason: 1, startedAt: new Date().toISOString(), phase: 'testing', officialSeasonStarted: false, testingCycle: 1 } },
+    { _id: 'seasonHistory', data: { seasons: [] } },
+    { _id: 'systemMeta',    data: { lastQueueMessageId: null } },
+  ];
+
+  for (const doc of defaults) {
+    await col.updateOne({ _id: doc._id }, { $setOnInsert: doc }, { upsert: true });
+  }
+}
+
+async function readDoc(id, fallback) {
+  const database = await getDb();
+  const doc = await database.collection('data').findOne({ _id: id });
+  return doc ? doc.data : fallback;
+}
+
+async function writeDoc(id, data) {
+  const database = await getDb();
+  await database.collection('data').updateOne(
+    { _id: id },
+    { $set: { data } },
+    { upsert: true }
+  );
+}
+
+// --- Lock de operações (mantido em memória, igual ao anterior) ---
 const queueOperationLocks = new Map();
-
-function ensureDataFiles() {
-  const directory = path.dirname(QUEUE_FILE_PATH);
-
-  if (!fs.existsSync(directory)) {
-    fs.mkdirSync(directory, { recursive: true });
-  }
-
-  if (!fs.existsSync(QUEUE_FILE_PATH)) {
-    fs.writeFileSync(QUEUE_FILE_PATH, JSON.stringify({ lobbies: {} }, null, 2));
-  }
-
-  if (!fs.existsSync(PLAYER_STATS_FILE_PATH)) {
-    fs.writeFileSync(PLAYER_STATS_FILE_PATH, JSON.stringify({ players: {} }, null, 2));
-  }
-
-  if (!fs.existsSync(CURRENT_MATCH_FILE_PATH)) {
-    fs.writeFileSync(CURRENT_MATCH_FILE_PATH, JSON.stringify({ matches: {} }, null, 2));
-  }
-
-  if (!fs.existsSync(SEASON_META_FILE_PATH)) {
-    fs.writeFileSync(
-      SEASON_META_FILE_PATH,
-      JSON.stringify({ currentSeason: 1, startedAt: new Date().toISOString() }, null, 2)
-    );
-  }
-
-  if (!fs.existsSync(SYSTEM_META_FILE_PATH)) {
-    fs.writeFileSync(SYSTEM_META_FILE_PATH, JSON.stringify({ lastQueueMessageId: null }, null, 2));
-  }
-}
-
-function readJsonFile(filePath, fallbackValue) {
-  ensureDataFiles();
-  const raw = fs.readFileSync(filePath, 'utf8');
-  const parsed = JSON.parse(raw);
-
-  return parsed ?? fallbackValue;
-}
-
-function writeJsonFile(filePath, data) {
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
-}
 
 async function withQueueOperationLock(lockKey, operation) {
   const currentLock = queueOperationLocks.get(lockKey) || Promise.resolve();
   let releaseLock;
-  const nextLock = new Promise((resolve) => {
-    releaseLock = resolve;
-  });
-
+  const nextLock = new Promise((resolve) => { releaseLock = resolve; });
   queueOperationLocks.set(lockKey, currentLock.then(() => nextLock));
   await currentLock;
-
   try {
     return await operation();
   } finally {
     releaseLock();
-
     if (queueOperationLocks.get(lockKey) === nextLock) {
       queueOperationLocks.delete(lockKey);
     }
   }
 }
 
-function loadQueue() {
-  const parsed = readJsonFile(QUEUE_FILE_PATH, { lobbies: {} });
-
-  if (parsed.lobbies && typeof parsed.lobbies === 'object') {
-    return { lobbies: parsed.lobbies };
-  }
-
-  if (Array.isArray(parsed.players) && parsed.players.length > 0) {
-    return {
-      lobbies: {
-        legacy: {
-          id: 'legacy',
-          mode: parsed.mode || QUEUE_MODES.CLASSIC,
-          format: parsed.mode === QUEUE_MODES.ARAM ? '5x5' : '5x5',
-          letter: 'A',
-          waitingChannelId: null,
-          players: parsed.players,
-          requiredPlayers: parsed.players.length,
-          status: 'waiting'
-        }
-      }
-    };
-  }
-
+// --- Queue ---
+async function loadQueue() {
+  const parsed = await readDoc('queue', { lobbies: {} });
+  if (parsed.lobbies && typeof parsed.lobbies === 'object') return { lobbies: parsed.lobbies };
   return { lobbies: {} };
 }
 
-function saveQueue(queueData) {
-  writeJsonFile(QUEUE_FILE_PATH, queueData);
+async function saveQueue(data) {
+  await writeDoc('queue', data);
 }
 
-function loadPlayerStats() {
-  const parsed = readJsonFile(PLAYER_STATS_FILE_PATH, { players: {} });
-
-  if (!parsed.players || typeof parsed.players !== 'object') {
-    return { players: {} };
-  }
-
+// --- Player Stats ---
+async function loadPlayerStats() {
+  const parsed = await readDoc('playerStats', { players: {} });
+  if (!parsed.players || typeof parsed.players !== 'object') return { players: {} };
   return parsed;
 }
 
-function savePlayerStats(statsData) {
-  writeJsonFile(PLAYER_STATS_FILE_PATH, statsData);
+async function savePlayerStats(data) {
+  await writeDoc('playerStats', data);
 }
 
-function loadCurrentMatch() {
-  const parsed = readJsonFile(CURRENT_MATCH_FILE_PATH, { matches: {} });
-
-  if (parsed.matches && typeof parsed.matches === 'object') {
-    return { matches: parsed.matches };
-  }
-
-  if (parsed.active && parsed.match) {
-    return {
-      matches: {
-        legacy: {
-          active: true,
-          match: parsed.match
-        }
-      }
-    };
-  }
-
+// --- Current Match ---
+async function loadCurrentMatch() {
+  const parsed = await readDoc('currentMatch', { matches: {} });
+  if (parsed.matches && typeof parsed.matches === 'object') return { matches: parsed.matches };
   return { matches: {} };
 }
 
-function saveCurrentMatch(matchData) {
-  writeJsonFile(CURRENT_MATCH_FILE_PATH, matchData);
+async function saveCurrentMatch(data) {
+  await writeDoc('currentMatch', data);
 }
 
-function loadSeasonMeta() {
-  const parsed = readJsonFile(SEASON_META_FILE_PATH, {
+// --- Season Meta ---
+async function loadSeasonMeta() {
+  const parsed = await readDoc('seasonMeta', {
     currentSeason: 1,
     startedAt: new Date().toISOString(),
     phase: 'testing',
     officialSeasonStarted: false,
     testingCycle: 1
   });
-
   return {
     currentSeason: Number(parsed.currentSeason || 1),
     startedAt: parsed.startedAt || new Date().toISOString(),
@@ -167,35 +125,29 @@ function loadSeasonMeta() {
   };
 }
 
-function saveSeasonMeta(meta) {
-  writeJsonFile(SEASON_META_FILE_PATH, meta);
+async function saveSeasonMeta(data) {
+  await writeDoc('seasonMeta', data);
 }
 
-function loadSeasonHistory() {
-  const parsed = readJsonFile(SEASON_HISTORY_FILE_PATH, { seasons: [] });
-
-  if (!Array.isArray(parsed.seasons)) {
-    return { seasons: [] };
-  }
-
+// --- Season History ---
+async function loadSeasonHistory() {
+  const parsed = await readDoc('seasonHistory', { seasons: [] });
+  if (!Array.isArray(parsed.seasons)) return { seasons: [] };
   return parsed;
 }
 
-function saveSeasonHistory(history) {
-  writeJsonFile(SEASON_HISTORY_FILE_PATH, history);
+async function saveSeasonHistory(data) {
+  await writeDoc('seasonHistory', data);
 }
 
-function loadSystemMeta() {
-  const parsed = readJsonFile(SYSTEM_META_FILE_PATH, { lastQueueMessageId: null });
-
-  return {
-    lastQueueMessageId: parsed.lastQueueMessageId || null,
-    ...parsed
-  };
+// --- System Meta ---
+async function loadSystemMeta() {
+  const parsed = await readDoc('systemMeta', { lastQueueMessageId: null });
+  return { lastQueueMessageId: null, ...parsed };
 }
 
-function saveSystemMeta(meta) {
-  writeJsonFile(SYSTEM_META_FILE_PATH, meta);
+async function saveSystemMeta(data) {
+  await writeDoc('systemMeta', data);
 }
 
 module.exports = {
