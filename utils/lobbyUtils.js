@@ -141,6 +141,9 @@ function getAramFormatLabel(teamSize) {
   return `${teamSize}x${teamSize}`;
 }
 
+/** Multiplicador do delta de MMR interno em ARAM 5v5 vs CLASSIC (1.0 = Summoner's Rift). */
+const ARAM_5V5_RATING_WEIGHT = 0.3;
+
 function getAramWeightByTeamSize(teamSize) {
   const numericTeamSize = Number(teamSize || 0);
 
@@ -161,7 +164,7 @@ function getAramWeightByTeamSize(teamSize) {
   }
 
   if (numericTeamSize === 5) {
-    return 0;
+    return ARAM_5V5_RATING_WEIGHT;
   }
 
   return 1.0;
