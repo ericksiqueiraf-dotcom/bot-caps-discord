@@ -50,6 +50,32 @@ const {
 
 const getRiotService = () => global.riotService;
 
+/**
+ * Atribui o cargo definido em config.roles.registeredPlayerRoleId apos !cadastrar / !nick.
+ */
+async function grantRegisteredPlayerRole(guild, userId) {
+  const roleId = config.roles?.registeredPlayerRoleId;
+  if (!roleId || typeof roleId !== 'string' || !roleId.trim()) {
+    return { ok: false, reason: 'not_configured' };
+  }
+  const trimmed = roleId.trim();
+  try {
+    const role = await guild.roles.fetch(trimmed).catch(() => null);
+    if (!role) {
+      console.warn('[CADASTRO] Cargo registeredPlayerRoleId nao encontrado:', trimmed);
+      return { ok: false, reason: 'role_missing' };
+    }
+    const member = await guild.members.fetch(userId).catch(() => null);
+    if (!member) return { ok: false, reason: 'member_missing' };
+    if (member.roles.cache.has(trimmed)) return { ok: true, alreadyHad: true };
+    await member.roles.add(role, 'Vinculacao Riot (!cadastrar)');
+    return { ok: true };
+  } catch (err) {
+    console.error('[CADASTRO] Falha ao adicionar cargo de cadastrado:', err.message);
+    return { ok: false, reason: 'discord_error' };
+  }
+}
+
 // Armazena timeouts de auto-start pendentes: { [lobbyId]: timeoutId }
 const pendingAutoStarts = new Map();
 const VOTE_THRESHOLD = 3; // Fase de testes: 3 votos decidem
@@ -273,11 +299,21 @@ async function handleRegisterCommand(message, args) {
       }
     });
     await savePlayerStats(playerStats);
+    const gate = await grantRegisteredPlayerRole(message.guild, message.author.id);
     const rankStr = rankProfile.isFallbackUnranked ? 'Unranked (base Gold IV)' : `${rankProfile.tier} ${rankProfile.rank} — ${rankProfile.leaguePoints} PDL`;
+    let accessLine = '';
+    if (gate.ok && !gate.alreadyHad) {
+      accessLine = '\n**Salas liberadas.** Voce ja pode ver os canais de texto e voz do servidor.';
+    } else if (gate.ok && gate.alreadyHad) {
+      accessLine = '';
+    } else if (gate.reason !== 'not_configured') {
+      accessLine = '\n_Nao foi possivel atribuir o cargo automaticamente. Staff: confira o ID em config, permissoes Manage Roles e hierarquia dos cargos._';
+    }
     await replyToMessage(message,
       `✅ Conta vinculada com sucesso!\n` +
       `🎮 **${rankProfile.nickname}** · ${rankStr}\n` +
-      `Agora e so usar \`!entrar\` para entrar na fila rapidinho! 🚀`
+      `Agora e so usar \`!entrar\` para entrar na fila rapidinho! 🚀` +
+      accessLine
     );
   } catch (error) {
     console.error('[ERRO] !cadastrar:', error);
@@ -315,10 +351,18 @@ async function handleNickUpdateCommand(message, args) {
       isFallbackUnranked: Boolean(rankProfile.isFallbackUnranked),
     });
     await savePlayerStats(playerStats);
+    const gate = await grantRegisteredPlayerRole(message.guild, message.author.id);
     const rankStr = rankProfile.isFallbackUnranked ? 'Unranked (base Gold IV)' : `${rankProfile.tier} ${rankProfile.rank} — ${rankProfile.leaguePoints} PDL`;
+    let accessLine = '';
+    if (gate.ok && !gate.alreadyHad) {
+      accessLine = '\n**Salas liberadas.** Voce ja pode ver os canais de texto e voz do servidor.';
+    } else if (gate.reason !== 'not_configured') {
+      accessLine = '\n_Nao foi possivel atribuir o cargo automaticamente. Confira config e permissoes do bot._';
+    }
     await replyToMessage(message,
       `✅ Nick atualizado!\n` +
-      `🎮 **${rankProfile.nickname}** · ${rankStr}`
+      `🎮 **${rankProfile.nickname}** · ${rankStr}` +
+      accessLine
     );
   } catch (error) {
     console.error('[ERRO] !nick:', error);

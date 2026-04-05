@@ -1,6 +1,9 @@
 {
   "prefix": "!",
   "region": "br1",
+  "roles": {
+    "registeredPlayerRoleId": "1487820221694742651"
+  },
   "voiceChannels": {
     "classicQueueChannelId": "1489240283051856023",
     "aramQueueChannelId": "1489240459875455169"
