@@ -662,8 +662,9 @@ client.on('guildMemberAdd', async (member) => {
     .setDescription(`Prepare-se para subir de elo nas nossas partidas personalizadas balanceadas! Aqui está o seu guia rápido para começar.`)
     .addFields(
       { name: '📜 Regras', value: 'Primeiro de tudo, leia as nossas regras no canal <#📜┃regras> (ou equivalente) para evitar punições.', inline: false },
-      { name: '🎮 Como Jogar', value: '1. Entre em um canal de voz de **Lobby**.\n2. Use o comando `!entrar SeuNick#TAG`.\n3. Aguarde o preenchimento da fila.', inline: false },
-      { name: '🕹️ Comandos Úteis', value: '`!perfil` • Veja seu MMR e elo\n`!ajuda` • Lista completa de comandos', inline: false }
+      { name: '✅ Libere o acesso (1x)', value: 'Para visualizar todas as salas do servidor, cadastre sua conta Riot:\n`!cadastrar Nick#TAG`\n> Após cadastrar, o bot libera o cargo de acesso automaticamente.', inline: false },
+      { name: '🎮 Como Jogar', value: '1. Entre em um canal de voz de **Lobby**.\n2. Use o comando `!entrar`.\n3. Aguarde o preenchimento da fila.', inline: false },
+      { name: '🕹️ Comandos Úteis', value: '`!perfil` • Veja seu MMR e elo\n`!ajuda` • Lista completa de comandos\n`!nick Nick#TAG` • Atualiza seu cadastro', inline: false }
     )
     .setColor(THEME?.INFO ?? '#0099ff')
     .setThumbnail(member.user.displayAvatarURL())
