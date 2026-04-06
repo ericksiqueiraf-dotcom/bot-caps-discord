@@ -665,7 +665,7 @@ client.on('guildMemberAdd', async (member) => {
       { name: '🎮 Como Jogar', value: '1. Entre em um canal de voz de **Lobby**.\n2. Use o comando `!entrar SeuNick#TAG`.\n3. Aguarde o preenchimento da fila.', inline: false },
       { name: '🕹️ Comandos Úteis', value: '`!perfil` • Veja seu MMR e elo\n`!ajuda` • Lista completa de comandos', inline: false }
     )
-    .setColor(THEME ? THEME.PRIMARY : '#0099ff')
+    .setColor(THEME?.INFO ?? '#0099ff')
     .setThumbnail(member.user.displayAvatarURL())
     .setFooter({ text: `${FOOTER_PREFIX || 'Caps Bot'} • Arena de Personalizadas` })
     .setTimestamp();
