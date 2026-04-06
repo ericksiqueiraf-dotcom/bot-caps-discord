@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Caps Bot Admin</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Dashboard local</p>
+          <h1>Caps Bot Admin</h1>
+          <p class="hero-copy">Painel operacional para revisar estado salvo, ajustar jogadores e corrigir filas ou partidas antes de publicar alteracoes no Railway.</p>
+        </div>
+        <div class="hero-meta">
+          <div class="meta-card">
+            <span>Temporada</span>
+            <strong><%= seasonMeta.currentSeason %></strong>
+          </div>
+          <div class="meta-card">
+            <span>Fase</span>
+            <strong><%= seasonMeta.phase === 'official' ? 'Oficial' : 'Testes' %></strong>
+          </div>
+        </div>
+      </header>
+
+      <% if (flash.success) { %><div class="flash flash-success"><%= flash.success %></div><% } %>
+      <% if (flash.error) { %><div class="flash flash-error"><%= flash.error %></div><% } %>
+
+      <section class="cards-grid">
+        <% overviewCards.forEach((card) => { %>
+          <article class="stat-card">
+            <span><%= card.label %></span>
+            <strong><%= card.value %></strong>
+          </article>
+        <% }) %>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Visao rapida</p>
+            <h2>Top 5 do momento</h2>
+          </div>
+        </div>
+        <div class="leaderboard-grid">
+          <article class="leaderboard-card">
+            <h3>Classic</h3>
+            <ol>
+              <% leaderboardPreview.classic.forEach((player) => { %>
+                <li><strong><%= player.registeredNickname || player.discordUsername %></strong><span><%= player.adjustedMmr %> MMR</span></li>
+              <% }) %>
+            </ol>
+          </article>
+          <article class="leaderboard-card">
+            <h3>ARAM 1x1</h3>
+            <ol>
+              <% leaderboardPreview.aram1x1.forEach((player) => { %>
+                <li><strong><%= player.registeredNickname || player.discordUsername %></strong><span><%= player.adjustedMmr %> MMR</span></li>
+              <% }) %>
+            </ol>
+          </article>
+          <article class="leaderboard-card">
+            <h3>ARAM agrupado</h3>
+            <ol>
+              <% leaderboardPreview.aram.forEach((player) => { %>
+                <li><strong><%= player.registeredNickname || player.discordUsername %></strong><span><%= player.adjustedMmr %> MMR</span></li>
+              <% }) %>
+            </ol>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Conteudo</p>
+            <h2>Textos editaveis do bot</h2>
+          </div>
+          <form class="inline-form" method="post" action="/content/reset">
+            <input type="hidden" name="section" value="all" />
+            <button type="submit" class="ghost-button">Restaurar padrao</button>
+          </form>
+        </div>
+
+        <form class="content-form" method="post" action="/content/update">
+          <div class="content-grid">
+            <div class="content-block">
+              <div class="queue-card-head">
+                <h3>Boas-vindas</h3>
+                <form method="post" action="/content/reset">
+                  <input type="hidden" name="section" value="welcome" />
+                  <button type="submit" class="ghost-button">Padrao boas-vindas</button>
+                </form>
+              </div>
+              <label>Titulo
+                <input type="text" name="welcomeTitleTemplate" value="<%= contentTemplates.welcome.titleTemplate %>" />
+              </label>
+              <p class="helper-text">Use <code>{{username}}</code> e <code>{{serverName}}</code> se quiser variaveis.</p>
+              <label>Descricao
+                <textarea name="welcomeDescription" rows="4"><%= contentTemplates.welcome.description %></textarea>
+              </label>
+              <label>Titulo regras
+                <input type="text" name="welcomeRulesTitle" value="<%= contentTemplates.welcome.rulesTitle %>" />
+              </label>
+              <label>Texto regras
+                <textarea name="welcomeRulesText" rows="4"><%= contentTemplates.welcome.rulesText %></textarea>
+              </label>
+              <label>Titulo acesso
+                <input type="text" name="welcomeUnlockTitle" value="<%= contentTemplates.welcome.unlockTitle %>" />
+              </label>
+              <label>Texto acesso
+                <textarea name="welcomeUnlockText" rows="5"><%= contentTemplates.welcome.unlockText %></textarea>
+              </label>
+              <label>Titulo como jogar
+                <input type="text" name="welcomeHowToPlayTitle" value="<%= contentTemplates.welcome.howToPlayTitle %>" />
+              </label>
+              <label>Texto como jogar
+                <textarea name="welcomeHowToPlayText" rows="4"><%= contentTemplates.welcome.howToPlayText %></textarea>
+              </label>
+              <label>Titulo comandos
+                <input type="text" name="welcomeCommandsTitle" value="<%= contentTemplates.welcome.commandsTitle %>" />
+              </label>
+              <label>Texto comandos
+                <textarea name="welcomeCommandsText" rows="4"><%= contentTemplates.welcome.commandsText %></textarea>
+              </label>
+              <label>Rodape
+                <input type="text" name="welcomeFooterText" value="<%= contentTemplates.welcome.footerText %>" />
+              </label>
+            </div>
+
+            <div class="content-block">
+              <div class="queue-card-head">
+                <h3>Onboarding</h3>
+                <form method="post" action="/content/reset">
+                  <input type="hidden" name="section" value="onboarding" />
+                  <button type="submit" class="ghost-button">Padrao onboarding</button>
+                </form>
+              </div>
+              <label>Titulo
+                <input type="text" name="onboardingTitle" value="<%= contentTemplates.onboarding.title %>" />
+              </label>
+              <label>Descricao
+                <textarea name="onboardingDescription" rows="5"><%= contentTemplates.onboarding.description %></textarea>
+              </label>
+              <label>Titulo cadastro
+                <input type="text" name="onboardingRegistrationTitle" value="<%= contentTemplates.onboarding.registrationTitle %>" />
+              </label>
+              <label>Texto cadastro
+                <textarea name="onboardingRegistrationText" rows="6"><%= contentTemplates.onboarding.registrationText %></textarea>
+              </label>
+              <label>Titulo fila
+                <input type="text" name="onboardingQueueTitle" value="<%= contentTemplates.onboarding.queueTitle %>" />
+              </label>
+              <label>Texto fila
+                <textarea name="onboardingQueueText" rows="7"><%= contentTemplates.onboarding.queueText %></textarea>
+              </label>
+              <label>Titulo votacao
+                <input type="text" name="onboardingVoteTitle" value="<%= contentTemplates.onboarding.voteTitle %>" />
+              </label>
+              <label>Texto votacao
+                <textarea name="onboardingVoteText" rows="6"><%= contentTemplates.onboarding.voteText %></textarea>
+              </label>
+              <label>Titulo evolucao
+                <input type="text" name="onboardingProgressTitle" value="<%= contentTemplates.onboarding.progressTitle %>" />
+              </label>
+              <label>Texto evolucao
+                <textarea name="onboardingProgressText" rows="5"><%= contentTemplates.onboarding.progressText %></textarea>
+              </label>
+              <label>Titulo canais
+                <input type="text" name="onboardingChannelsTitle" value="<%= contentTemplates.onboarding.channelsTitle %>" />
+              </label>
+              <label>Texto canais
+                <textarea name="onboardingChannelsText" rows="4"><%= contentTemplates.onboarding.channelsText %></textarea>
+              </label>
+              <label>Titulo outros comandos
+                <input type="text" name="onboardingCommandsTitle" value="<%= contentTemplates.onboarding.commandsTitle %>" />
+              </label>
+              <label>Texto outros comandos
+                <textarea name="onboardingCommandsText" rows="5"><%= contentTemplates.onboarding.commandsText %></textarea>
+              </label>
+              <label>Titulo fair play
+                <input type="text" name="onboardingFairPlayTitle" value="<%= contentTemplates.onboarding.fairPlayTitle %>" />
+              </label>
+              <label>Texto fair play
+                <textarea name="onboardingFairPlayText" rows="4"><%= contentTemplates.onboarding.fairPlayText %></textarea>
+              </label>
+              <label>Rodape
+                <input type="text" name="onboardingFooterText" value="<%= contentTemplates.onboarding.footerText %>" />
+              </label>
+            </div>
+          </div>
+          <div class="action-row">
+            <button type="submit">Salvar textos</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Jogadores</p>
+            <h2>Edicao manual</h2>
+          </div>
+          <form class="search-form" method="get" action="/">
+            <input type="text" name="q" value="<%= filters.q %>" placeholder="Buscar por nick, Discord ID ou PUUID" />
+            <button type="submit">Filtrar</button>
+          </form>
+        </div>
+
+        <div class="stack-list">
+          <% players.forEach((player) => { %>
+            <article class="player-card">
+              <div class="player-card-head">
+                <div>
+                  <h3><%= player.registeredNickname || player.discordUsername || 'Sem nick' %></h3>
+                  <p><%= player.discordUsername || 'Sem usuario Discord' %> · <%= player.discordId %></p>
+                </div>
+                <div class="pill-row">
+                  <span class="pill">Classic <%= player.adjustedClassicMmr %></span>
+                  <span class="pill">ARAM <%= player.adjustedAramMmr %></span>
+                </div>
+              </div>
+
+              <form class="player-form" method="post" action="/players/<%= encodeURIComponent(player.key) %>/update">
+                <label>Nick Riot<input type="text" name="registeredNickname" value="<%= player.registeredNickname || '' %>" /></label>
+                <label>Tier<input type="text" name="tier" value="<%= player.tier || 'GOLD' %>" /></label>
+                <label>Rank<input type="text" name="rank" value="<%= player.rank || 'IV' %>" /></label>
+                <label>LP<input type="number" name="leaguePoints" value="<%= player.leaguePoints || 0 %>" /></label>
+                <label>
+                  Modo editado
+                  <select name="mode">
+                    <option value="classic">Classic</option>
+                    <option value="aram">ARAM</option>
+                  </select>
+                </label>
+                <label>
+                  Formato ARAM
+                  <select name="format">
+                    <option value="">Agrupado / geral</option>
+                    <% aramFormats.forEach((format) => { %>
+                      <option value="<%= format %>"><%= format %></option>
+                    <% }) %>
+                  </select>
+                </label>
+                <label>Base MMR<input type="number" name="baseMmr" value="<%= player.baseMmr || 1200 %>" /></label>
+                <label>MMR interno<input type="number" name="internalRating" value="<%= player.classicStats.internalRating || 1200 %>" /></label>
+                <label>Wins<input type="number" name="customWins" value="<%= player.classicStats.customWins || 0 %>" /></label>
+                <label>Losses<input type="number" name="customLosses" value="<%= player.classicStats.customLosses || 0 %>" /></label>
+                <label>Streak<input type="number" name="winStreak" value="<%= player.classicStats.winStreak || 0 %>" /></label>
+                <label class="checkbox-field"><input type="checkbox" name="isFallbackUnranked" <%= player.isFallbackUnranked ? 'checked' : '' %> />Unranked fallback</label>
+                <div class="action-row">
+                  <button type="submit">Salvar jogador</button>
+                </div>
+              </form>
+
+              <form class="inline-form" method="post" action="/players/<%= encodeURIComponent(player.key) %>/reseed">
+                <input type="hidden" name="mode" value="classic" />
+                <button type="submit" class="ghost-button">Recalcular seed Classic</button>
+              </form>
+            </article>
+          <% }) %>
+        </div>
+      </section>
+
+      <section class="two-column">
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Filas</p>
+              <h2>Lobbies ativos</h2>
+            </div>
+          </div>
+
+          <% if (lobbies.length === 0) { %><p class="empty-state">Nenhum lobby salvo no momento.</p><% } %>
+
+          <% lobbies.forEach((lobby) => { %>
+            <article class="queue-card">
+              <div class="queue-card-head">
+                <div>
+                  <h3><%= lobby.letter %> · <%= lobby.modeLabel %></h3>
+                  <p><%= lobby.occupancyLabel %> jogadores</p>
+                </div>
+                <form method="post" action="/lobbies/<%= encodeURIComponent(lobby.id) %>/delete">
+                  <button type="submit" class="danger-button">Excluir lobby</button>
+                </form>
+              </div>
+              <ul class="compact-list">
+                <% lobby.players.forEach((player) => { %>
+                  <li>
+                    <span><strong><%= player.nickname %></strong> · <%= player.discordUsername %></span>
+                    <form method="post" action="/lobbies/<%= encodeURIComponent(lobby.id) %>/remove-player">
+                      <input type="hidden" name="discordId" value="<%= player.discordId %>" />
+                      <button type="submit" class="ghost-button">Remover</button>
+                    </form>
+                  </li>
+                <% }) %>
+              </ul>
+            </article>
+          <% }) %>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Partidas</p>
+              <h2>Estado ativo</h2>
+            </div>
+          </div>
+
+          <% if (matches.length === 0) { %><p class="empty-state">Nenhuma partida ativa salva no momento.</p><% } %>
+
+          <% matches.forEach((match) => { %>
+            <article class="match-card">
+              <div class="queue-card-head">
+                <div>
+                  <h3><%= match.letter || '?' %> · <%= match.modeLabel %></h3>
+                  <p>Votos atuais: <%= match.voteCount %></p>
+                </div>
+                <form method="post" action="/matches/<%= encodeURIComponent(match.matchId) %>/delete">
+                  <button type="submit" class="danger-button">Excluir partida</button>
+                </form>
+              </div>
+              <div class="match-grid">
+                <div>
+                  <h4>Time 1 · media <%= match.teamOneAvg %></h4>
+                  <ul class="compact-list compact-list-plain">
+                    <% match.teamOne.forEach((player) => { %>
+                      <li><%= player.nickname %> · <%= player.mmr %></li>
+                    <% }) %>
+                  </ul>
+                </div>
+                <div>
+                  <h4>Time 2 · media <%= match.teamTwoAvg %></h4>
+                  <ul class="compact-list compact-list-plain">
+                    <% match.teamTwo.forEach((player) => { %>
+                      <li><%= player.nickname %> · <%= player.mmr %></li>
+                    <% }) %>
+                  </ul>
+                </div>
+              </div>
+              <form class="inline-form" method="post" action="/matches/<%= encodeURIComponent(match.matchId) %>/result">
+                <button type="submit" name="winnerTeam" value="1">Registrar vitoria Time 1</button>
+                <button type="submit" name="winnerTeam" value="2">Registrar vitoria Time 2</button>
+              </form>
+            </article>
+          <% }) %>
+        </section>
+      </section>
+    </div>
+  </body>
+</html>

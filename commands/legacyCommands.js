@@ -39,9 +39,11 @@ const {
   QUEUE_MODES, loadQueue, saveQueue, loadPlayerStats, 
   savePlayerStats, loadCurrentMatch, saveCurrentMatch, 
   loadSeasonMeta, saveSeasonMeta, loadSeasonHistory, 
-  saveSeasonHistory, loadSystemMeta, saveSystemMeta, 
+  saveSeasonHistory, loadSystemMeta, saveSystemMeta,
+  loadContentTemplates,
   withQueueOperationLock 
 } = require('../services/dataService');
+const { getResolvedContentTemplates } = require('../services/contentTextService');
 
 const { 
   calculateSeedRating, calculateHybridMmr, calculateEloDelta, 
@@ -430,7 +432,7 @@ async function handlePingCommand(message) {
   const latency = message.client.ws.ping >= 0 ? `${Math.round(message.client.ws.ping)} ms` : 'indisponivel';
   const embed = new EmbedBuilder()
     .setColor(THEME.INFO)
-    .setTitle('Pong 🏓')
+    .setTitle('Pong')
     .setDescription('O bot esta online e operacional.')
     .addFields({ name: 'Latencia', value: latency, inline: true })
     .setTimestamp();
@@ -751,6 +753,8 @@ async function handleOnboardingCommand(message) {
     return await replyToMessage(message, '❌ Voce nao tem permissao para usar o onboarding.');
   }
 
+  const storedTemplates = await loadContentTemplates();
+  const onboardingContent = getResolvedContentTemplates(storedTemplates).onboarding;
   const importantChannels = [
     config.textChannels.queueStatusChannelId ? `• <#${config.textChannels.queueStatusChannelId}> — Status das filas` : null,
     config.textChannels.matchOngoingChannelId ? `• <#${config.textChannels.matchOngoingChannelId}> — Auto-start, salas e partidas em andamento` : null,

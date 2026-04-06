@@ -37,8 +37,10 @@ const {
   saveSeasonMeta,
   loadSeasonHistory,
   saveSeasonHistory,
+  loadContentTemplates,
   QUEUE_MODES
 } = require('./services/dataService');
+const { getResolvedContentTemplates, renderTemplate } = require('./services/contentTextService');
 
 if (!DISCORD_TOKEN) {
   throw new Error('DISCORD_TOKEN nao foi configurado no arquivo .env.');
@@ -656,6 +658,8 @@ client.on('guildMemberAdd', async (member) => {
 
   const channel = await member.guild.channels.fetch(channelId).catch(() => null);
   if (!channel || !channel.isTextBased()) return;
+  const storedTemplates = await loadContentTemplates();
+  const welcomeContent = getResolvedContentTemplates(storedTemplates).welcome;
 
   const welcomeEmbed = new EmbedBuilder()
     .setTitle(`🏠 Bem-vindo à Arena Caps, ${member.user.username}!`)
@@ -670,6 +674,19 @@ client.on('guildMemberAdd', async (member) => {
     .setThumbnail(member.user.displayAvatarURL())
     .setFooter({ text: `${FOOTER_PREFIX || 'Caps Bot'} • Arena de Personalizadas` })
     .setTimestamp();
+
+  welcomeEmbed
+    .setTitle(renderTemplate(welcomeContent.titleTemplate, { username: member.user.username, serverName: member.guild.name }))
+    .setDescription(welcomeContent.description)
+    .setFields(
+      [
+        { name: welcomeContent.rulesTitle, value: welcomeContent.rulesText, inline: false },
+        { name: welcomeContent.unlockTitle, value: welcomeContent.unlockText, inline: false },
+        { name: welcomeContent.howToPlayTitle, value: welcomeContent.howToPlayText, inline: false },
+        { name: welcomeContent.commandsTitle, value: welcomeContent.commandsText, inline: false }
+      ].filter((field) => String(field.name || '').trim() && String(field.value || '').trim())
+    )
+    .setFooter({ text: welcomeContent.footerText || `${FOOTER_PREFIX || 'Caps Bot'} • Arena de Personalizadas` });
 
   await channel.send({ content: `Seja bem-vindo, ${member}!`, embeds: [welcomeEmbed] }).catch((err) => console.error('[BOAS-VINDAS] Erro ao enviar mensagem:', err));
 });

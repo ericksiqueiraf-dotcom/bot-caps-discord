@@ -22,7 +22,8 @@ const LOCAL_FILES = {
     }
   },
   seasonHistory: { file: 'seasonHistory.json', fallback: { seasons: [] } },
-  systemMeta: { file: 'systemMeta.json', fallback: { lastQueueMessageId: null } }
+  systemMeta: { file: 'systemMeta.json', fallback: { lastQueueMessageId: null } },
+  contentTemplates: { file: 'contentTemplates.json', fallback: { onboarding: {}, welcome: {} } }
 };
 
 let client = null;
@@ -113,7 +114,8 @@ async function ensureDataFiles() {
       }
     },
     { _id: 'seasonHistory', data: { seasons: [] } },
-    { _id: 'systemMeta', data: { lastQueueMessageId: null } }
+    { _id: 'systemMeta', data: { lastQueueMessageId: null } },
+    { _id: 'contentTemplates', data: { onboarding: {}, welcome: {} } }
   ];
 
   for (const doc of defaults) {
@@ -238,6 +240,18 @@ async function saveSystemMeta(data) {
   await writeDoc('systemMeta', data);
 }
 
+async function loadContentTemplates() {
+  const parsed = await readDoc('contentTemplates', { onboarding: {}, welcome: {} });
+  return {
+    onboarding: parsed?.onboarding && typeof parsed.onboarding === 'object' ? parsed.onboarding : {},
+    welcome: parsed?.welcome && typeof parsed.welcome === 'object' ? parsed.welcome : {}
+  };
+}
+
+async function saveContentTemplates(data) {
+  await writeDoc('contentTemplates', data);
+}
+
 module.exports = {
   ensureDataFiles,
   withQueueOperationLock,
@@ -253,5 +267,7 @@ module.exports = {
   saveSeasonHistory,
   loadSystemMeta,
   saveSystemMeta,
+  loadContentTemplates,
+  saveContentTemplates,
   QUEUE_MODES
 };
