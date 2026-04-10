@@ -250,14 +250,23 @@ function numberToLobbyLetter(value) {
   return result;
 }
 
-function getNextLobbyLetter(queueData, mode, format) {
-  const letters = Object.values(queueData.lobbies || {})
+function getReservedLobbyLetters(queueData, currentMatchData, mode, format) {
+  const waitingLetters = Object.values(queueData.lobbies || {})
     .filter((lobby) => lobby.mode === mode && lobby.format === format)
     .map((lobby) => lobby.letter);
+  const activeLetters = Object.values(currentMatchData?.matches || {})
+    .filter((entry) => entry.active && entry.match && entry.match.mode === mode && entry.match.format === format)
+    .map((entry) => entry.match.letter);
+
+  return new Set([...waitingLetters, ...activeLetters].filter(Boolean));
+}
+
+function getNextLobbyLetter(queueData, currentMatchData, mode, format) {
+  const letters = getReservedLobbyLetters(queueData, currentMatchData, mode, format);
 
   let index = 0;
 
-  while (letters.includes(numberToLobbyLetter(index))) {
+  while (letters.has(numberToLobbyLetter(index))) {
     index += 1;
   }
 
@@ -1419,11 +1428,11 @@ async function deleteChannelsByNames(guild, names = []) {
   return removedCount;
 }
 
-function findReusableWaitingLobby(guild, queueData, mode, format) {
+function findReusableWaitingLobby(guild, queueData, currentMatchData, mode, format) {
   const waitingLobbies = Object.values(queueData.lobbies || {}).filter(
     (lobby) => lobby.mode === mode && lobby.format === format && lobby.status === 'waiting'
   );
-  const knownLetters = new Set(waitingLobbies.map((lobby) => lobby.letter));
+  const reservedLetters = getReservedLobbyLetters(queueData, currentMatchData, mode, format);
 
   for (const channel of guild.channels.cache.values()) {
     if (!isManagedDynamicChannel(channel) || channel.type !== ChannelType.GuildVoice) {
@@ -1431,7 +1440,7 @@ function findReusableWaitingLobby(guild, queueData, mode, format) {
     }
 
     for (const letter of Array.from({ length: 26 }, (_, index) => String.fromCharCode(65 + index))) {
-      if (knownLetters.has(letter)) {
+      if (reservedLetters.has(letter)) {
         continue;
       }
 
@@ -1751,6 +1760,7 @@ module.exports = {
   getFormatFromArgs,
   getNicknameArgs,
   numberToLobbyLetter,
+  getReservedLobbyLetters,
   getNextLobbyLetter,
   getBaseQueueChannelIdByMode,
   getOpenLobby,

@@ -87,6 +87,7 @@ function createEnterQueueDeps() {
   return {
     loadPlayerStats,
     loadQueue,
+    loadCurrentMatch,
     saveQueue,
     savePlayerStats,
     withQueueOperationLock,

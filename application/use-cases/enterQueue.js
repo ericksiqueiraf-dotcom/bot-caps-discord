@@ -11,6 +11,7 @@ async function enterQueue({
   const {
     loadPlayerStats,
     loadQueue,
+    loadCurrentMatch,
     saveQueue,
     savePlayerStats,
     withQueueOperationLock,
@@ -58,6 +59,7 @@ async function enterQueue({
 
   const result = await withQueueOperationLock(`${guildId}:${selectedMode}:${selectedFormat}`, async () => {
     const queueData = await loadQueue();
+    const currentMatchData = await loadCurrentMatch();
     const freshStats = await loadPlayerStats();
     const alreadyInQueue = findLobbyByPlayer(queueData, author.id);
 
@@ -87,10 +89,10 @@ async function enterQueue({
     }
 
     let lobby = getOpenLobby(queueData, selectedMode, selectedFormat)
-      || findReusableWaitingLobby(guild, queueData, selectedMode, selectedFormat);
+      || findReusableWaitingLobby(guild, queueData, currentMatchData, selectedMode, selectedFormat);
 
     if (!lobby) {
-      const letter = getNextLobbyLetter(queueData, selectedMode, selectedFormat);
+      const letter = getNextLobbyLetter(queueData, currentMatchData, selectedMode, selectedFormat);
       const createdLobby = await createLobbyChannels(guild, selectedMode, selectedFormat, letter);
       lobby = {
         id: `${selectedMode}-${selectedFormat}-${letter.toLowerCase()}`,
