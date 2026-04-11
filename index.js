@@ -465,6 +465,10 @@ async function processCommand(message, rawContent) {
       case 'nick':
         await handlers.handleNickUpdateCommand(message, args);
         break;
+      case 'stats':
+      case 'estatisticas':
+        await handlers.handleStatsCommand(message);
+        break;
       case 'votar':
         await handlers.handleVoteCommand(message, args);
         break;
