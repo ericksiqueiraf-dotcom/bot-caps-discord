@@ -841,8 +841,49 @@ async function handleClearCommand(message, args) {
   await (message.channel || message).bulkDelete(Math.min(amount + 1, 100), true);
 }
 
+async function handleStatsCommand(message) {
+  try {
+    const targetUser = message.mentions.users.first() || message.author;
+    const statsData = await loadPlayerStats();
+    const playerStats = Object.values(statsData.players || {}).find((p) => p.discordId === targetUser.id);
+
+    if (!playerStats) {
+      return await replyToMessage(message, 'Jogador não registrado. Use `!cadastrar SeuNick#TAG` antes de entrar no ranking.');
+    }
+
+    const modes = normalizePlayerModes(playerStats);
+    const fields = Object.entries(modes)
+      .filter(([key]) => key === 'classic' || key.startsWith('aram'))
+      .map(([key, stats]) => {
+        const totalGames = (stats.customWins || 0) + (stats.customLosses || 0);
+        const winRate = totalGames ? ((stats.customWins / totalGames) * 100).toFixed(1) : '0.0';
+        const modeLabel = key === 'classic' ? 'Classic' : key.toUpperCase().replace('ARAM', 'ARAM ');
+        return {
+          name: `${modeLabel} • ${stats.customWins || 0}W / ${stats.customLosses || 0}L`,
+          value: `${totalGames} jogos • ${winRate}% WR • ${stats.internalRating || 0} pts`,
+          inline: false
+        };
+      });
+
+    const embed = new EmbedBuilder()
+      .setColor(THEME.INFO)
+      .setTitle(`📊 Estatísticas de ${targetUser.username}`)
+      .setDescription(`Recorde por modo para ${targetUser.username || targetUser.toString()}.`)
+      .addFields(fields)
+      .setFooter({ text: `${FOOTER_PREFIX} • Ranking Insights` })
+      .setTimestamp();
+
+    await sendToMessageChannel(message, { embeds: [embed] });
+  } catch (error) {
+    console.error('[ERRO] !stats:', error);
+    await replyToMessage(message, `❌ Erro ao buscar estatísticas: ${error.message}`);
+  } finally {
+    if (message.deletable) await message.delete().catch(() => null);
+  }
+}
+
 module.exports = {
-  handleEnterCommand, handleListCommand, handlePingCommand, handleLeaderboardCommand, handleTopTenCommand,
+  handleEnterCommand, handleListCommand, handleStatsCommand, handlePingCommand, handleLeaderboardCommand, handleTopTenCommand,
   handleTopStreakCommand, handleSeasonHistoryCommand, handlePlayerCardCommand, handleHelpCommand, handleLeaveCommand, handleRemoveCommand,
   handleResetCommand, handleCleanupRoomsCommand, handleSeasonResetCommand, handleOfficialSeasonStartCommand,
   handleUndoSeasonResetCommand, handleRestoreArchivedPeriodCommand, handleCancelStartCommand, handleStartCommand,
