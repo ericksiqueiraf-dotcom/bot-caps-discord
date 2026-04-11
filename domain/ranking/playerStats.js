@@ -115,11 +115,19 @@ function getRankedPlayersByMode(statsData, mode, format = null, seasonMeta = nul
     .map((player) => mapPlayerRankingEntry(player, getModeStats(player, mode, format)))
     .filter((player) => player.totalGames >= minGames)
     .sort((a, b) => {
+      if (b.customWins !== a.customWins) {
+        return b.customWins - a.customWins;
+      }
+
+      if (b.customLosses !== a.customLosses) {
+        return a.customLosses - b.customLosses;
+      }
+
       if (b.adjustedMmr !== a.adjustedMmr) {
         return b.adjustedMmr - a.adjustedMmr;
       }
 
-      return b.customWins - a.customWins;
+      return b.internalRating - a.internalRating;
     });
 }
 

@@ -827,7 +827,10 @@ function buildTopTenEmbed(statsData, seasonMeta, mode, format = null) {
       (player, index) => {
         const medal = medals[index] || `#${index + 1}`;
         const rankName = getRankName(player.adjustedMmr);
-        return `${medal} <@${player.discordId}>\n**${rankName} (${player.adjustedMmr} pts)** • ${player.customWins}V / ${player.customLosses}D`;
+        const totalGames = player.customWins + player.customLosses;
+        const winRate = totalGames > 0 ? ((player.customWins / totalGames) * 100).toFixed(0) : '0';
+
+        return `${medal} <@${player.discordId}>\n**${rankName} (${player.adjustedMmr} pts)** • ${player.customWins}V / ${player.customLosses}D • ${winRate}% WR`;
       }
     );
 
