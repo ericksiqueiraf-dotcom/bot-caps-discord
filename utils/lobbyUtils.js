@@ -1640,7 +1640,8 @@ function buildTopStreakEmbed(statsData, mode, format = null) {
 
 // ─── Task 6.1: buildPlayerMatchLogEmbed ──────────────────────────────────────
 function buildPlayerMatchLogEmbed(player, delta, match) {
-  const isWin = delta.result === 'vitória';
+  const normalizedResult = String(delta.result || '').toLowerCase();
+  const isWin = normalizedResult === 'vitoria';
   const color = isWin ? THEME.SUCCESS : THEME.ERROR;
   const resultLabel = isWin ? '✅ Vitória' : '❌ Derrota';
   const modeLabel = getStatsBucketLabel(match.mode, match.format);
