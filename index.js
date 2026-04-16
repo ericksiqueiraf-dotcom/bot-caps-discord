@@ -8,7 +8,10 @@ const {
   EmbedBuilder,
   ChannelType,
   PermissionFlagsBits,
-  SlashCommandBuilder
+  SlashCommandBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle
 } = require('discord.js');
 
 const config = require('./config.json');
@@ -23,6 +26,10 @@ const {
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const RIOT_API_KEY = process.env.RIOT_API_KEY;
 const BOT_VERSION = 'v1.8.0';
+const ONBOARDING_BUTTON_IDS = {
+  LOL_PLAYER: 'onboarding_lol_player',
+  NON_PLAYER: 'onboarding_non_player'
+};
 
 const {
   ensureDataFiles,
@@ -510,7 +517,39 @@ client.on('messageCreate', async (message) => {
 });
 
 client.on('interactionCreate', async (interaction) => {
-  if (!interaction.isChatInputCommand() || !interaction.guild) {
+  if (!interaction.guild) {
+    return;
+  }
+
+  if (interaction.isButton()) {
+    try {
+      if (interaction.customId === ONBOARDING_BUTTON_IDS.LOL_PLAYER) {
+        await interaction.reply({
+          content:
+            'Se voce joga LoL, faca `!cadastrar Nick#TAG` para liberar o acesso completo ao servidor. Ate concluir o cadastro, voce permanece apenas com os canais abertos.',
+          ephemeral: true
+        });
+        return;
+      }
+
+      if (interaction.customId === ONBOARDING_BUTTON_IDS.NON_PLAYER) {
+        await interaction.reply({
+          content:
+            'Perfeito. Voce ficara somente com acesso aos canais e salas abertas do servidor, sem receber cargo de jogador.',
+          ephemeral: true
+        });
+        return;
+      }
+    } catch (error) {
+      console.error('[BUTTON] Erro ao responder onboarding:', error);
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({ content: 'Nao consegui processar essa escolha agora.', ephemeral: true }).catch(() => null);
+      }
+      return;
+    }
+  }
+
+  if (!interaction.isChatInputCommand()) {
     return;
   }
 
@@ -667,12 +706,12 @@ client.on('guildMemberAdd', async (member) => {
 
   const welcomeEmbed = new EmbedBuilder()
     .setTitle(`🏠 Bem-vindo à Arena Caps, ${member.user.username}!`)
-    .setDescription(`Prepare-se para subir de elo nas nossas partidas personalizadas balanceadas! Aqui está o seu guia rápido para começar.`)
+    .setDescription('Escolha abaixo como você vai usar o servidor. Jogadores de LoL precisam concluir o cadastro para liberar o acesso completo.')
     .addFields(
-      { name: '📜 Regras', value: 'Primeiro de tudo, leia as nossas regras no canal <#📜┃regras> (ou equivalente) para evitar punições.', inline: false },
-      { name: '✅ Libere o acesso (1x)', value: 'Para visualizar todas as salas do servidor, cadastre sua conta Riot:\n`!cadastrar Nick#TAG`\n> Após cadastrar, o bot libera o cargo de acesso automaticamente.', inline: false },
-      { name: '🎮 Como Jogar', value: '1. Entre em um canal de voz de **Lobby**.\n2. Use o comando `!entrar`.\n3. Aguarde o preenchimento da fila.', inline: false },
-      { name: '🕹️ Comandos Úteis', value: '`!perfil` • Veja seu MMR e elo\n`!ajuda` • Lista completa de comandos\n`!nick Nick#TAG` • Atualiza seu cadastro', inline: false }
+      { name: 'Como funciona o acesso', value: 'Quem joga LoL precisa usar `!cadastrar Nick#TAG` para receber o cargo de jogador e liberar os canais privados.\nQuem não joga LoL permanece apenas com as salas abertas.', inline: false },
+      { name: 'Se você joga LoL', value: 'Clique em **Jogo LoL** e depois envie `!cadastrar Nick#TAG` no chat.\nApós o cadastro, o bot libera seu acesso automaticamente.', inline: false },
+      { name: 'Se você não joga LoL', value: 'Clique em **Não jogo LoL** para permanecer apenas com os canais abertos, sem receber cargo de jogador.', inline: false },
+      { name: 'Comandos importantes', value: '`!cadastrar Nick#TAG` • libera o acesso completo\n`!nick Nick#TAG` • atualiza o cadastro\n`!ajuda` • lista completa de comandos', inline: false }
     )
     .setColor(THEME?.INFO ?? '#0099ff')
     .setThumbnail(member.user.displayAvatarURL())
@@ -692,7 +731,22 @@ client.on('guildMemberAdd', async (member) => {
     )
     .setFooter({ text: welcomeContent.footerText || `${FOOTER_PREFIX || 'Caps Bot'} • Arena de Personalizadas` });
 
-  await channel.send({ content: `Seja bem-vindo, ${member}!`, embeds: [welcomeEmbed] }).catch((err) => console.error('[BOAS-VINDAS] Erro ao enviar mensagem:', err));
+  const onboardingActions = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(ONBOARDING_BUTTON_IDS.LOL_PLAYER)
+      .setLabel('Jogo LoL')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId(ONBOARDING_BUTTON_IDS.NON_PLAYER)
+      .setLabel('Nao jogo LoL')
+      .setStyle(ButtonStyle.Secondary)
+  );
+
+  await channel.send({
+    content: `Seja bem-vindo, ${member}! Escolha abaixo como voce vai usar o servidor:`,
+    embeds: [welcomeEmbed],
+    components: [onboardingActions]
+  }).catch((err) => console.error('[BOAS-VINDAS] Erro ao enviar mensagem:', err));
 });
 
 client.login(DISCORD_TOKEN);

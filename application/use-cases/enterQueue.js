@@ -38,10 +38,14 @@ async function enterQueue({
   let rankProfile;
   let usedApiCall = false;
 
+  if (!registeredNick) {
+    return { status: 'missing_registration' };
+  }
+
   if (providedNick) {
     rankProfile = await riotService.getPlayerRankProfile(providedNick);
     usedApiCall = true;
-  } else if (registeredNick) {
+  } else {
     const storedModeStats = getModeStats(storedEntry, selectedMode, selectedFormat);
     rankProfile = {
       puuid: storedEntry.puuid,
@@ -53,8 +57,6 @@ async function enterQueue({
       mmr: storedModeStats.baseMmr || storedEntry.baseMmr || 1200,
       isFallbackUnranked: Boolean(storedEntry.isFallbackUnranked)
     };
-  } else {
-    return { status: 'missing_registration' };
   }
 
   const result = await withQueueOperationLock(`${guildId}:${selectedMode}:${selectedFormat}`, async () => {
