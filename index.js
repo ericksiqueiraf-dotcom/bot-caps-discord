@@ -11,7 +11,10 @@ const {
   SlashCommandBuilder,
   ActionRowBuilder,
   ButtonBuilder,
-  ButtonStyle
+  ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle
 } = require('discord.js');
 
 const config = require('./config.json');
@@ -30,6 +33,8 @@ const ONBOARDING_BUTTON_IDS = {
   LOL_PLAYER: 'onboarding_lol_player',
   NON_PLAYER: 'onboarding_non_player'
 };
+const ONBOARDING_MODAL_ID = 'onboarding_lol_registration';
+const ONBOARDING_MODAL_FIELD_ID = 'riot_nickname';
 
 const {
   ensureDataFiles,
@@ -524,11 +529,21 @@ client.on('interactionCreate', async (interaction) => {
   if (interaction.isButton()) {
     try {
       if (interaction.customId === ONBOARDING_BUTTON_IDS.LOL_PLAYER) {
-        await interaction.reply({
-          content:
-            'Se voce joga LoL, faca `!cadastrar Nick#TAG` para liberar o acesso completo ao servidor. Ate concluir o cadastro, voce permanece apenas com os canais abertos.',
-          ephemeral: true
-        });
+        const modal = new ModalBuilder()
+          .setCustomId(ONBOARDING_MODAL_ID)
+          .setTitle('Cadastro LoL');
+        const nicknameInput = new TextInputBuilder()
+          .setCustomId(ONBOARDING_MODAL_FIELD_ID)
+          .setLabel('Nick do LoL#TAG')
+          .setPlaceholder('Ex.: MeuNick#BR1')
+          .setRequired(true)
+          .setStyle(TextInputStyle.Short);
+
+        modal.addComponents(
+          new ActionRowBuilder().addComponents(nicknameInput)
+        );
+
+        await interaction.showModal(modal);
         return;
       }
 
@@ -544,6 +559,29 @@ client.on('interactionCreate', async (interaction) => {
       console.error('[BUTTON] Erro ao responder onboarding:', error);
       if (!interaction.replied && !interaction.deferred) {
         await interaction.reply({ content: 'Nao consegui processar essa escolha agora.', ephemeral: true }).catch(() => null);
+      }
+      return;
+    }
+  }
+
+  if (interaction.isModalSubmit()) {
+    try {
+      if (interaction.customId === ONBOARDING_MODAL_ID) {
+        await interaction.deferReply({ ephemeral: true }).catch(() => null);
+        const nickname = interaction.fields.getTextInputValue(ONBOARDING_MODAL_FIELD_ID)?.trim();
+        const context = createInteractionContext(interaction, {
+          content: `!cadastrar ${nickname}`
+        });
+
+        await handlers.handleRegisterCommand(context, [nickname]);
+        return;
+      }
+    } catch (error) {
+      console.error('[MODAL] Erro ao processar cadastro inicial:', error);
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({ content: 'Nao consegui concluir o cadastro agora.', ephemeral: true }).catch(() => null);
+      } else {
+        await interaction.editReply({ content: 'Nao consegui concluir o cadastro agora.' }).catch(() => null);
       }
       return;
     }
