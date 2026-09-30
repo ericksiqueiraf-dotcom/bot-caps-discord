@@ -1,4 +1,4 @@
-const { calculateSeedRating, calculateHybridMmr } = require('../../services/balanceService');
+const { calculateSeedRating, migrateInternalRating, RATING_VERSION } = require('../../services/balanceService');
 const { QUEUE_MODES } = require('../constants/queueModes');
 const { isGroupedAramStreakFormat, normalizeQueueFormat } = require('../constants/queueFormats');
 
@@ -10,7 +10,8 @@ function createEmptyModeStats(baseMmr = 0) {
     customLosses: 0,
     baseMmr: Number(baseMmr || 0),
     internalRating: seedRating,
-    winStreak: 0
+    winStreak: 0,
+    ratingVersion: RATING_VERSION
   };
 }
 
@@ -36,27 +37,33 @@ function normalizePlayerModes(player) {
     const baseStats = createEmptyModeStats(legacyBaseMmr);
 
     if (key === 'classic') {
-      normalized[key] = {
+      normalized[key] = migrateInternalRating({
         ...baseStats,
         ...modeStats,
         customWins: Number(modeStats.customWins ?? legacyWins),
         customLosses: Number(modeStats.customLosses ?? legacyLosses),
         baseMmr: Number(modeStats.baseMmr ?? legacyBaseMmr),
-        internalRating: Number(modeStats.internalRating ?? calculateSeedRating(legacyBaseMmr)),
-        winStreak: Number(modeStats.winStreak ?? 0)
-      };
+        internalRating: Number.isFinite(Number(modeStats.internalRating))
+          ? Number(modeStats.internalRating)
+          : undefined,
+        winStreak: Number(modeStats.winStreak ?? 0),
+        ratingVersion: modeStats.ratingVersion
+      });
       continue;
     }
 
-    normalized[key] = {
+    normalized[key] = migrateInternalRating({
       ...baseStats,
       ...modeStats,
       customWins: Number(modeStats.customWins ?? 0),
       customLosses: Number(modeStats.customLosses ?? 0),
       baseMmr: Number(modeStats.baseMmr ?? legacyBaseMmr),
-      internalRating: Number(modeStats.internalRating ?? calculateSeedRating(legacyBaseMmr)),
-      winStreak: Number(modeStats.winStreak ?? 0)
-    };
+      internalRating: Number.isFinite(Number(modeStats.internalRating))
+        ? Number(modeStats.internalRating)
+        : undefined,
+      winStreak: Number(modeStats.winStreak ?? 0),
+      ratingVersion: modeStats.ratingVersion
+    });
   }
 
   return normalized;
@@ -100,7 +107,7 @@ function mapPlayerRankingEntry(player, modeStats) {
     customWins,
     customLosses,
     totalGames,
-    adjustedMmr: calculateHybridMmr(baseMmr, customWins, customLosses, modeStats.internalRating),
+    adjustedMmr: Number(modeStats.internalRating || calculateSeedRating(baseMmr)),
     winRate: totalGames > 0 ? ((customWins / totalGames) * 100).toFixed(0) : '0',
     internalRating: Number(modeStats.internalRating || calculateSeedRating(baseMmr)),
     winStreak: Number(modeStats.winStreak || 0)

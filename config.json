@@ -2,11 +2,14 @@
   "prefix": "!",
   "region": "br1",
   "roles": {
-    "registeredPlayerRoleId": "1487820221694742651"
+    "registeredPlayerRoleId": "1487820221694742651",
+    "infernalRoleName": "INFERNAL",
+    "mvpPlayerRoleName": "MVP player"
   },
   "voiceChannels": {
     "classicQueueChannelId": "1489240283051856023",
-    "aramQueueChannelId": "1489240459875455169"
+    "aramQueueChannelId": "1489240459875455169",
+    "postMatchWaitingChannelId": "1490385246775017572"
   },
   "textChannels": {
     "rankUpdatesChannelId": "1489247981155651645",
@@ -16,7 +19,8 @@
     "matchOngoingChannelId": "1489236955479937114",
     "welcomeChannelId": "1489303816557035700",
     "playerLogChannelId": "1489810297832210654",
-    "seasonLogChannelId": "1489810341809487966"
+    "seasonLogChannelId": "1489810341809487966",
+    "smurfAlertChannelId": ""
   },
   "automation": {
     "dailyRankUpdatesHour": 8,

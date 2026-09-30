@@ -11,11 +11,13 @@ async function startMatch({
     saveQueue,
     saveCurrentMatch,
     createBalancedTeams,
+    calculateHybridMmr,
+    migrateInternalRating,
     createTeamChannelsForLobby,
     movePlayersToTeamChannels
   } = deps;
 
-  return withQueueOperationLock(`${guildId}:start:${lobby.id}`, async () => {
+  return withQueueOperationLock(`${guildId}:global:queue`, async () => {
     const queueData = await loadQueue();
     const currentMatchData = await loadCurrentMatch();
 
@@ -23,7 +25,29 @@ async function startMatch({
       return null;
     }
 
-    const teams = createBalancedTeams(lobby.players);
+    const currentLobby = queueData.lobbies[lobby.id];
+    const playersForBalance = currentLobby.players.map((player) => {
+      const migrated = migrateInternalRating({
+        baseMmr: player.baseMmr,
+        internalRating: player.internalRating,
+        customWins: player.customWins,
+        customLosses: player.customLosses,
+        ratingVersion: player.ratingVersion
+      });
+
+      return {
+        ...player,
+        ...migrated,
+        mmr: calculateHybridMmr(
+          migrated.baseMmr,
+          migrated.customWins,
+          migrated.customLosses,
+          migrated.internalRating
+        )
+      };
+    });
+
+    const teams = createBalancedTeams(playersForBalance);
     const channels = await createTeamChannelsForLobby(guild, lobby);
 
     teams.mode = lobby.mode;

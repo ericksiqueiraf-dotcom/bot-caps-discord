@@ -32,7 +32,8 @@ const {
   movePlayersToTeamChannels, sendMatchStartAnnouncement, syncMvpRole, clearMvpRoles,
   postMvpAnnouncement, postMatchHistoryLog, buildPlayerCardEmbed, 
   buildSeasonHistoryEmbed, formatCustomRecord,
-  postPlayerLogs, postMatchSummaryToSeasonLog, postSeasonSummaryToSeasonLog
+  postPlayerLogs, postMatchSummaryToSeasonLog, postSeasonSummaryToSeasonLog, postSmurfAlerts,
+  getCustomPointsDelta, getCustomDisplayScore
 } = require('../utils/lobbyUtils');
 
 const { 
@@ -47,7 +48,7 @@ const { getResolvedContentTemplates } = require('../services/contentTextService'
 
 const { 
   calculateSeedRating, calculateHybridMmr, calculateEloDelta, 
-  createBalancedTeams 
+  createBalancedTeams, applyLeagueMmrChange, migrateInternalRating
 } = require('../services/balanceService');
 
 const getRiotService = () => global.riotService;
@@ -80,8 +81,27 @@ async function grantRegisteredPlayerRole(guild, userId) {
 
 // Armazena timeouts de auto-start pendentes: { [lobbyId]: timeoutId }
 const pendingAutoStarts = new Map();
-const VOTE_THRESHOLD = 3; // Fase de testes: 3 votos decidem
+let bulkEloSyncRunning = false;
+const BULK_ELO_SYNC_DELAY_MS = 2500;
+// Calcula o threshold de votos baseado no tamanho do time da partida
+function getVoteThreshold(teamSize) {
+  const size = Number(teamSize || 5);
+  if (size <= 1) return 1;  // 1x1: 1 voto decide
+  if (size <= 2) return 2;  // 2x2: 2 votos
+  if (size <= 3) return 3;  // 3x3: 3 votos
+  if (size <= 4) return 3;  // 4x4: 3 votos
+  return 5;                  // 5x5 Classic: 5 votos (maioria)
+}
 const RECENT_VICTORY_WINDOW_MS = 2 * 60 * 1000;
+
+function syncBaseMmrAcrossModes(playerStats, baseMmr) {
+  return Object.fromEntries(
+    Object.entries(normalizePlayerModes(playerStats)).map(([modeKey, modeStats]) => [
+      modeKey,
+      applyLeagueMmrChange(modeStats, baseMmr)
+    ])
+  );
+}
 
 function createEnterQueueDeps() {
   return {
@@ -103,7 +123,8 @@ function createEnterQueueDeps() {
     getStatsBucketKey,
     upsertPlayerStats,
     calculateHybridMmr,
-    calculateSeedRating
+    calculateSeedRating,
+    applyLeagueMmrChange
   };
 }
 
@@ -115,6 +136,8 @@ function createStartMatchDeps() {
     saveQueue,
     saveCurrentMatch,
     createBalancedTeams,
+    calculateHybridMmr,
+    migrateInternalRating,
     createTeamChannelsForLobby,
     movePlayersToTeamChannels
   };
@@ -296,13 +319,11 @@ async function handleRegisterCommand(message, args) {
       puuid: rankProfile.puuid,
       summonerId: rankProfile.summonerId,
       isFallbackUnranked: Boolean(rankProfile.isFallbackUnranked),
-      modes: {
-        ...normalizePlayerModes(previousEntry || storedStats),
-        classic: { ...getModeStats(previousEntry || storedStats, QUEUE_MODES.CLASSIC), baseMmr: rankProfile.mmr }
-      }
+      modes: syncBaseMmrAcrossModes(previousEntry || storedStats, rankProfile.mmr)
     });
     await savePlayerStats(playerStats);
     const gate = await grantRegisteredPlayerRole(message.guild, message.author.id);
+    await syncMemberRankRole(message.guild, message.author.id, rankProfile.mmr);
     const rankStr = rankProfile.isFallbackUnranked ? 'Unranked (base Gold IV)' : `${rankProfile.tier} ${rankProfile.rank} — ${rankProfile.leaguePoints} PDL`;
     let accessLine = '';
     if (gate.ok && !gate.alreadyHad) {
@@ -352,9 +373,11 @@ async function handleNickUpdateCommand(message, args) {
       puuid: rankProfile.puuid,
       summonerId: rankProfile.summonerId,
       isFallbackUnranked: Boolean(rankProfile.isFallbackUnranked),
+      modes: syncBaseMmrAcrossModes(storedStats, rankProfile.mmr)
     });
     await savePlayerStats(playerStats);
     const gate = await grantRegisteredPlayerRole(message.guild, message.author.id);
+    await syncMemberRankRole(message.guild, message.author.id, rankProfile.mmr);
     const rankStr = rankProfile.isFallbackUnranked ? 'Unranked (base Gold IV)' : `${rankProfile.tier} ${rankProfile.rank} — ${rankProfile.leaguePoints} PDL`;
     let accessLine = '';
     if (gate.ok && !gate.alreadyHad) {
@@ -375,6 +398,75 @@ async function handleNickUpdateCommand(message, args) {
   }
 }
 
+async function handleSyncPlayerRankCommand(message, targetUserOverride = null) {
+  try {
+    if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+      return await replyToMessage(message, '❌ Voce nao tem permissao para sincronizar o elo de jogadores.');
+    }
+
+    const targetUser = targetUserOverride || message.mentions.users.first();
+    if (!targetUser) {
+      return await replyToMessage(message, '❌ Mencione o jogador. Ex.: `!sincronizarelo @jogador`');
+    }
+
+    const playerStats = await loadPlayerStats();
+    const storedEntry = Object.values(playerStats.players || {}).find((player) => player.discordId === targetUser.id);
+    if (!storedEntry?.registeredNickname) {
+      return await replyToMessage(message, '❌ Esse jogador nao possui uma conta Riot cadastrada.');
+    }
+
+    if (storedEntry.puuid && global.riotService.invalidateCache) {
+      global.riotService.invalidateCache(storedEntry.puuid);
+    }
+
+    const rankProfile = await global.riotService.getPlayerRankProfile(storedEntry.registeredNickname);
+    upsertPlayerStats(playerStats, {
+      discordId: targetUser.id,
+      nickname: rankProfile.nickname,
+      puuid: rankProfile.puuid
+    }, {
+      registeredNickname: rankProfile.nickname,
+      registeredAt: new Date().toISOString(),
+      tier: rankProfile.tier,
+      rank: rankProfile.rank,
+      leaguePoints: rankProfile.leaguePoints,
+      baseMmr: rankProfile.mmr,
+      puuid: rankProfile.puuid,
+      summonerId: rankProfile.summonerId,
+      isFallbackUnranked: Boolean(rankProfile.isFallbackUnranked),
+      modes: syncBaseMmrAcrossModes(storedEntry, rankProfile.mmr)
+    });
+    await savePlayerStats(playerStats);
+    const roleSync = await syncMemberRankRole(message.guild, targetUser.id, rankProfile.mmr);
+
+    const rankLabel = rankProfile.isFallbackUnranked
+      ? 'Unranked (base Gold IV)'
+      : `${rankProfile.tier} ${rankProfile.rank} - ${rankProfile.leaguePoints} PDL`;
+
+    let roleLine = '';
+    if (roleSync?.ok) {
+      roleLine = `\nCargo atualizado: **${roleSync.roleName}**.`;
+    } else if (roleSync?.reason === 'hierarchy') {
+      roleLine = `\n⚠️ Elo salvo, mas o cargo **${roleSync.roleName}** nao foi aplicado: o cargo do bot precisa ficar **acima** dos cargos de elo.`;
+    } else if (roleSync?.reason === 'role_not_found') {
+      roleLine = `\n⚠️ Elo salvo, mas nao achei o cargo de **${roleSync.rankTier}** no servidor.`;
+    } else if (roleSync?.reason === 'member_not_found') {
+      roleLine = '\n⚠️ Elo salvo, mas o jogador nao esta no servidor.';
+    } else if (roleSync?.reason === 'discord_error') {
+      roleLine = `\n⚠️ Elo salvo, mas o Discord recusou o cargo: ${roleSync.error}`;
+    } else {
+      roleLine = '\n⚠️ Elo salvo, mas o cargo nao foi alterado.';
+    }
+
+    await replyToMessage(message, `✅ Elo de ${targetUser} sincronizado: **${rankLabel}**.${roleLine}`);
+  } catch (error) {
+    console.error('[ERRO] !sincronizarelo:', error);
+    await replyToMessage(message, `❌ Erro ao sincronizar elo: ${error.message}`);
+  } finally {
+    if (message.deletable) await message.delete().catch(() => null);
+  }
+}
+
 async function handleVoteCommand(message, args) {
   try {
     await handleVoteCommandFlow({
@@ -382,6 +474,7 @@ async function handleVoteCommand(message, args) {
       args,
       deps: {
         VOTE_THRESHOLD,
+        getVoteThreshold,
         loadCurrentMatch,
         castVictoryVote,
         createCastVictoryVoteDeps,
@@ -429,6 +522,154 @@ async function handleListCommand(message, args = []) {
   }
 }
 
+async function handleWaitingListCommand(message, args = []) {
+  try {
+    const action = String(args[0] || '').toLowerCase();
+    const isViewOnly = ['ver', 'listar', 'lista'].includes(action);
+    const isLeaving = ['sair', 'remover'].includes(action);
+    const queueArgs = isViewOnly || isLeaving ? args.slice(1) : args;
+    const { mode, format } = parseModeAndFormatArgs(queueArgs);
+    const listKey = `${mode}:${format || '5x5'}`;
+    const modeLabel = mode === QUEUE_MODES.ARAM ? `ARAM ${format || '5x5'}` : 'CLASSIC 5x5';
+    let players = [];
+    let response = null;
+
+    await withQueueOperationLock(`${message.guild.id}:global:queue`, async () => {
+      const queueData = await loadQueue();
+      queueData.waitingLists ||= {};
+      const currentList = Array.isArray(queueData.waitingLists[listKey])
+        ? queueData.waitingLists[listKey]
+        : [];
+      const playerIndex = currentList.findIndex((player) => player.discordId === message.author.id);
+      const otherWaitingList = Object.entries(queueData.waitingLists).find(
+        ([key, players]) => key !== listKey && Array.isArray(players) && players.some((player) => player.discordId === message.author.id)
+      );
+
+      if (isLeaving) {
+        if (playerIndex === -1) {
+          response = 'Voce nao esta na fila de espera.';
+          players = currentList;
+          return;
+        }
+
+        currentList.splice(playerIndex, 1);
+        if (currentList.length === 0) {
+          delete queueData.waitingLists[listKey];
+        } else {
+          queueData.waitingLists[listKey] = currentList;
+        }
+        await saveQueue(queueData);
+        response = 'Voce saiu da fila de espera.';
+        players = currentList;
+        return;
+      }
+
+      if (!isViewOnly && playerIndex === -1) {
+        if (otherWaitingList) {
+          response = 'Voce ja esta aguardando em outra fila. Use `!fila sair` antes de entrar em uma fila diferente.';
+          players = currentList;
+          return;
+        }
+
+        const playerStats = await loadPlayerStats();
+        const registeredPlayer = Object.values(playerStats.players || {}).find(
+          (player) => player.discordId === message.author.id
+        );
+
+        if (!registeredPlayer) {
+          response = 'Voce precisa se cadastrar com `!cadastrar Nick#TAG` antes de entrar na fila de espera.';
+          players = currentList;
+          return;
+        }
+
+        currentList.push({
+          discordId: message.author.id,
+          discordUsername: message.author.username,
+          nickname: registeredPlayer.registeredNickname || message.author.username,
+          joinedAt: new Date().toISOString()
+        });
+        queueData.waitingLists[listKey] = currentList;
+        await saveQueue(queueData);
+      }
+
+      players = currentList;
+      const position = currentList.findIndex((player) => player.discordId === message.author.id) + 1;
+      if (!isViewOnly && position > 0) {
+        response = playerIndex === -1
+          ? `Voce entrou na fila de espera na posicao **${position}**.`
+          : `Voce ja esta na fila de espera, na posicao **${position}**.`;
+      }
+    });
+
+    if (response) {
+      await replyToMessage(message, response);
+    }
+
+    if (players.length === 0) {
+      if (!response) {
+        await replyToMessage(message, 'Nao ha jogadores aguardando nessa fila no momento.');
+      }
+      return;
+    }
+
+    const orderedPlayers = [...players].sort(
+      (first, second) => new Date(first.joinedAt || 0) - new Date(second.joinedAt || 0)
+    );
+    const entries = orderedPlayers.map(
+      (player, index) => `**${index + 1}.** <@${player.discordId}> - \`${player.nickname}\``
+    );
+    const embed = new EmbedBuilder()
+      .setColor(THEME.INFO)
+      .setTitle(`Fila de Espera - ${modeLabel}`)
+      .setDescription('Ordem de prioridade para a proxima partida.')
+      .setFooter({ text: `${FOOTER_PREFIX} • Fila de Espera` })
+      .setTimestamp();
+
+    splitEmbedFieldChunks(entries).forEach((chunk, index) => {
+      embed.addFields({
+        name: index === 0 ? 'Jogadores aguardando' : 'Jogadores aguardando (continua)',
+        value: chunk
+      });
+    });
+
+    await sendToMessageChannel(message, { embeds: [embed] });
+  } catch (error) {
+    console.error('[ERRO] !espera:', error);
+    await replyToMessage(message, `Erro ao mostrar a ordem da fila: ${error.message}`);
+  } finally {
+    if (message.deletable) await message.delete().catch(() => null);
+  }
+}
+
+async function handleClearWaitingListsCommand(message) {
+  if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+    return await replyToMessage(message, '❌ Voce nao tem permissao para limpar filas de espera.');
+  }
+
+  let clearedLists = 0;
+  let clearedPlayers = 0;
+
+  await withQueueOperationLock(`${message.guild.id}:global:queue`, async () => {
+    const queueData = await loadQueue();
+    const waitingLists = queueData.waitingLists || {};
+
+    for (const players of Object.values(waitingLists)) {
+      if (!Array.isArray(players)) continue;
+      clearedLists += 1;
+      clearedPlayers += players.length;
+    }
+
+    queueData.waitingLists = {};
+    await saveQueue(queueData);
+  });
+
+  await updateQueueDashboard(message.guild);
+  await replyToMessage(
+    message,
+    `✅ Filas de espera limpas: ${clearedPlayers} jogador(es) removido(s) de ${clearedLists} fila(s).`
+  );
+}
+
 async function handlePingCommand(message) {
   const latency = message.client.ws.ping >= 0 ? `${Math.round(message.client.ws.ping)} ms` : 'indisponivel';
   const embed = new EmbedBuilder()
@@ -474,11 +715,11 @@ async function handleHelpCommand(message) {
   const embed = new EmbedBuilder()
     .setColor(THEME.INFO)
     .setTitle('📚 Guia Completo de Comandos')
-    .setDescription('Aqui estao os comandos para gerenciar a Arena Caps.')
+    .setDescription('Aqui estao os comandos para gerenciar a CAPS Arena.')
     .addFields(
       { name: '🕹️ Cadastro (1x)', value: '`!cadastrar Nick#TAG` • Vincula sua conta Riot\n`!nick Nick#TAG` • Atualiza seu nick' },
-      { name: '🎮 Jogador', value: '`!entrar` • Fila Classic\n`!entrar aram` • Fila ARAM\n`!entrar aram 2x2` • ARAM formato\n`!sair` • Sai da fila\n`!votar 1/2` • Vota no vencedor\n`!perfil` • Seu MMR e Elo\n`!top10` • Ranking MMR\n`!topstreak` • Ranking Streak 🔥' },
-      { name: '🛠️ Staff', value: '`!remover @u`, `!limpar [qnt]`, `!sync`, `!onboarding`' },
+      { name: '🎮 Jogador', value: '`!entrar` • Fila Classic\n`!entrar aram` • Fila ARAM\n`!entrar aram 2x2` • ARAM formato\n`!fila` • Mostra jogadores em sala\n`!espera` • Entra na espera\n`!espera ver` • Mostra a ordem\n`!espera sair` • Sai da espera\n`!sair` • Sai da sala\n`!votar 1/2` • Vota no vencedor\n`!perfil` • Seu MMR e Elo\n`!top10` • Ranking MMR\n`!topstreak` • Ranking Streak 🔥' },
+      { name: '🛠️ Staff', value: '`!remover @u`, `!limpar [qnt]`, `!sincronizarelo @u`, `!sincronizartodos` (ou `!sync todos`), `!sync`, `!onboarding`' },
       { name: '⚙️ Partida (Staff)', value: '`!start [lobby]`, `!vitoria [1|2]`, `!cancelarstart`' },
       { name: '📊 Temporada', value: '`!temporadas`, `!resetgeral` (Admin)' }
     )
@@ -489,10 +730,29 @@ async function handleHelpCommand(message) {
 
 async function handleLeaveCommand(message) {
   try {
+    let leftWaitingList = false;
     await withQueueOperationLock(`${message.guild.id}:global:queue`, async () => {
       const queueData = await loadQueue();
       const lobby = findLobbyByPlayer(queueData, message.author.id);
-      if (!lobby) return await replyToMessage(message, 'Voce nao esta em nenhuma fila.');
+      queueData.waitingLists ||= {};
+
+      for (const [listKey, players] of Object.entries(queueData.waitingLists)) {
+        if (!Array.isArray(players)) continue;
+        const playerIndex = players.findIndex((player) => player.discordId === message.author.id);
+        if (playerIndex === -1) continue;
+
+        players.splice(playerIndex, 1);
+        if (players.length === 0) {
+          delete queueData.waitingLists[listKey];
+        }
+        leftWaitingList = true;
+      }
+
+      if (!lobby) {
+        if (!leftWaitingList) return await replyToMessage(message, 'Voce nao esta em nenhuma fila.');
+        await saveQueue(queueData);
+        return;
+      }
 
       const playerIndex = lobby.players.findIndex(p => p.discordId === message.author.id);
       const [removedPlayer] = lobby.players.splice(playerIndex, 1);
@@ -512,6 +772,9 @@ async function handleLeaveCommand(message) {
       await saveQueue(queueData);
     });
     await updateQueueDashboard(message.guild);
+    if (leftWaitingList) {
+      await replyToMessage(message, 'Voce saiu da fila de espera.');
+    }
   } catch (error) {
     console.error('[ERRO] !sair:', error);
     await replyToMessage(message, `❌ Erro ao sair da fila: ${error.message}`);
@@ -576,13 +839,64 @@ async function handleResetCommand(message) {
   }
 }
 
-async function handleCleanupRoomsCommand(message) {
+async function handleCleanupRoomsCommand(message, args = []) {
   if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
     return await replyToMessage(message, '❌ Voce nao tem permissao para limpar salas.');
   }
+
+  const normalizedArgs = args.map((arg) => String(arg || '').trim().toLowerCase());
+  const selectedMode = normalizedArgs.find((arg) => [QUEUE_MODES.CLASSIC, QUEUE_MODES.ARAM].includes(arg)) || null;
+  const selectedLetter = normalizedArgs.find((arg) => /^[a-z]+$/i.test(arg) && arg !== selectedMode)?.toUpperCase() || null;
+
+  if (selectedLetter) {
+    const queueData = await loadQueue();
+    const currentMatchData = await loadCurrentMatch();
+    const matchingLobbies = Object.values(queueData.lobbies || {}).filter(
+      (lobby) => lobby.letter === selectedLetter && (!selectedMode || lobby.mode === selectedMode)
+    );
+    const activeMatch = Object.values(currentMatchData.matches || {}).find(
+      (entry) => entry.active && entry.match?.letter === selectedLetter && (!selectedMode || entry.match.mode === selectedMode)
+    );
+
+    if (activeMatch) {
+      return await replyToMessage(
+        message,
+        `❌ A sala ${selectedLetter} possui uma partida ativa. Finalize ou cancele a partida antes de limpar a sala.`
+      );
+    }
+
+    if (matchingLobbies.length === 0) {
+      return await replyToMessage(message, `❌ Nenhuma sala ${selectedLetter} aguardando jogadores foi encontrada.`);
+    }
+
+    let removedChannels = 0;
+    for (const lobby of matchingLobbies) {
+      if (pendingAutoStarts.has(lobby.id)) {
+        clearTimeout(pendingAutoStarts.get(lobby.id));
+        pendingAutoStarts.delete(lobby.id);
+      }
+
+      removedChannels += await deleteManagedChannelsForLobby(
+        message.guild,
+        lobby.mode,
+        lobby.format,
+        lobby.letter,
+        [lobby.waitingChannelId, lobby.teamOneChannelId, lobby.teamTwoChannelId]
+      );
+      delete queueData.lobbies[lobby.id];
+    }
+
+    await saveQueue(queueData);
+    await updateQueueDashboard(message.guild);
+    return await replyToMessage(
+      message,
+      `✅ Sala ${selectedLetter} limpa: ${matchingLobbies.length} fila(s) e ${removedChannels} canal(is) removido(s).`
+    );
+  }
+
   const dynamicChannels = message.guild.channels.cache.filter(c => isManagedDynamicChannel(c));
   for (const channel of dynamicChannels.values()) await deleteVoiceChannelIfExists(message.guild, channel.id);
-  await saveQueue({ lobbies: {} });
+  await saveQueue({ lobbies: {}, waitingLists: {} });
   await saveCurrentMatch({ matches: {} });
   await updateQueueDashboard(message.guild);
   await replyToMessage(message, 'Canais dinamicos e estados internos limpos.');
@@ -599,12 +913,18 @@ async function handleSeasonResetCommand(message) {
   history.seasons.push(archivedSeason);
   await saveSeasonHistory(history);
   await savePlayerStats(resetStatsForNewSeason(statsData));
-  await saveQueue({ lobbies: {} });
+  await saveQueue({ lobbies: {}, waitingLists: {} });
   await saveCurrentMatch({ matches: {} });
-  const nextMeta = { ...seasonMeta, currentSeason: seasonMeta.currentSeason + 1, startedAt: new Date().toISOString() };
+  const isTesting = seasonMeta.phase === 'testing';
+  const nextMeta = {
+    ...seasonMeta,
+    currentSeason: isTesting ? seasonMeta.currentSeason : seasonMeta.currentSeason + 1,
+    testingCycle: isTesting ? (seasonMeta.testingCycle || 1) + 1 : seasonMeta.testingCycle,
+    startedAt: new Date().toISOString()
+  };
   await saveSeasonMeta(nextMeta);
   await updateQueueDashboard(message.guild);
-  await replyToMessage(message, 'Temporada resetada com sucesso.');
+  await replyToMessage(message, `Temporada resetada com sucesso. Iniciando ${getSeasonDisplayLabel(nextMeta)}.`);
   await postSeasonSummaryToSeasonLog(message.guild, archivedSeason);
 }
 
@@ -710,7 +1030,8 @@ async function handleVictoryCommand(message, args) {
         loadSeasonMeta,
         loadPlayerStats,
         postPlayerLogs,
-        postMatchSummaryToSeasonLog
+        postMatchSummaryToSeasonLog,
+        postSmurfAlerts
       }
     });
   } catch (error) {
@@ -744,9 +1065,118 @@ async function handleSyncAllRolesCommand(message) {
   }
   const statsData = await loadPlayerStats();
   const players = Object.values(statsData.players || {});
-  await replyToMessage(message, `Sincronizando ${players.length} jogadores...`);
-  for(const p of players) await syncMemberRankRole(message.guild, p.discordId, p.internalRating || 1200);
-  await replyToMessage(message, 'Sincronizacao concluida.');
+  await replyToMessage(message, `Sincronizando cargos de ${players.length} jogadores (elo ja cadastrado)...`);
+  for(const p of players) await syncMemberRankRole(message.guild, p.discordId, p.baseMmr || 1200);
+  await replyToMessage(message, 'Sincronizacao de cargos concluida.');
+}
+
+function collectUniqueRegisteredPlayers(statsData) {
+  const byDiscordId = new Map();
+
+  for (const player of Object.values(statsData.players || {})) {
+    if (!player?.discordId || !player.registeredNickname) {
+      continue;
+    }
+
+    const previous = byDiscordId.get(player.discordId);
+    if (!previous || new Date(player.registeredAt || 0) > new Date(previous.registeredAt || 0)) {
+      byDiscordId.set(player.discordId, player);
+    }
+  }
+
+  return [...byDiscordId.values()];
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function handleSyncAllPlayersEloCommand(message) {
+  if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
+    return await replyToMessage(message, '❌ Comando restrito a administradores.');
+  }
+
+  if (bulkEloSyncRunning) {
+    return await replyToMessage(message, '⚠️ Ja existe uma sincronizacao em massa em andamento. Aguarde terminar.');
+  }
+
+  bulkEloSyncRunning = true;
+
+  try {
+    const statsData = await loadPlayerStats();
+    const players = collectUniqueRegisteredPlayers(statsData);
+
+    if (players.length === 0) {
+      return await replyToMessage(message, 'Nenhum jogador cadastrado para atualizar.');
+    }
+
+    const estimatedMinutes = Math.max(1, Math.ceil((players.length * BULK_ELO_SYNC_DELAY_MS) / 60000));
+    await replyToMessage(
+      message,
+      `Atualizando elo da Riot e cargos de **${players.length}** jogadores.\nIsso leva cerca de **${estimatedMinutes} min** para nao estourar o limite da API.`
+    );
+
+    let updated = 0;
+    let roleWarnings = 0;
+    let failed = 0;
+
+    for (const [index, storedEntry] of players.entries()) {
+      try {
+        if (storedEntry.puuid && global.riotService.invalidateCache) {
+          global.riotService.invalidateCache(storedEntry.puuid);
+        }
+
+        const rankProfile = await global.riotService.getPlayerRankProfile(storedEntry.registeredNickname);
+        const freshStats = await loadPlayerStats();
+        const currentEntry = getStoredPlayerStats(freshStats, {
+          discordId: storedEntry.discordId,
+          nickname: rankProfile.nickname,
+          puuid: rankProfile.puuid
+        });
+
+        upsertPlayerStats(freshStats, {
+          discordId: storedEntry.discordId,
+          nickname: rankProfile.nickname,
+          puuid: rankProfile.puuid
+        }, {
+          registeredNickname: rankProfile.nickname,
+          registeredAt: currentEntry.registeredAt || storedEntry.registeredAt || new Date().toISOString(),
+          tier: rankProfile.tier,
+          rank: rankProfile.rank,
+          leaguePoints: rankProfile.leaguePoints,
+          baseMmr: rankProfile.mmr,
+          puuid: rankProfile.puuid,
+          summonerId: rankProfile.summonerId,
+          isFallbackUnranked: Boolean(rankProfile.isFallbackUnranked),
+          modes: syncBaseMmrAcrossModes(currentEntry || storedEntry, rankProfile.mmr)
+        });
+        await savePlayerStats(freshStats);
+
+        const roleSync = await syncMemberRankRole(message.guild, storedEntry.discordId, rankProfile.mmr);
+        updated += 1;
+        if (!roleSync?.ok) {
+          roleWarnings += 1;
+        }
+      } catch (error) {
+        failed += 1;
+        console.error(`[SYNC TODOS] Falha em ${storedEntry.registeredNickname}:`, error.message);
+      }
+
+      if (index < players.length - 1) {
+        await sleep(BULK_ELO_SYNC_DELAY_MS);
+      }
+    }
+
+    await replyToMessage(
+      message,
+      `✅ Sincronizacao em massa concluida.\nAtualizados: **${updated}**\nFalha na Riot: **${failed}**\nCargo com aviso: **${roleWarnings}**`
+    );
+  } catch (error) {
+    console.error('[ERRO] !sincronizartodos:', error);
+    await replyToMessage(message, `❌ Erro na sincronizacao em massa: \`${error.message}\`.`);
+  } finally {
+    bulkEloSyncRunning = false;
+  }
 }
 
 async function handleOnboardingCommand(message) {
@@ -767,7 +1197,7 @@ async function handleOnboardingCommand(message) {
 
   const embedGuia = new EmbedBuilder()
     .setColor('#5865F2')
-    .setTitle('🎮 Arena Caps — Guia de Início Rápido')
+    .setTitle('🎮 CAPS Arena — Guia de Início Rápido')
     .setDescription(
       'Partidas personalizadas com fila persistente, times balanceados por MMR interno e histórico completo de resultados.\n\n' +
       '**Fluxo rápido: cadastrar, entrar na call, jogar, votar e acompanhar sua evolução.**'
@@ -860,7 +1290,7 @@ async function handleStatsCommand(message) {
         const modeLabel = key === 'classic' ? 'Classic' : key.toUpperCase().replace('ARAM', 'ARAM ');
         return {
           name: `${modeLabel} • ${stats.customWins || 0}W / ${stats.customLosses || 0}L`,
-          value: `${totalGames} jogos • ${winRate}% WR • ${stats.internalRating || 0} pts`,
+          value: `${totalGames} jogos • ${winRate}% WR • LoL ${stats.baseMmr || 0} pts • Custom ${getCustomDisplayScore(stats)}`,
           inline: false
         };
       });
@@ -882,11 +1312,74 @@ async function handleStatsCommand(message) {
   }
 }
 
+async function handleRematchCommand(message) {
+  try {
+    const hasStaffPermission = message.member?.permissions?.has('ManageMessages') || message.member?.permissions?.has('Administrator');
+    if (!hasStaffPermission) {
+      await replyToMessage(message, '❌ Apenas staff pode usar o comando rematch.');
+      return;
+    }
+
+    const systemMeta = await loadSystemMeta();
+    const recentVictory = getRecentVictoryForGuild(systemMeta, message.guild.id);
+    if (!recentVictory) {
+      await replyToMessage(message, '❌ Nenhuma partida finalizada recentemente encontrada no servidor. (Expira em 2 minutos)');
+      return;
+    }
+
+    const { match } = recentVictory;
+    const allPlayers = [...(match.teamOne || []), ...(match.teamTwo || [])];
+    if (allPlayers.length === 0) {
+      await replyToMessage(message, '❌ Nao foi possivel identificar os jogadores da ultima partida.');
+      return;
+    }
+
+    const mode = match.mode || 'classic';
+    const format = match.format;
+
+    const queueData = await loadQueue();
+    let lobby = getOpenLobby(queueData, mode, format);
+    
+    // Garantir que cabe todo mundo se estivermos adicionando? 
+    // Em tese, eles preenchem exatamente uma sala inteira.
+    if (!lobby) {
+      // Cria a sala forçadamente se não tiver (mas getOpenLobby deve criar)
+    }
+
+    let added = 0;
+    for (const player of allPlayers) {
+      if (!lobby.players.find(p => p.discordId === player.discordId)) {
+        lobby.players.push({
+          discordId: player.discordId,
+          nickname: player.nickname,
+          joinedAt: new Date().toISOString()
+        });
+        added++;
+      }
+    }
+    
+    await saveQueue(queueData);
+    await updateQueueDashboard(message.guild);
+
+    await replyToMessage(message, `✅ **Rematch** acionado! **${added}** jogadores foram recolocados na fila de **${mode.toUpperCase()} ${format || ''}** na sala **${lobby.letter}**.`);
+
+    if (lobby.players.length >= lobby.requiredPlayers && !pendingAutoStarts.has(lobby.id)) {
+      await triggerAutoStart(message.guild, lobby.id);
+    }
+  } catch (err) {
+    console.error('[ERRO] !rematch:', err);
+    await replyToMessage(message, `❌ Erro ao acionar rematch: \`${err.message}\``);
+  } finally {
+    if (message.deletable) await message.delete().catch(() => null);
+  }
+}
+
 module.exports = {
-  handleEnterCommand, handleListCommand, handleStatsCommand, handlePingCommand, handleLeaderboardCommand, handleTopTenCommand,
+  handleEnterCommand, handleListCommand, handleWaitingListCommand, handleClearWaitingListsCommand, handleStatsCommand, handlePingCommand, handleLeaderboardCommand, handleTopTenCommand,
   handleTopStreakCommand, handleSeasonHistoryCommand, handlePlayerCardCommand, handleHelpCommand, handleLeaveCommand, handleRemoveCommand,
   handleResetCommand, handleCleanupRoomsCommand, handleSeasonResetCommand, handleOfficialSeasonStartCommand,
   handleUndoSeasonResetCommand, handleRestoreArchivedPeriodCommand, handleCancelStartCommand, handleStartCommand,
-  handleSyncAllRolesCommand, handleVictoryCommand, handleOnboardingCommand, handleClearCommand,
-  handleRegisterCommand, handleNickUpdateCommand, handleVoteCommand, pendingAutoStarts
+  handleSyncAllRolesCommand, handleSyncAllPlayersEloCommand, handleVictoryCommand, handleOnboardingCommand, handleClearCommand,
+  handleRegisterCommand, handleNickUpdateCommand, handleSyncPlayerRankCommand, handleVoteCommand, pendingAutoStarts, triggerAutoStart,
+  handleRematchCommand
 };

@@ -28,8 +28,8 @@ async function registerVictory({
   const mmrWeight = match.mode === QUEUE_MODES.ARAM
     ? getAramWeightByTeamSize(match.teamSize || Number(String(match.format || '5x5').split('x')[0]))
     : 1;
-  const avgWinnerOppMmr = Math.round(losingPlayers.reduce((sum, player) => sum + Number(player.mmr || 1200), 0) / (losingPlayers.length || 1));
-  const avgLoserOppMmr = Math.round(winningPlayers.reduce((sum, player) => sum + Number(player.mmr || 1200), 0) / (winningPlayers.length || 1));
+  const avgWinnerOppMmr = Math.round(losingPlayers.reduce((sum, player) => sum + Number(player.mmr || player.internalRating || 0), 0) / (losingPlayers.length || 1));
+  const avgLoserOppMmr = Math.round(winningPlayers.reduce((sum, player) => sum + Number(player.mmr || player.internalRating || 0), 0) / (winningPlayers.length || 1));
 
   return withQueueOperationLock(`${guildId}:victory:${matchId}`, async () => {
     const currentMatchData = await loadCurrentMatch();

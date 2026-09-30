@@ -22,7 +22,7 @@ const {
   getStatsBucketKey,
   getRankedPlayersByMode
 } = require('../domain/ranking/playerStats');
-const { calculateHybridMmr, calculateSeedRating, calculateEloDelta } = require('../services/balanceService');
+const { calculateHybridMmr, calculateSeedRating, calculateEloDelta, RATING_VERSION } = require('../services/balanceService');
 const { DEFAULT_CONTENT_TEMPLATES, getResolvedContentTemplates } = require('../services/contentTextService');
 
 function ensureArray(value) {
@@ -278,7 +278,8 @@ async function updatePlayer(playerKey, payload) {
     internalRating,
     customWins,
     customLosses,
-    winStreak
+    winStreak,
+    ratingVersion: RATING_VERSION
   };
 
   statsData.players[playerKey] = {
@@ -309,7 +310,8 @@ async function reseedPlayer(playerKey, mode, format = null) {
 
   modes[bucketKey] = {
     ...modeStats,
-    internalRating: calculateSeedRating(modeStats.baseMmr)
+    internalRating: calculateSeedRating(modeStats.baseMmr),
+    ratingVersion: RATING_VERSION
   };
 
   statsData.players[playerKey] = {

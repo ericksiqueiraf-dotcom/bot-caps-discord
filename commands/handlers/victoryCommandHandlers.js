@@ -28,17 +28,32 @@ async function handleVictoryCommandFlow({
     loadSeasonMeta,
     loadPlayerStats,
     postPlayerLogs,
-    postMatchSummaryToSeasonLog
+    postMatchSummaryToSeasonLog,
+    postSmurfAlerts
   } = deps;
 
-  const winningTeam = args[args.length - 1];
-  if (!['1', '2'].includes(winningTeam)) {
-    await replyToMessage(message, 'Use !vitoria 1 ou 2.');
+  const teamArgs = args.filter((arg) => ['1', '2'].includes(String(arg)));
+  if (teamArgs.length !== 1) {
+    await replyToMessage(message, 'Use `!vitoria A 1` ou `!vitoria 1 A`.');
+    return;
+  }
+  const winningTeam = teamArgs[0];
+  const selectorArgs = args.filter((arg) => String(arg) !== winningTeam);
+
+  // Verifica se o usuário tem permissão de staff (ManageMessages ou Administrator)
+  // _isAutoVote é true quando a vitória foi disparada automaticamente pelo sistema de votos
+  const hasStaffPermission = message._isAutoVote === true ||
+                             message.member?.permissions?.has('ManageMessages') ||
+                             message.member?.permissions?.has('Administrator');
+  if (!hasStaffPermission) {
+    await replyToMessage(message, '❌ Apenas staff pode registrar vitórias manualmente. Use `!votar 1` ou `!votar 2` para votar.');
     return;
   }
 
   const currentMatchData = await loadCurrentMatch();
-  const matchEntry = findActiveMatchBySelector(currentMatchData, args.slice(0, -1)) || getActiveMatchEntry(currentMatchData, message.member.voice?.channelId);
+  const matchEntry = selectorArgs.length > 0
+    ? findActiveMatchBySelector(currentMatchData, selectorArgs)
+    : getActiveMatchEntry(currentMatchData, message.member.voice?.channelId);
   if (!matchEntry) {
     const systemMeta = await loadSystemMeta();
     const recentVictory = getRecentVictoryForGuild(systemMeta, message.guild.id);
@@ -60,6 +75,7 @@ async function handleVictoryCommandFlow({
 
   const [matchId, entry] = matchEntry;
   const match = entry.match;
+  console.log(`[VITORIA] Sala ${match.letter} (${match.mode} ${match.format}) | equipe ${winningTeam} | comando: ${args.join(' ')}`);
   const victoryResult = await registerVictory({
     guildId: message.guild.id,
     matchId,
@@ -71,12 +87,10 @@ async function handleVictoryCommandFlow({
   match.losers = victoryResult.losers;
 
   const { winners, losers } = match;
-  for (const player of [...winners, ...losers]) {
-    await syncMemberRankRole(message.guild, player.discordId, player.afterRank);
-  }
 
-  const maxStreak = Math.max(...winners.map((player) => player.winStreak || 0));
-  const mvps = maxStreak > 0 ? winners.filter((player) => (player.winStreak || 0) === maxStreak) : [];
+  // MVP: jogador(es) com maior ganho de rating nesta partida (mais justo que streak)
+  const maxDelta = Math.max(...winners.map((player) => player.ratingDelta || 0));
+  const mvps = maxDelta > 0 ? winners.filter((player) => (player.ratingDelta || 0) === maxDelta) : [];
   await clearMvpRoles(message.guild);
   for (const mvp of mvps) {
     await syncMvpRole(message.guild, mvp.discordId);
@@ -164,7 +178,8 @@ async function handleVictoryCommandFlow({
   const freshStats = await loadPlayerStats();
   await Promise.all([
     postPlayerLogs(message.guild, matchResult, freshStats),
-    postMatchSummaryToSeasonLog(message.guild, matchResult)
+    postMatchSummaryToSeasonLog(message.guild, matchResult),
+    postSmurfAlerts(message.guild, match, freshStats)
   ]);
 }
 

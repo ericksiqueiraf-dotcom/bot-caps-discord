@@ -1,18 +1,20 @@
+const DEFAULT_CUSTOM_POINTS = 1000;
+const RATING_VERSION = 2;
+
 function calculateTeamMmr(team) {
   return team.reduce((total, player) => total + player.mmr, 0);
 }
 
-function calculateSeedRating(baseMmr = 1000) {
-  const numericBase = Number(baseMmr || 1000);
-
-  // Comprime o peso do elo da Riot para nao dominar o rank interno
-  // e aplica limites para evitar "bronze inflado" ou "diamond instantâneo".
-  const compressed = Math.round(1000 + (numericBase - 1000) * 0.25);
-  return Math.min(1400, Math.max(900, compressed));
+function calculateSeedRating(baseMmr = 0) {
+  return DEFAULT_CUSTOM_POINTS + Math.max(0, Number(baseMmr || 0));
 }
 
 function getExperienceWeight(totalGames = 0) {
   const games = Number(totalGames || 0);
+
+  if (games === 0) {
+    return 0;
+  }
 
   if (games >= 20) {
     return 1.0;
@@ -26,17 +28,57 @@ function getExperienceWeight(totalGames = 0) {
     return 0.8;
   }
 
-  return 0.7; // pesa mais o desempenho interno mesmo nos primeiros jogos
+  return 0.7;
+}
+
+function migrateInternalRating(modeStats = {}) {
+  const baseMmr = Math.max(0, Number(modeStats.baseMmr || 0));
+
+  if (Number(modeStats.ratingVersion) === RATING_VERSION) {
+    const currentRating = Number(modeStats.internalRating);
+
+    return {
+      ...modeStats,
+      baseMmr,
+      internalRating: Number.isFinite(currentRating) ? currentRating : calculateSeedRating(baseMmr),
+      ratingVersion: RATING_VERSION
+    };
+  }
+
+  const previousRating = Number.isFinite(Number(modeStats.internalRating))
+    ? Number(modeStats.internalRating)
+    : DEFAULT_CUSTOM_POINTS;
+
+  return {
+    ...modeStats,
+    baseMmr,
+    internalRating: previousRating + baseMmr,
+    ratingVersion: RATING_VERSION
+  };
+}
+
+function applyLeagueMmrChange(modeStats, newBaseMmr) {
+  const migrated = migrateInternalRating(modeStats);
+  const nextBaseMmr = Math.max(0, Number(newBaseMmr || 0));
+  const previousBaseMmr = Number(migrated.baseMmr || 0);
+  const totalGames = Number(migrated.customWins || 0) + Number(migrated.customLosses || 0);
+  const nextRating = totalGames === 0
+    ? calculateSeedRating(nextBaseMmr)
+    : Math.max(0, Number(migrated.internalRating) + (nextBaseMmr - previousBaseMmr));
+
+  return {
+    ...migrated,
+    baseMmr: nextBaseMmr,
+    internalRating: nextRating,
+    ratingVersion: RATING_VERSION
+  };
 }
 
 function calculateHybridMmr(baseMmr, customWins = 0, customLosses = 0, internalRating) {
-  const totalGames = Number(customWins || 0) + Number(customLosses || 0);
   const seedRating = calculateSeedRating(baseMmr);
   const currentInternalRating = Number.isFinite(Number(internalRating)) ? Number(internalRating) : seedRating;
-  const experienceWeight = getExperienceWeight(totalGames);
-  const blendedRating = seedRating * (1 - experienceWeight) + currentInternalRating * experienceWeight;
 
-  return Math.max(0, Math.round(blendedRating));
+  return Math.max(0, Math.round(currentInternalRating));
 }
 
 function calculateExpectedScore(ownRating, opponentRating) {
@@ -145,10 +187,14 @@ function applySnakeDraft(players) {
 }
 
 module.exports = {
+  DEFAULT_CUSTOM_POINTS,
+  RATING_VERSION,
   createBalancedTeams,
   calculateTeamMmr,
   calculateHybridMmr,
   calculateSeedRating,
   calculateEloDelta,
-  getExperienceWeight
+  getExperienceWeight,
+  migrateInternalRating,
+  applyLeagueMmrChange
 };
