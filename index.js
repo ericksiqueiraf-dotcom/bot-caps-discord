@@ -145,6 +145,9 @@ function buildSlashCommands() {
           )
       ),
     addModeAndLobbyOptions(new SlashCommandBuilder().setName('lista').setDescription('Mostra a fila atual.')),
+    addModeAndLobbyOptions(new SlashCommandBuilder().setName('fila').setDescription('Mostra a fila atual.')),
+    addModeAndLobbyOptions(new SlashCommandBuilder().setName('espera').setDescription('Entra na fila de espera.')),
+    new SlashCommandBuilder().setName('limparespera').setDescription('Limpa todas as filas de espera.'),
     new SlashCommandBuilder().setName('sair').setDescription('Remove voce da fila.'),
     addModeAndLobbyOptions(new SlashCommandBuilder().setName('start').setDescription('Inicia a partida da sala.')),
     addModeAndLobbyOptions(new SlashCommandBuilder().setName('cancelarstart').setDescription('Cancela a partida ativa.')),
@@ -211,10 +214,15 @@ function buildSlashCommands() {
       .setName('remover')
       .setDescription('Remove um usuario da fila.')
       .addUserOption((option) => option.setName('usuario').setDescription('Usuario a remover').setRequired(true)),
-    new SlashCommandBuilder().setName('limparsalas').setDescription('Limpa salas automaticas orfas.'),
+    addModeAndLobbyOptions(new SlashCommandBuilder().setName('limparsalas').setDescription('Limpa salas automaticas ou uma sala especifica.')),
     new SlashCommandBuilder().setName('reset').setDescription('Limpa todas as filas e partidas ativas.'),
     new SlashCommandBuilder().setName('resetgeral').setDescription('Arquiva a fase atual e inicia uma nova.'),
     new SlashCommandBuilder().setName('sincronizar-cargos').setDescription('Força a atualização dos cargos de todos os jogadores.'),
+    new SlashCommandBuilder().setName('sincronizartodos').setDescription('Atualiza o elo Riot e o cargo de todos os jogadores cadastrados.'),
+    new SlashCommandBuilder()
+      .setName('sincronizarelo')
+      .setDescription('Atualiza o elo Riot e o cargo de um jogador.')
+      .addUserOption((option) => option.setName('usuario').setDescription('Jogador a sincronizar').setRequired(true)),
     new SlashCommandBuilder().setName('onboarding').setDescription('Gera a mensagem de boas-vindas e guia do servidor.'),
     new SlashCommandBuilder()
       .setName('limpar')
@@ -343,6 +351,9 @@ const {
   getSaoPauloDateParts,
   postDailyRankUpdates,
   postMatchHistoryLog,
+  handleMvpVoteInteraction,
+  resumePendingMvpVotes,
+  expireInfernalRolesIfDue,
   startDailyRankScheduler,
   movePlayersToTeamChannels,
   movePlayersToVoiceChannel,
@@ -373,6 +384,37 @@ client.once('ready', async () => {
   console.log(`Bot conectado como ${client.user.tag} | ${BOT_VERSION}`);
   await registerSlashCommands();
   startDailyRankScheduler();
+
+  // Retoma votacoes de MVP pendentes (se o bot reiniciou no meio de uma votacao)
+  try {
+    await resumePendingMvpVotes();
+  } catch (err) {
+    console.error('[RESTART] Erro ao retomar votacoes de MVP:', err);
+  }
+
+  // Expira cargos INFERNAL vencidos (08h) logo na inicializacao
+  try {
+    for (const guild of client.guilds.cache.values()) {
+      await expireInfernalRolesIfDue(guild);
+    }
+  } catch (err) {
+    console.error('[RESTART] Erro ao expirar cargos INFERNAL:', err);
+  }
+
+  // Item 3: Recuperar auto-starts pendentes (se a sala estiver cheia no BD e reiniciou)
+  try {
+    const queueData = await loadQueue();
+    for (const guild of client.guilds.cache.values()) {
+      for (const [lobbyId, lobby] of Object.entries(queueData.lobbies || {})) {
+        if (lobby.players && lobby.players.length >= lobby.requiredPlayers) {
+          console.log(`[RESTART] Retomando auto-start pendente para lobby ${lobbyId}`);
+          handlers.triggerAutoStart(guild, lobbyId);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[RESTART] Erro ao recuperar auto-starts:', err);
+  }
 });
 
 client.on('guildCreate', async (guild) => {
@@ -402,6 +444,15 @@ async function processCommand(message, rawContent) {
         break;
       case 'lista':
         await handlers.handleListCommand(message, args);
+        break;
+      case 'fila':
+        await handlers.handleListCommand(message, args);
+        break;
+      case 'espera':
+        await handlers.handleWaitingListCommand(message, args);
+        break;
+      case 'limparespera':
+        await handlers.handleClearWaitingListsCommand(message);
         break;
       case 'placar':
         await handlers.handleLeaderboardCommand(message, args);
@@ -445,7 +496,7 @@ async function processCommand(message, rawContent) {
         await handlers.handleResetCommand(message);
         break;
       case 'limparsalas':
-        await handlers.handleCleanupRoomsCommand(message);
+        await handlers.handleCleanupRoomsCommand(message, args);
         break;
       case 'resetgeral':
         await handlers.handleSeasonResetCommand(message);
@@ -471,6 +522,9 @@ async function processCommand(message, rawContent) {
       case 'start':
         await handlers.handleStartCommand(message, args);
         break;
+      case 'rematch':
+        await handlers.handleRematchCommand(message, args);
+        break;
       case 'cadastrar':
         await handlers.handleRegisterCommand(message, args);
         break;
@@ -490,7 +544,21 @@ async function processCommand(message, rawContent) {
         break;
       case 'sincronizar-cargos':
       case 'sync':
-        await handlers.handleSyncAllRolesCommand(message);
+        if (['elo', 'todos', 'riot'].includes(String(args[0] || '').toLowerCase())) {
+          await handlers.handleSyncAllPlayersEloCommand(message);
+        } else {
+          await handlers.handleSyncAllRolesCommand(message);
+        }
+        break;
+      case 'sincronizartodos':
+      case 'sicronizartodos':
+      case 'sincronizatodos':
+      case 'atualizartodos':
+      case 'atualizarelos':
+        await handlers.handleSyncAllPlayersEloCommand(message);
+        break;
+      case 'sincronizarelo':
+        await handlers.handleSyncPlayerRankCommand(message);
         break;
       default:
         await replyToMessage(message, `Comando desconhecido: \`${rawContent}\`. Use \`!ajuda\` para ver os comandos.`);
@@ -587,6 +655,22 @@ client.on('interactionCreate', async (interaction) => {
     }
   }
 
+  if (interaction.isStringSelectMenu()) {
+    try {
+      if (String(interaction.customId || '').startsWith('mvpvote:')) {
+        await handleMvpVoteInteraction(interaction);
+        return;
+      }
+    } catch (error) {
+      console.error('[MVP] Erro ao processar voto:', error);
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({ content: 'Nao consegui registrar seu voto agora.', ephemeral: true }).catch(() => null);
+      }
+      return;
+    }
+    return;
+  }
+
   if (!interaction.isChatInputCommand()) {
     return;
   }
@@ -633,6 +717,12 @@ client.on('interactionCreate', async (interaction) => {
       case 'lista':
         await handlers.handleListCommand(context, selectorArgs);
         break;
+      case 'fila':
+        await handlers.handleListCommand(context, selectorArgs);
+        break;
+      case 'espera':
+        await handlers.handleWaitingListCommand(context, selectorArgs);
+        break;
       case 'sair':
         await handlers.handleLeaveCommand(context);
         break;
@@ -661,6 +751,9 @@ client.on('interactionCreate', async (interaction) => {
       case 'remover':
         await handlers.handleRemoveCommand(context, targetUser);
         break;
+      case 'limparespera':
+        await handlers.handleClearWaitingListsCommand(context);
+        break;
       case 'limpar':
         await handlers.handleClearCommand(context, [String(interaction.options.getInteger('quantidade'))]);
         break;
@@ -668,7 +761,7 @@ client.on('interactionCreate', async (interaction) => {
         await handlers.handleOnboardingCommand(context);
         break;
       case 'limparsalas':
-        await handlers.handleCleanupRoomsCommand(context);
+        await handlers.handleCleanupRoomsCommand(context, selectorArgs);
         break;
       case 'reset':
         await handlers.handleResetCommand(context);
@@ -678,6 +771,12 @@ client.on('interactionCreate', async (interaction) => {
         break;
       case 'sincronizar-cargos':
         await handlers.handleSyncAllRolesCommand(context);
+        break;
+      case 'sincronizartodos':
+        await handlers.handleSyncAllPlayersEloCommand(context);
+        break;
+      case 'sincronizarelo':
+        await handlers.handleSyncPlayerRankCommand(context, targetUser);
         break;
       case 'desfazerresettemporada':
         await handlers.handleUndoSeasonResetCommand(context);
@@ -743,7 +842,7 @@ client.on('guildMemberAdd', async (member) => {
   const welcomeContent = getResolvedContentTemplates(storedTemplates).welcome;
 
   const welcomeEmbed = new EmbedBuilder()
-    .setTitle(`🏠 Bem-vindo à Arena Caps, ${member.user.username}!`)
+    .setTitle(`🏠 Bem-vindo à CAPS Arena, ${member.user.username}!`)
     .setDescription('Escolha abaixo como você vai usar o servidor. Jogadores de LoL precisam concluir o cadastro para liberar o acesso completo.')
     .addFields(
       { name: 'Como funciona o acesso', value: 'Quem joga LoL precisa usar `!cadastrar Nick#TAG` para receber o cargo de jogador e liberar os canais privados.\nQuem não joga LoL permanece apenas com as salas abertas.', inline: false },

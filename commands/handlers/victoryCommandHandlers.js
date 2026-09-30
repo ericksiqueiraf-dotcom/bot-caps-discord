@@ -15,10 +15,10 @@ async function handleVictoryCommandFlow({
     registerVictory,
     createRegisterVictoryDeps,
     syncMemberRankRole,
-    clearMvpRoles,
-    syncMvpRole,
-    postMvpAnnouncement,
-    getBaseQueueChannelIdByMode,
+    syncInfernalRolesAfterMatch,
+    postInfernalAnnouncement,
+    startMvpVote,
+    getPostMatchVoiceChannelId,
     movePlayersToVoiceChannel,
     deleteManagedChannelsForLobby,
     updateQueueDashboard,
@@ -28,17 +28,32 @@ async function handleVictoryCommandFlow({
     loadSeasonMeta,
     loadPlayerStats,
     postPlayerLogs,
-    postMatchSummaryToSeasonLog
+    postMatchSummaryToSeasonLog,
+    postSmurfAlerts
   } = deps;
 
-  const winningTeam = args[args.length - 1];
-  if (!['1', '2'].includes(winningTeam)) {
-    await replyToMessage(message, 'Use !vitoria 1 ou 2.');
+  const teamArgs = args.filter((arg) => ['1', '2'].includes(String(arg)));
+  if (teamArgs.length !== 1) {
+    await replyToMessage(message, 'Use `!vitoria A 1` ou `!vitoria 1 A`.');
+    return;
+  }
+  const winningTeam = teamArgs[0];
+  const selectorArgs = args.filter((arg) => String(arg) !== winningTeam);
+
+  // Verifica se o usuário tem permissão de staff (ManageMessages ou Administrator)
+  // _isAutoVote é true quando a vitória foi disparada automaticamente pelo sistema de votos
+  const hasStaffPermission = message._isAutoVote === true ||
+                             message.member?.permissions?.has('ManageMessages') ||
+                             message.member?.permissions?.has('Administrator');
+  if (!hasStaffPermission) {
+    await replyToMessage(message, '❌ Apenas staff pode registrar vitórias manualmente. Use `!votar 1` ou `!votar 2` para votar.');
     return;
   }
 
   const currentMatchData = await loadCurrentMatch();
-  const matchEntry = findActiveMatchBySelector(currentMatchData, args.slice(0, -1)) || getActiveMatchEntry(currentMatchData, message.member.voice?.channelId);
+  const matchEntry = selectorArgs.length > 0
+    ? findActiveMatchBySelector(currentMatchData, selectorArgs)
+    : getActiveMatchEntry(currentMatchData, message.member.voice?.channelId);
   if (!matchEntry) {
     const systemMeta = await loadSystemMeta();
     const recentVictory = getRecentVictoryForGuild(systemMeta, message.guild.id);
@@ -60,6 +75,7 @@ async function handleVictoryCommandFlow({
 
   const [matchId, entry] = matchEntry;
   const match = entry.match;
+  console.log(`[VITORIA] Sala ${match.letter} (${match.mode} ${match.format}) | equipe ${winningTeam} | comando: ${args.join(' ')}`);
   const victoryResult = await registerVictory({
     guildId: message.guild.id,
     matchId,
@@ -71,20 +87,23 @@ async function handleVictoryCommandFlow({
   match.losers = victoryResult.losers;
 
   const { winners, losers } = match;
-  for (const player of [...winners, ...losers]) {
-    await syncMemberRankRole(message.guild, player.discordId, player.afterRank);
+
+  // INFERNAL: cargo automatico para 5+ vitorias seguidas (sai na derrota, expira as 08h)
+  // + anuncio dos recem-premiados no canal de destaques. Nunca quebra o !vitoria.
+  try {
+    const infernalAwarded = await syncInfernalRolesAfterMatch(message.guild, winners, losers);
+    await postInfernalAnnouncement(message.guild, infernalAwarded);
+  } catch (err) {
+    console.error('[INFERNAL] Falha no pos-jogo:', err.message);
   }
 
-  const maxStreak = Math.max(...winners.map((player) => player.winStreak || 0));
-  const mvps = maxStreak > 0 ? winners.filter((player) => (player.winStreak || 0) === maxStreak) : [];
-  await clearMvpRoles(message.guild);
-  for (const mvp of mvps) {
-    await syncMvpRole(message.guild, mvp.discordId);
-    await postMvpAnnouncement(message.guild, mvp);
-  }
+  // MVP: votacao de 2 min entre os jogadores da partida + cargo MVP player ao mais votado.
+  // Se ninguem votar, o encerramento usa fallback automatico (maior ganho de rating).
+  await startMvpVote(message.guild, match, winners, losers);
 
-  const baseLobbyChannelId = getBaseQueueChannelIdByMode(match.mode);
-  await movePlayersToVoiceChannel(message.guild, [...winners, ...losers], baseLobbyChannelId);
+  // Pos-partida: todos voltam para a Sala de Espera (nao para o lobby da fila)
+  const postMatchChannelId = getPostMatchVoiceChannelId(match.mode);
+  await movePlayersToVoiceChannel(message.guild, [...winners, ...losers], postMatchChannelId);
 
   await deleteManagedChannelsForLobby(message.guild, match.mode, match.format, match.letter, [
     match.teamOneChannelId,
@@ -96,18 +115,28 @@ async function handleVictoryCommandFlow({
   await updateQueueDashboard(message.guild);
 
   const finishedAt = new Date().toISOString();
+  const finishedTeams = {
+    teamOne: (match.teamOne || []).map((player) => ({ discordId: player.discordId, nickname: player.nickname })),
+    teamTwo: (match.teamTwo || []).map((player) => ({ discordId: player.discordId, nickname: player.nickname }))
+  };
   const systemMeta = await loadSystemMeta();
+  const finishedEntry = {
+    guildId: message.guild.id,
+    matchId,
+    winnerTeam: winningTeam,
+    mode: match.mode,
+    format: match.format,
+    letter: match.letter || null,
+    finishedAt,
+    ...finishedTeams
+  };
+  // Historico curto das ultimas partidas finalizadas (p/ !rematch <letra>).
+  // O recentVictory (ultima) e mantido como antes para o anti-duplo do !vitoria.
+  const recentVictories = [finishedEntry, ...((systemMeta.recentVictories || []).filter((e) => e && e.matchId !== matchId))].slice(0, 5);
   await saveSystemMeta({
     ...systemMeta,
-    recentVictory: {
-      guildId: message.guild.id,
-      matchId,
-      winnerTeam: winningTeam,
-      mode: match.mode,
-      format: match.format,
-      letter: match.letter || null,
-      finishedAt
-    }
+    recentVictory: finishedEntry,
+    recentVictories
   });
 
   await postMatchHistoryLog(message.guild, {
@@ -164,7 +193,8 @@ async function handleVictoryCommandFlow({
   const freshStats = await loadPlayerStats();
   await Promise.all([
     postPlayerLogs(message.guild, matchResult, freshStats),
-    postMatchSummaryToSeasonLog(message.guild, matchResult)
+    postMatchSummaryToSeasonLog(message.guild, matchResult),
+    postSmurfAlerts(message.guild, match, freshStats)
   ]);
 }
 

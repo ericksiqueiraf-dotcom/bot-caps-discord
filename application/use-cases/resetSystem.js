@@ -35,7 +35,7 @@ async function resetSystem({
     ]);
   }
 
-  await saveQueue({ lobbies: {} });
+  await saveQueue({ lobbies: {}, waitingLists: {} });
   await saveCurrentMatch({ matches: {} });
 }
 

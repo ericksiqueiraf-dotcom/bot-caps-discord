@@ -54,6 +54,17 @@ async function handleEnterCommandFlow({
     return;
   }
 
+  if (result.status === 'waiting_list_priority') {
+    const positionMessage = result.position
+      ? `Voce esta na posicao **${result.position}** da fila de espera.`
+      : 'Ha jogadores aguardando antes de voce.';
+    await replyToMessage(
+      message,
+      `${positionMessage} Aguarde os jogadores anteriores entrarem na proxima sala.`
+    );
+    return;
+  }
+
   if (result.status === 'duplicate_nickname') {
     await replyToMessage(message, 'Ja existe um jogador com esse nick na fila.');
     return;
@@ -66,6 +77,26 @@ async function handleEnterCommandFlow({
   }
 
   await updateQueueDashboard(message.guild);
+
+  // Notifica quando falta 1 jogador para completar a sala
+  const playersCount = lobby.players.length;
+  const required = lobby.requiredPlayers;
+  if (playersCount === required - 1 && playersCount > 0) {
+    try {
+      const statusChannelId = require('../config.json').textChannels?.matchOngoingChannelId;
+      const statusChannel = statusChannelId
+        ? await message.guild.channels.fetch(statusChannelId).catch(() => null)
+        : null;
+      if (statusChannel?.isTextBased()) {
+        const modeLabel = lobby.mode === 'aram' ? `ARAM ${lobby.format || '5x5'}` : 'Classic';
+        await statusChannel.send(
+          `⚡ **Fila ${lobby.letter} (${modeLabel})** quase cheia! Falta **1 jogador** — entre no canal de voz para participar!`
+        ).catch(() => null);
+      }
+    } catch (e) {
+      // notificação não é crítica, ignora erro silenciosamente
+    }
+  }
 
   if (lobby.players.length >= lobby.requiredPlayers && !pendingAutoStarts.has(lobby.id)) {
     await triggerAutoStart(message.guild, lobby.id);

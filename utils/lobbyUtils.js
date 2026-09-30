@@ -1,4 +1,4 @@
-const { ChannelType, EmbedBuilder } = require('discord.js');
+const { ChannelType, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
 const config = require('../config.json');
 const { QUEUE_MODES } = require('../domain/constants/queueModes');
 const { KNOWN_ARAM_FORMATS, isGroupedAramStreakFormat, normalizeQueueFormat } = require('../domain/constants/queueFormats');
@@ -16,7 +16,7 @@ const {
   loadPlayerStats, savePlayerStats, loadSeasonMeta, 
   loadSeasonHistory, saveSeasonHistory 
 } = require('../services/dataService');
-const { calculateSeedRating, calculateHybridMmr, calculateEloDelta } = require('../services/balanceService');
+const { calculateSeedRating, calculateHybridMmr, calculateEloDelta, RATING_VERSION, DEFAULT_CUSTOM_POINTS } = require('../services/balanceService');
 
 const THEME = {
   SUCCESS: '#00ff88',
@@ -32,25 +32,104 @@ let lastDailyRankPostKey = null;
 
 function getRankName(mmr) {
   const val = Number(mmr || 0);
-  if (val < 900) return 'Ferro';
-  if (val < 1100) return 'Bronze';
-  if (val < 1300) return 'Prata';
-  if (val < 1500) return 'Ouro';
-  if (val < 1700) return 'Platina';
-  return 'Diamante';
+  if (val < 400) return 'Ferro';
+  if (val < 800) return 'Bronze';
+  if (val < 1200) return 'Prata';
+  if (val < 1600) return 'Ouro';
+  if (val < 2000) return 'Platina';
+  if (val < 2400) return 'Esmeralda';
+  if (val < 2800) return 'Diamante';
+  if (val < 3200) return 'Mestre';
+  if (val < 3600) return 'GraoMestre';
+  return 'Desafiante';
 }
 
 const RANK_ROLES_MAP = {
-  Ferro: 'Ferro',
-  Bronze: '🥉 Bronze',
-  Prata: '🥈 Prata',
-  Ouro: '🥇 Ouro',
-  Platina: '🔷Platina',
-  Diamante: '💎 Diamante'
+  Ferro: ['Ferro'],
+  Bronze: ['🥉Bronze', 'Bronze'],
+  Prata: ['🥈Prata', 'Prata'],
+  Ouro: ['🥇Ouro', 'Ouro'],
+  Platina: ['🔷Platina', 'Platina'],
+  Esmeralda: ['Esmeralda', 'Mestre Esmeralda'],
+  Diamante: ['💎Diamante', 'Diamante'],
+  Mestre: ['Mestre'],
+  GraoMestre: ['Grão Mestre', 'Grao Mestre'],
+  Desafiante: ['Desafiante']
 };
 
-const ALL_RANK_ROLE_NAMES = Object.values(RANK_ROLES_MAP);
-const MVP_ROLE_NAME = '⭐ MVP';
+const ALL_RANK_ROLE_NAMES = [
+  'Ferro',
+  '🥉Bronze', '🥉 Bronze', 'Bronze',
+  '🥈Prata', '🥈 Prata', 'Prata',
+  '🥇Ouro', '🥇 Ouro', 'Ouro',
+  '🔷Platina', '🔷 Platina', 'Platina',
+  'Esmeralda', 'Mestre Esmeralda',
+  '💎Diamante', '💎 Diamante', '💎 DIAMANTE', 'Diamante',
+  'Mestre',
+  'Grão Mestre', 'Grao Mestre',
+  'Desafiante'
+];
+
+const RANK_ROLE_PATTERNS = [
+  { key: 'GraoMestre', needle: 'graomestre' },
+  { key: 'Desafiante', needle: 'desafiante' },
+  { key: 'Diamante', needle: 'diamante' },
+  { key: 'Esmeralda', needle: 'mestreesmeralda' },
+  { key: 'Esmeralda', needle: 'esmeralda' },
+  { key: 'Platina', needle: 'platina' },
+  { key: 'Ouro', needle: 'ouro' },
+  { key: 'Prata', needle: 'prata' },
+  { key: 'Bronze', needle: 'bronze' },
+  { key: 'Mestre', needle: 'mestre' },
+  { key: 'Ferro', needle: 'ferro' }
+];
+
+function normalizeRoleName(name) {
+  return String(name || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .toLowerCase();
+}
+
+function getRankTierFromRoleName(roleName) {
+  const normalized = normalizeRoleName(roleName);
+  return RANK_ROLE_PATTERNS.find((entry) => normalized.includes(entry.needle))?.key || null;
+}
+
+function getPreferredRankRoleNames(rankTier) {
+  const mapped = RANK_ROLES_MAP[rankTier];
+  if (!mapped) return [];
+  return Array.isArray(mapped) ? mapped : [mapped];
+}
+
+function findRankRole(guild, rankTier) {
+  const roles = guild.roles.cache;
+
+  for (const preferredName of getPreferredRankRoleNames(rankTier)) {
+    const preferredNormalized = normalizeRoleName(preferredName);
+    const exact = roles.find((role) => normalizeRoleName(role.name) === preferredNormalized);
+    if (exact) return exact;
+  }
+
+  return roles.find((role) => getRankTierFromRoleName(role.name) === rankTier) || null;
+}
+
+function isRankRole(role) {
+  if (!role) return false;
+  const normalizedName = role.name.replace(/\s+/g, '').toLowerCase();
+  if (ALL_RANK_ROLE_NAMES.some((name) => name.replace(/\s+/g, '').toLowerCase() === normalizedName)) {
+    return true;
+  }
+  return Boolean(getRankTierFromRoleName(role.name));
+}
+
+const MVP_ROLE_NAMES = [config.roles?.mvpPlayerRoleName || 'MVP player', '⭐ MVP'];
+const INFERNAL_ROLE_NAME = config.roles?.infernalRoleName || 'INFERNAL';
+const INFERNAL_STREAK = 5;
+const MVP_VOTE_DURATION_MS = 2 * 60 * 1000;
+const pendingMvpVotes = new Map();
+const mvpVoteTimeouts = new Map();
 
 function getSeasonDisplayLabel(seasonMeta) {
   if (seasonMeta.phase === 'official') {
@@ -277,6 +356,61 @@ function getBaseQueueChannelIdByMode(mode) {
   return mode === QUEUE_MODES.ARAM ? config.voiceChannels.aramQueueChannelId : config.voiceChannels.classicQueueChannelId;
 }
 
+function getPostMatchVoiceChannelId(mode) {
+  const waitingChannelId = config.voiceChannels.postMatchWaitingChannelId;
+  if (waitingChannelId) {
+    return waitingChannelId;
+  }
+  return getBaseQueueChannelIdByMode(mode);
+}
+
+async function ensureNamedRole(guild, name) {
+  const existing = findRoleByNames(guild, [name]);
+  if (existing) {
+    return existing;
+  }
+
+  try {
+    return await guild.roles.create({
+      name,
+      mentionable: true,
+      reason: 'Cargo automatico do CAPS Bot'
+    });
+  } catch (error) {
+    console.warn(`[ROLES] Nao foi possivel criar o cargo ${name}:`, error.message);
+    return null;
+  }
+}
+
+function findRoleByNames(guild, names = []) {
+  const normalized = names.map((name) => String(name || '').replace(/\s+/g, '').toLowerCase());
+  return guild.roles.cache.find((role) =>
+    normalized.includes(String(role.name || '').replace(/\s+/g, '').toLowerCase())
+  ) || null;
+}
+
+function findMvpRole(guild) {
+  return findRoleByNames(guild, MVP_ROLE_NAMES);
+}
+
+async function ensureMvpRole(guild) {
+  return findMvpRole(guild) || ensureNamedRole(guild, config.roles?.mvpPlayerRoleName || 'MVP player');
+}
+
+function findInfernalRole(guild) {
+  return findRoleByNames(guild, [INFERNAL_ROLE_NAME]);
+}
+
+async function ensureInfernalRole(guild) {
+  return findInfernalRole(guild) || ensureNamedRole(guild, INFERNAL_ROLE_NAME);
+}
+
+function getNextEightAmSaoPauloIso(from = new Date()) {
+  const parts = getSaoPauloDateParts(from);
+  const eightAmTodayUtc = Date.UTC(parts.year, parts.month - 1, parts.day, 11, 0, 0);
+  return new Date(eightAmTodayUtc + 24 * 60 * 60 * 1000).toISOString();
+}
+
 function getOpenLobby(queueData, mode, format) {
   return Object.values(queueData.lobbies || {}).find(
     (lobby) => lobby.mode === mode && lobby.format === format && lobby.status === 'waiting' && lobby.players.length < lobby.requiredPlayers
@@ -480,38 +614,43 @@ function formatCustomRecord(player) {
 }
 
 async function syncMemberRankRole(guild, discordId, mmr) {
-  if (!guild || !discordId) return;
+  if (!guild || !discordId) {
+    return { ok: false, reason: 'missing_target' };
+  }
 
   try {
     const member = await guild.members.fetch(discordId).catch(() => null);
-    if (!member) return;
+    if (!member) {
+      return { ok: false, reason: 'member_not_found' };
+    }
 
     const rankTier = getRankName(mmr);
-    const targetRoleName = RANK_ROLES_MAP[rankTier];
-    if (!targetRoleName) return;
+    const targetRole = findRankRole(guild, rankTier);
+    if (!targetRole) {
+      console.warn(`[ROLES] Cargo de elo nao encontrado para ${rankTier}`);
+      return { ok: false, reason: 'role_not_found', rankTier };
+    }
 
-    const roles = guild.roles.cache;
-    const targetRole = roles.find(r => r.name === targetRoleName);
+    const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
+    if (botMember && targetRole.position >= botMember.roles.highest.position) {
+      console.warn(`[ROLES] Hierarquia impede atribuir ${targetRole.name} para ${member.user.tag}`);
+      return { ok: false, reason: 'hierarchy', roleName: targetRole.name, rankTier };
+    }
 
-    // Remove other rank roles
-    const currentRankRoles = member.roles.cache.filter(r => 
-      ALL_RANK_ROLE_NAMES.includes(r.name) && r.name !== targetRoleName
-    );
+    const currentRankRoles = member.roles.cache.filter((role) => isRankRole(role) && role.id !== targetRole.id);
 
     if (currentRankRoles.size > 0) {
-      await member.roles.remove(currentRankRoles).catch(err => 
-        console.error(`[ROLES] Erro ao remover cargos de ${member.user.tag}:`, err.message)
-      );
+      await member.roles.remove(currentRankRoles);
     }
 
-    // Add target role if not present
-    if (targetRole && !member.roles.cache.has(targetRole.id)) {
-      await member.roles.add(targetRole).catch(err => 
-        console.error(`[ROLES] Erro ao adicionar cargo ${targetRoleName} em ${member.user.tag}:`, err.message)
-      );
+    if (!member.roles.cache.has(targetRole.id)) {
+      await member.roles.add(targetRole);
     }
+
+    return { ok: true, roleName: targetRole.name, rankTier };
   } catch (err) {
-    console.error(`[ROLES] Erro crítico na sincronização de cargo para ${discordId}:`, err.message);
+    console.error(`[ROLES] Erro na sincronizacao de cargo para ${discordId}:`, err.message);
+    return { ok: false, reason: 'discord_error', error: err.message };
   }
 }
 
@@ -519,13 +658,15 @@ async function syncMvpRole(guild, mvpId) {
   if (!guild || !mvpId) return;
 
   try {
-    const mvpRole = guild.roles.cache.find(r => r.name === MVP_ROLE_NAME);
-    if (!mvpRole) return;
+    const mvpRole = await ensureMvpRole(guild);
+    if (!mvpRole) {
+      console.warn('[MVP] Cargo MVP player / ⭐ MVP nao encontrado.');
+      return;
+    }
 
-    // Add to new MVP (não remove dos outros — a remoção é feita no início da próxima partida)
     const newMvp = await guild.members.fetch(mvpId).catch(() => null);
     if (newMvp && !newMvp.roles.cache.has(mvpRole.id)) {
-      await newMvp.roles.add(mvpRole).catch(err => 
+      await newMvp.roles.add(mvpRole).catch((err) =>
         console.error(`[ROLES] Erro ao atribuir cargo MVP para ${newMvp.user.tag}:`, err.message)
       );
     }
@@ -537,7 +678,7 @@ async function syncMvpRole(guild, mvpId) {
 async function clearMvpRoles(guild) {
   if (!guild) return;
   try {
-    const mvpRole = guild.roles.cache.find(r => r.name === MVP_ROLE_NAME);
+    const mvpRole = findMvpRole(guild);
     if (!mvpRole) return;
     for (const [, member] of mvpRole.members) {
       await member.roles.remove(mvpRole).catch(() => null);
@@ -547,16 +688,367 @@ async function clearMvpRoles(guild) {
   }
 }
 
+async function syncInfernalRolesAfterMatch(guild, winners = [], losers = []) {
+  const newlyAwarded = [];
+  if (!guild) return newlyAwarded;
+
+  const infernalRole = await ensureInfernalRole(guild);
+  if (!infernalRole) {
+    console.warn('[INFERNAL] Cargo INFERNAL nao encontrado. Crie o cargo no Discord.');
+    return newlyAwarded;
+  }
+
+  const statsData = await loadPlayerStats();
+
+  for (const loser of losers) {
+    upsertPlayerStats(statsData, loser, { infernalExpiresAt: null });
+    const member = await guild.members.fetch(loser.discordId).catch(() => null);
+    if (member?.roles.cache.has(infernalRole.id)) {
+      await member.roles.remove(infernalRole).catch((err) =>
+        console.error(`[INFERNAL] Erro ao remover cargo de ${member.user.tag}:`, err.message)
+      );
+    }
+  }
+
+  for (const winner of winners) {
+    if (Number(winner.winStreak || 0) < INFERNAL_STREAK) {
+      continue;
+    }
+
+    const stored = getStoredPlayerStats(statsData, winner);
+    const stillValid = stored.infernalExpiresAt && new Date(stored.infernalExpiresAt).getTime() > Date.now();
+    const infernalExpiresAt = stillValid ? stored.infernalExpiresAt : getNextEightAmSaoPauloIso();
+    upsertPlayerStats(statsData, winner, { infernalExpiresAt });
+
+    const member = await guild.members.fetch(winner.discordId).catch(() => null);
+    if (member && !member.roles.cache.has(infernalRole.id)) {
+      await member.roles.add(infernalRole).catch((err) =>
+        console.error(`[INFERNAL] Erro ao atribuir cargo a ${member.user.tag}:`, err.message)
+      );
+      newlyAwarded.push({
+        discordId: winner.discordId,
+        nickname: winner.nickname,
+        winStreak: Number(winner.winStreak || 0),
+        infernalExpiresAt
+      });
+    }
+  }
+
+  await savePlayerStats(statsData);
+  return newlyAwarded;
+}
+
+async function postInfernalAnnouncement(guild, awarded = []) {
+  if (!guild || !Array.isArray(awarded) || awarded.length === 0) return;
+
+  const channelId = config.textChannels.mvpAnnouncementsChannelId || config.textChannels.matchHistoryChannelId;
+  const channel = await guild.channels.fetch(channelId).catch(() => null);
+  if (!channel?.isTextBased()) {
+    console.warn('[INFERNAL] Canal de anuncio nao encontrado.');
+    return;
+  }
+
+  const mentions = awarded.map((p) => `<@${p.discordId}>`).join(' ');
+  const lines = awarded
+    .map((p) => `• **${p.nickname || p.discordId}** — \`${p.winStreak}\` vitorias seguidas (vale ate ${formatDateTimeForHistory(p.infernalExpiresAt)})`)
+    .join('\n');
+
+  const embed = new EmbedBuilder()
+    .setColor(THEME.RANK)
+    .setTitle('🔥 NOVO INFERNAL 🔥')
+    .setDescription(`${mentions}\nChegou a **${INFERNAL_STREAK} vitorias seguidas** e conquistou o cargo **${INFERNAL_ROLE_NAME}**!`)
+    .addFields({ name: 'Conquistas', value: lines || 'Sem detalhes' })
+    .setFooter({ text: `${FOOTER_PREFIX} • Streak INFERNAL` })
+    .setTimestamp();
+
+  await channel.send({ embeds: [embed] }).catch((err) =>
+    console.error('[INFERNAL] Erro ao postar anuncio:', err.message)
+  );
+}
+
+async function expireInfernalRolesIfDue(guild) {
+  if (!guild) return;
+
+  const infernalRole = findInfernalRole(guild);
+  const statsData = await loadPlayerStats();
+  const now = Date.now();
+  let changed = false;
+
+  for (const player of Object.values(statsData.players || {})) {
+    if (!player.infernalExpiresAt) {
+      continue;
+    }
+
+    if (new Date(player.infernalExpiresAt).getTime() > now) {
+      continue;
+    }
+
+    upsertPlayerStats(statsData, player, { infernalExpiresAt: null });
+    changed = true;
+
+    if (!infernalRole || !player.discordId) {
+      continue;
+    }
+
+    const member = await guild.members.fetch(player.discordId).catch(() => null);
+    if (member?.roles.cache.has(infernalRole.id)) {
+      await member.roles.remove(infernalRole).catch(() => null);
+    }
+  }
+
+  if (changed) {
+    await savePlayerStats(statsData);
+  }
+}
+
+function countMvpVotes(session) {
+  const tallies = new Map();
+  for (const targetId of Object.values(session.votes || {})) {
+    tallies.set(targetId, (tallies.get(targetId) || 0) + 1);
+  }
+  return tallies;
+}
+
+function pickAutomaticMvp(session) {
+  const candidates = (session.players || []).filter((player) => player.wasWinner);
+  const pool = candidates.length > 0 ? candidates : (session.players || []);
+  let best = null;
+  for (const player of pool) {
+    if (!best || (player.ratingDelta || 0) > (best.ratingDelta || 0)) {
+      best = player;
+    }
+  }
+  if (!best || (best.ratingDelta || 0) <= 0) {
+    return null;
+  }
+  return { ...best, votes: 0, automatic: true };
+}
+
+function pickMvpWinner(session) {
+  const tallies = countMvpVotes(session);
+  if (tallies.size === 0) {
+    return pickAutomaticMvp(session);
+  }
+
+  let best = null;
+  for (const player of session.players) {
+    const votes = tallies.get(player.discordId) || 0;
+    if (votes === 0) continue;
+    if (
+      !best ||
+      votes > best.votes ||
+      (votes === best.votes && (player.ratingDelta || 0) > (best.ratingDelta || 0))
+    ) {
+      best = { ...player, votes };
+    }
+  }
+  return best;
+}
+
+async function persistPendingMvpVotes() {
+  const systemMeta = await loadSystemMeta();
+  systemMeta.pendingMvpVotes = Object.fromEntries(pendingMvpVotes.entries());
+  await saveSystemMeta(systemMeta);
+}
+
+async function finalizeMvpVote(voteId) {
+  const session = pendingMvpVotes.get(voteId);
+  if (!session || session.closed) {
+    return;
+  }
+
+  session.closed = true;
+  pendingMvpVotes.set(voteId, session);
+  const timeoutId = mvpVoteTimeouts.get(voteId);
+  if (timeoutId) {
+    clearTimeout(timeoutId);
+    mvpVoteTimeouts.delete(voteId);
+  }
+
+  const guild = global.discordClient?.guilds.cache.get(session.guildId)
+    || await global.discordClient?.guilds.fetch(session.guildId).catch(() => null);
+  const channel = await guild?.channels.fetch(session.channelId).catch(() => null);
+  const message = session.messageId && channel?.isTextBased()
+    ? await channel.messages.fetch(session.messageId).catch(() => null)
+    : null;
+
+  const winner = pickMvpWinner(session);
+  const voteLines = session.players
+    .map((player) => {
+      const votes = countMvpVotes(session).get(player.discordId) || 0;
+      return `• ${player.nickname}: **${votes}** voto(s)`;
+    })
+    .join('\n');
+
+  if (guild) {
+    await clearMvpRoles(guild);
+    if (winner) {
+      await syncMvpRole(guild, winner.discordId);
+      await postMvpAnnouncement(guild, {
+        discordId: winner.discordId,
+        nickname: winner.nickname,
+        winStreak: winner.winStreak || 0,
+        afterRank: winner.afterRank || 0,
+        mvpVotes: winner.votes
+      });
+    }
+  }
+
+  if (message) {
+    const winnerDescription = winner
+      ? (winner.automatic
+        ? `<@${winner.discordId}> ficou com o MVP pelo maior ganho de rating (ninguem votou).`
+        : `<@${winner.discordId}> foi o mais votado (**${winner.votes}** voto(s)).`)
+      : 'Nenhum voto foi registrado.';
+    const resultEmbed = EmbedBuilder.from(message.embeds[0] || new EmbedBuilder())
+      .setTitle(winner ? `MVP: ${winner.nickname}` : 'Votacao de MVP encerrada')
+      .setDescription(winnerDescription)
+      .spliceFields(0, 25, { name: 'Placar', value: voteLines || 'Sem votos' });
+
+    await message.edit({ embeds: [resultEmbed], components: [] }).catch(() => null);
+  }
+
+  pendingMvpVotes.delete(voteId);
+  await persistPendingMvpVotes();
+}
+
+async function startMvpVote(guild, match, winners = [], losers = []) {
+  const players = [...winners, ...losers].filter((player) => player.discordId);
+  if (!guild || players.length === 0) {
+    return;
+  }
+
+  const channelId = config.textChannels.mvpAnnouncementsChannelId || config.textChannels.matchHistoryChannelId;
+  const channel = await guild.channels.fetch(channelId).catch(() => null);
+  if (!channel?.isTextBased()) {
+    console.warn('[MVP] Canal de votacao nao encontrado.');
+    return;
+  }
+
+  const voteId = `${Date.now().toString(36)}`;
+  const session = {
+    voteId,
+    guildId: guild.id,
+    channelId,
+    messageId: null,
+    players: players.map((player) => ({
+      discordId: player.discordId,
+      nickname: player.nickname,
+      ratingDelta: player.ratingDelta || 0,
+      afterRank: player.afterRank || 0,
+      winStreak: player.winStreak || 0,
+      wasWinner: winners.some((winner) => winner.discordId === player.discordId)
+    })),
+    votes: {},
+    closed: false,
+    expiresAt: Date.now() + MVP_VOTE_DURATION_MS
+  };
+
+  const select = new StringSelectMenuBuilder()
+    .setCustomId(`mvpvote:${voteId}`)
+    .setPlaceholder('Escolha o MVP desta partida')
+    .addOptions(
+      session.players.map((player) => ({
+        label: String(player.nickname || player.discordId).slice(0, 100),
+        value: player.discordId,
+        description: player.wasWinner ? 'Time vencedor' : 'Time oponente'
+      }))
+    );
+
+  const embed = new EmbedBuilder()
+    .setColor(THEME.RANK)
+    .setTitle('Vote no MVP da partida')
+    .setDescription(
+      `Lobby **${match.letter || '?'}** • ${formatQueueMode(match.mode)} ${match.format || ''}\n` +
+      `Apenas quem jogou esta partida pode votar. Tempo: **2 minutos**.`
+    )
+    .setFooter({ text: `${FOOTER_PREFIX} • Votacao MVP` })
+    .setTimestamp();
+
+  const message = await channel.send({
+    embeds: [embed],
+    components: [new ActionRowBuilder().addComponents(select)]
+  });
+
+  session.messageId = message.id;
+  pendingMvpVotes.set(voteId, session);
+  await persistPendingMvpVotes();
+
+  const timeoutId = setTimeout(() => {
+    finalizeMvpVote(voteId).catch((error) => console.error('[MVP] Falha ao encerrar votacao:', error));
+  }, MVP_VOTE_DURATION_MS);
+  mvpVoteTimeouts.set(voteId, timeoutId);
+}
+
+async function handleMvpVoteInteraction(interaction) {
+  const voteId = String(interaction.customId || '').split(':')[1];
+  const session = pendingMvpVotes.get(voteId);
+
+  if (!session || session.closed || Date.now() > session.expiresAt) {
+    await interaction.reply({ content: 'Essa votacao de MVP ja encerrou.', ephemeral: true }).catch(() => null);
+    return;
+  }
+
+  const isParticipant = session.players.some((player) => player.discordId === interaction.user.id);
+  if (!isParticipant) {
+    await interaction.reply({ content: 'So quem jogou essa partida pode votar no MVP.', ephemeral: true }).catch(() => null);
+    return;
+  }
+
+  const selectedId = interaction.values?.[0];
+  if (!selectedId || !session.players.some((player) => player.discordId === selectedId)) {
+    await interaction.reply({ content: 'Jogador invalido.', ephemeral: true }).catch(() => null);
+    return;
+  }
+
+  session.votes[interaction.user.id] = selectedId;
+  pendingMvpVotes.set(voteId, session);
+  await persistPendingMvpVotes();
+
+  const target = session.players.find((player) => player.discordId === selectedId);
+  await interaction.reply({
+    content: `Seu voto de MVP foi para **${target.nickname}**. Voce pode mudar o voto ate o tempo acabar.`,
+    ephemeral: true
+  }).catch(() => null);
+}
+
+async function resumePendingMvpVotes() {
+  const systemMeta = await loadSystemMeta();
+  const stored = systemMeta.pendingMvpVotes || {};
+
+  for (const [voteId, session] of Object.entries(stored)) {
+    if (!session || session.closed) {
+      continue;
+    }
+
+    const remaining = Number(session.expiresAt || 0) - Date.now();
+    pendingMvpVotes.set(voteId, session);
+
+    if (remaining <= 0) {
+      await finalizeMvpVote(voteId);
+      continue;
+    }
+
+    const timeoutId = setTimeout(() => {
+      finalizeMvpVote(voteId).catch((error) => console.error('[MVP] Falha ao encerrar votacao:', error));
+    }, remaining);
+    mvpVoteTimeouts.set(voteId, timeoutId);
+  }
+}
+
 function getPlayerStatsKey(player) {
   return player.puuid || `discord:${player.discordId}`;
 }
 
 function getStoredPlayerStats(statsData, player) {
   const key = getPlayerStatsKey(player);
+  const storedByDiscordId = player.discordId
+    ? Object.values(statsData.players || {}).find((entry) => entry.discordId === player.discordId)
+    : null;
   const normalizedModes = normalizePlayerModes(player);
 
   return (
-    statsData.players[key] || {
+    statsData.players[key] || storedByDiscordId || {
       discordId: player.discordId,
       nickname: player.nickname,
       puuid: player.puuid || null,
@@ -660,7 +1152,7 @@ function buildQueueEmbed(lobby, allLobbies = []) {
 
   const queueEntries = normalizedLobby.players.map(
     (player, index) =>
-      `**${index + 1}.** <@${player.discordId}>\nNick: \`${player.nickname}\`\nElo: \`${formatRank(player)}\`\nCustom ${formatQueueMode(normalizedLobby.mode)}: \`${formatCustomRecord(player)}\`\nRank: \`${player.mmr}\``
+      `**${index + 1}.** <@${player.discordId}>\nNick: \`${player.nickname}\`\nElo: \`${formatRank(player)}\`\nCustom ${formatQueueMode(normalizedLobby.mode)}: \`${formatCustomRecord(player)}\`\nPontos: \`${player.mmr}\``
   );
   const chunks = [];
   let currentChunk = '';
@@ -720,14 +1212,14 @@ function buildTeamsEmbed(teams) {
   const teamOneText = teams.teamOne
     .map(
       (player) =>
-        `- <@${player.discordId}> | ${player.nickname} | ${formatRank(player)} | ${formatCustomRecord(player)} | MMR: ${player.mmr}`
+        `- <@${player.discordId}> | ${player.nickname} | ${formatRank(player)} | ${formatCustomRecord(player)} | Pontos: ${player.mmr}`
     )
     .join('\n');
 
   const teamTwoText = teams.teamTwo
     .map(
       (player) =>
-        `- <@${player.discordId}> | ${player.nickname} | ${formatRank(player)} | ${formatCustomRecord(player)} | MMR: ${player.mmr}`
+        `- <@${player.discordId}> | ${player.nickname} | ${formatRank(player)} | ${formatCustomRecord(player)} | Pontos: ${player.mmr}`
     )
     .join('\n');
 
@@ -735,19 +1227,19 @@ function buildTeamsEmbed(teams) {
     .setColor(THEME.SUCCESS)
     .setTitle('⚔️ Times Balanceados')
     .setDescription(
-      `Os times foram montados automaticamente com base no MMR dos jogadores.\nModo: **${formatQueueMode(teams.mode)}** | Formato: **${teams.teamOne.length}x${teams.teamTwo.length}**`
+      `Os times foram montados automaticamente com base no elo do LoL dos jogadores.\nModo: **${formatQueueMode(teams.mode)}** | Formato: **${teams.teamOne.length}x${teams.teamTwo.length}**`
     )
     .addFields(
       {
-        name: `Equipe 1 | MMR total: ${teams.teamOneMmr}`,
+        name: `Equipe 1 | Elo total: ${teams.teamOneMmr}`,
         value: teamOneText || 'Sem jogadores'
       },
       {
-        name: `Equipe 2 | MMR total: ${teams.teamTwoMmr}`,
+        name: `Equipe 2 | Elo total: ${teams.teamTwoMmr}`,
         value: teamTwoText || 'Sem jogadores'
       },
       {
-        name: 'Diferenca de MMR',
+        name: 'Diferenca de Elo',
         value: `${teams.difference}`
       }
     )
@@ -779,7 +1271,7 @@ function buildLeaderboardEmbed(statsData, mode = QUEUE_MODES.CLASSIC, format = n
     .slice(0, 15)
     .map((player, index) => {
       const medal = medals[index] || `#${index + 1}`;
-      const rankName = getRankName(player.adjustedMmr);
+      const rankName = getRankName(player.baseMmr);
       const label = player.discordId ? `<@${player.discordId}>` : `\`${player.nickname}\``;
 
       return `${medal} ${label}\n**${rankName} (${player.adjustedMmr} pts)** • ${player.customWins}V / ${player.customLosses}D`;
@@ -826,7 +1318,7 @@ function buildTopTenEmbed(statsData, seasonMeta, mode, format = null) {
     .map(
       (player, index) => {
         const medal = medals[index] || `#${index + 1}`;
-        const rankName = getRankName(player.adjustedMmr);
+        const rankName = getRankName(player.baseMmr);
         const totalGames = player.customWins + player.customLosses;
         const winRate = totalGames > 0 ? ((player.customWins / totalGames) * 100).toFixed(0) : '0';
 
@@ -902,7 +1394,8 @@ function resetStatsForNewSeason(statsData) {
         customLosses: 0,
         baseMmr: Number(modeStats.baseMmr || 0),
         internalRating: calculateSeedRating(modeStats.baseMmr || 0),
-        winStreak: 0
+        winStreak: 0,
+        ratingVersion: RATING_VERSION
       };
     }
 
@@ -1021,15 +1514,26 @@ function archiveCurrentSeason(statsData, seasonMeta) {
   return archivedSeason;
 }
 
+function getCustomPointsDelta(modeStats) {
+  const baseMmr = Number(modeStats?.baseMmr || 0);
+  const seed = calculateSeedRating(baseMmr);
+  const rating = Number(modeStats?.internalRating);
+  const current = Number.isFinite(rating) ? rating : seed;
+
+  return Math.round(current - seed);
+}
+
+function getCustomDisplayScore(modeStats) {
+  return DEFAULT_CUSTOM_POINTS + getCustomPointsDelta(modeStats);
+}
+
 function buildPlayerCardEmbed(playerStats, targetUser) {
   const modes = normalizePlayerModes(playerStats);
   const classicStats = modes.classic;
-  const classicMmr = calculateHybridMmr(
-    classicStats.baseMmr,
-    classicStats.customWins,
-    classicStats.customLosses,
-    classicStats.internalRating
-  );
+  const lolMmr = Number(classicStats.baseMmr || playerStats.baseMmr || 0);
+  const lolRankLabel = playerStats.tier
+    ? formatRank(playerStats)
+    : getRankName(lolMmr);
 
   const embed = new EmbedBuilder()
     .setColor(THEME.INFO)
@@ -1037,18 +1541,17 @@ function buildPlayerCardEmbed(playerStats, targetUser) {
     .setDescription(targetUser ? `${targetUser}` : `\`${playerStats.nickname}\``)
     .addFields(
       { name: 'Nick', value: `\`${playerStats.nickname || 'Nao identificado'}\``, inline: true },
-      { name: 'Rank Principal', value: `**${getRankName(classicMmr)}** (${classicMmr} pts)`, inline: true },
-      { name: '\u200B', value: '\u200B', inline: true }
+      { name: 'Elo LoL', value: `**${lolRankLabel}**\n\`${lolMmr} pts\``, inline: true },
+      { name: 'Pontos Custom', value: `\`${getCustomDisplayScore(classicStats)}\``, inline: true }
     );
 
-  // Adicionar campos para cada modo que tenha pelo menos 1 partida jogada
   for (const [key, stats] of Object.entries(modes)) {
     const totalGames = Number(stats.customWins || 0) + Number(stats.customLosses || 0);
     if (totalGames === 0 && key !== 'classic') continue;
 
     const winRate = totalGames > 0 ? ((Number(stats.customWins || 0) / totalGames) * 100).toFixed(1) : '0.0';
-    
-    // Gerar um label amigável baseado na chave (ex: aram5x5 -> ARAM 5x5)
+    const customScore = getCustomDisplayScore(stats);
+
     let label = key.toUpperCase();
     if (key.startsWith('aram') && key.length > 4) {
        const format = key.slice(4);
@@ -1057,7 +1560,7 @@ function buildPlayerCardEmbed(playerStats, targetUser) {
 
     embed.addFields({
       name: `📊 ${label}`,
-      value: `\`${stats.customWins}V / ${stats.customLosses}D\`\nWR: \`${winRate}%\`\nStreak: \`${stats.winStreak || 0}\``,
+      value: `\`${stats.customWins}V / ${stats.customLosses}D\`\nCustom: \`${customScore}\`\nWR: \`${winRate}%\`\nStreak: \`${stats.winStreak || 0}\``,
       inline: true
     });
   }
@@ -1260,6 +1763,9 @@ function startDailyRankScheduler() {
 
       lastDailyRankPostKey = now.key;
       await postDailyRankUpdates();
+      for (const guild of global.discordClient?.guilds.cache.values() || []) {
+        await expireInfernalRolesIfDue(guild);
+      }
     } catch (error) {
       console.error('Erro ao publicar ranking diario:', error);
     }
@@ -1666,6 +2172,100 @@ function buildPlayerMatchLogEmbed(player, delta, match) {
     .setTimestamp();
 }
 
+const SMURF_MIN_GAMES = 5;
+const SMURF_MIN_WINRATE = 70;
+const SMURF_MAX_LOL_MMR = 1200;
+const SMURF_ALERT_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+const lastSmurfAlerts = new Map();
+
+function evaluateSmurfSuspect(player, modeStats) {
+  const wins = Number(modeStats.customWins || 0);
+  const losses = Number(modeStats.customLosses || 0);
+  const games = wins + losses;
+  const lolMmr = Number(modeStats.baseMmr || player.baseMmr || 0);
+
+  if (games < SMURF_MIN_GAMES || lolMmr >= SMURF_MAX_LOL_MMR) {
+    return null;
+  }
+
+  const winRate = (wins / games) * 100;
+  if (winRate < SMURF_MIN_WINRATE) {
+    return null;
+  }
+
+  return {
+    wins,
+    losses,
+    games,
+    winRate,
+    lolMmr,
+    rankName: getRankName(lolMmr),
+    customScore: getCustomDisplayScore(modeStats),
+    winStreak: Number(modeStats.winStreak || 0)
+  };
+}
+
+function buildSmurfAlertEmbed(player, suspect, match) {
+  const mention = player.discordId ? `<@${player.discordId}>` : `\`${player.nickname}\``;
+  const modeLabel = getStatsBucketLabel(match.mode, match.format);
+
+  return new EmbedBuilder()
+    .setColor(THEME.WARNING)
+    .setTitle('Possivel smurf')
+    .setDescription(`${mention} esta com elo baixo no cadastro e desempenho alto nas customs.`)
+    .addFields(
+      { name: 'Nick', value: `\`${player.nickname || player.registeredNickname || 'N/A'}\``, inline: true },
+      { name: 'Elo cadastrado', value: `**${suspect.rankName}**\n\`${suspect.lolMmr} pts LoL\``, inline: true },
+      { name: 'Modo', value: `\`${modeLabel}\``, inline: true },
+      { name: 'Custom', value: `\`${suspect.wins}V / ${suspect.losses}D\` (${suspect.winRate.toFixed(0)}% WR)`, inline: true },
+      { name: 'Pontos Custom', value: `\`${suspect.customScore}\``, inline: true },
+      { name: 'Streak', value: `\`${suspect.winStreak}\``, inline: true }
+    )
+    .setFooter({ text: `${FOOTER_PREFIX} • Conferir conta main ou ajustar Base MMR no admin` })
+    .setTimestamp();
+}
+
+async function postSmurfAlerts(guild, match, statsData) {
+  const channelId = config.textChannels?.smurfAlertChannelId
+    || config.textChannels?.seasonLogChannelId
+    || config.textChannels?.playerLogChannelId;
+
+  if (!channelId || !guild) {
+    return;
+  }
+
+  const channel = await guild.channels.fetch(channelId).catch(() => null);
+  if (!channel || !channel.isTextBased()) {
+    return;
+  }
+
+  const participants = [...(match.teamOne || []), ...(match.teamTwo || [])];
+  const now = Date.now();
+
+  for (const participant of participants) {
+    const stored = getStoredPlayerStats(statsData, participant);
+    const modeStats = getModeStats(stored, match.mode, match.format);
+    const suspect = evaluateSmurfSuspect(stored, modeStats);
+
+    if (!suspect) {
+      continue;
+    }
+
+    const cooldownKey = `${participant.discordId}:${match.mode}:${match.format || '5x5'}`;
+    const lastAlert = lastSmurfAlerts.get(cooldownKey) || 0;
+    if (now - lastAlert < SMURF_ALERT_COOLDOWN_MS) {
+      continue;
+    }
+
+    lastSmurfAlerts.set(cooldownKey, now);
+    await channel.send({
+      embeds: [buildSmurfAlertEmbed({ ...stored, ...participant }, suspect, match)]
+    }).catch((error) => {
+      console.error('[SMURF] Falha ao postar alerta:', error.message);
+    });
+  }
+}
+
 // ─── Task 6.3: postPlayerLogs ─────────────────────────────────────────────────
 async function postPlayerLogs(guild, matchResult, statsData) {
   const channelId = config.textChannels?.playerLogChannelId;
@@ -1767,6 +2367,7 @@ module.exports = {
   getReservedLobbyLetters,
   getNextLobbyLetter,
   getBaseQueueChannelIdByMode,
+  getPostMatchVoiceChannelId,
   getOpenLobby,
   findLobbyByChannelId,
   findLobbyByPlayer,
@@ -1784,9 +2385,17 @@ module.exports = {
   getStoredPlayerStats,
   upsertPlayerStats,
   getRankName,
+  getCustomPointsDelta,
+  getCustomDisplayScore,
   syncMemberRankRole,
   syncMvpRole,
   clearMvpRoles,
+  syncInfernalRolesAfterMatch,
+  postInfernalAnnouncement,
+  expireInfernalRolesIfDue,
+  startMvpVote,
+  handleMvpVoteInteraction,
+  resumePendingMvpVotes,
   THEME,
   FOOTER_PREFIX,
   buildQueueEmbed,
@@ -1808,6 +2417,7 @@ module.exports = {
   buildPlayerCardEmbed,
   buildPlayerMatchLogEmbed,
   postPlayerLogs,
+  postSmurfAlerts,
   postMatchSummaryToSeasonLog,
   postSeasonSummaryToSeasonLog,
   getSaoPauloDateParts,
@@ -1835,7 +2445,7 @@ module.exports = {
   createInteractionContext,
   RANK_ROLES_MAP,
   ALL_RANK_ROLE_NAMES,
-  MVP_ROLE_NAME,
+  MVP_ROLE_NAMES,
   THEME,
   FOOTER_PREFIX
 };

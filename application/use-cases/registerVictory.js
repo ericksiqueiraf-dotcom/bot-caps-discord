@@ -28,10 +28,13 @@ async function registerVictory({
   const mmrWeight = match.mode === QUEUE_MODES.ARAM
     ? getAramWeightByTeamSize(match.teamSize || Number(String(match.format || '5x5').split('x')[0]))
     : 1;
-  const avgWinnerOppMmr = Math.round(losingPlayers.reduce((sum, player) => sum + Number(player.mmr || 1200), 0) / (losingPlayers.length || 1));
-  const avgLoserOppMmr = Math.round(winningPlayers.reduce((sum, player) => sum + Number(player.mmr || 1200), 0) / (winningPlayers.length || 1));
+  const avgWinnerOppMmr = Math.round(losingPlayers.reduce((sum, player) => sum + Number(player.mmr || player.internalRating || 0), 0) / (losingPlayers.length || 1));
+  const avgLoserOppMmr = Math.round(winningPlayers.reduce((sum, player) => sum + Number(player.mmr || player.internalRating || 0), 0) / (winningPlayers.length || 1));
 
-  return withQueueOperationLock(`${guildId}:victory:${matchId}`, async () => {
+  // Lock por guild (nao por partida): duas vitorias simultaneas (A e B) fazem
+  // read-modify-write no MESMO documento de stats. Com lock por match elas
+  // corriam em paralelo e o ultimo save apagava o resultado do outro.
+  return withQueueOperationLock(`${guildId}:victory`, async () => {
     const currentMatchData = await loadCurrentMatch();
     const currentEntry = currentMatchData.matches[matchId];
 

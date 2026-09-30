@@ -3,3 +3,6 @@ node_modules/
 npm-debug.log*
 bot.stdout.log
 bot.stderr.log
+# Backups locais (os ZIPs contem .env com tokens - NUNCA subir)
+backups/
+*.log
