@@ -15,10 +15,10 @@ async function handleVictoryCommandFlow({
     registerVictory,
     createRegisterVictoryDeps,
     syncMemberRankRole,
-    clearMvpRoles,
-    syncMvpRole,
-    postMvpAnnouncement,
-    getBaseQueueChannelIdByMode,
+    syncInfernalRolesAfterMatch,
+    postInfernalAnnouncement,
+    startMvpVote,
+    getPostMatchVoiceChannelId,
     movePlayersToVoiceChannel,
     deleteManagedChannelsForLobby,
     updateQueueDashboard,
@@ -88,17 +88,22 @@ async function handleVictoryCommandFlow({
 
   const { winners, losers } = match;
 
-  // MVP: jogador(es) com maior ganho de rating nesta partida (mais justo que streak)
-  const maxDelta = Math.max(...winners.map((player) => player.ratingDelta || 0));
-  const mvps = maxDelta > 0 ? winners.filter((player) => (player.ratingDelta || 0) === maxDelta) : [];
-  await clearMvpRoles(message.guild);
-  for (const mvp of mvps) {
-    await syncMvpRole(message.guild, mvp.discordId);
-    await postMvpAnnouncement(message.guild, mvp);
+  // INFERNAL: cargo automatico para 5+ vitorias seguidas (sai na derrota, expira as 08h)
+  // + anuncio dos recem-premiados no canal de destaques. Nunca quebra o !vitoria.
+  try {
+    const infernalAwarded = await syncInfernalRolesAfterMatch(message.guild, winners, losers);
+    await postInfernalAnnouncement(message.guild, infernalAwarded);
+  } catch (err) {
+    console.error('[INFERNAL] Falha no pos-jogo:', err.message);
   }
 
-  const baseLobbyChannelId = getBaseQueueChannelIdByMode(match.mode);
-  await movePlayersToVoiceChannel(message.guild, [...winners, ...losers], baseLobbyChannelId);
+  // MVP: votacao de 2 min entre os jogadores da partida + cargo MVP player ao mais votado.
+  // Se ninguem votar, o encerramento usa fallback automatico (maior ganho de rating).
+  await startMvpVote(message.guild, match, winners, losers);
+
+  // Pos-partida: todos voltam para a Sala de Espera (nao para o lobby da fila)
+  const postMatchChannelId = getPostMatchVoiceChannelId(match.mode);
+  await movePlayersToVoiceChannel(message.guild, [...winners, ...losers], postMatchChannelId);
 
   await deleteManagedChannelsForLobby(message.guild, match.mode, match.format, match.letter, [
     match.teamOneChannelId,
@@ -110,18 +115,28 @@ async function handleVictoryCommandFlow({
   await updateQueueDashboard(message.guild);
 
   const finishedAt = new Date().toISOString();
+  const finishedTeams = {
+    teamOne: (match.teamOne || []).map((player) => ({ discordId: player.discordId, nickname: player.nickname })),
+    teamTwo: (match.teamTwo || []).map((player) => ({ discordId: player.discordId, nickname: player.nickname }))
+  };
   const systemMeta = await loadSystemMeta();
+  const finishedEntry = {
+    guildId: message.guild.id,
+    matchId,
+    winnerTeam: winningTeam,
+    mode: match.mode,
+    format: match.format,
+    letter: match.letter || null,
+    finishedAt,
+    ...finishedTeams
+  };
+  // Historico curto das ultimas partidas finalizadas (p/ !rematch <letra>).
+  // O recentVictory (ultima) e mantido como antes para o anti-duplo do !vitoria.
+  const recentVictories = [finishedEntry, ...((systemMeta.recentVictories || []).filter((e) => e && e.matchId !== matchId))].slice(0, 5);
   await saveSystemMeta({
     ...systemMeta,
-    recentVictory: {
-      guildId: message.guild.id,
-      matchId,
-      winnerTeam: winningTeam,
-      mode: match.mode,
-      format: match.format,
-      letter: match.letter || null,
-      finishedAt
-    }
+    recentVictory: finishedEntry,
+    recentVictories
   });
 
   await postMatchHistoryLog(message.guild, {

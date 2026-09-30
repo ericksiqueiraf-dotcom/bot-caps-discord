@@ -34,7 +34,7 @@ async function enterQueue({
   const playerStats = await loadPlayerStats();
   const allEntries = Object.values(playerStats.players || {}).filter((player) => player.discordId === author.id);
   const storedEntry = allEntries.sort((a, b) => new Date(b.registeredAt || 0) - new Date(a.registeredAt || 0))[0] || null;
-  const registeredNick = storedEntry?.registeredNickname || null;
+  const registeredNick = storedEntry?.registeredNickname || storedEntry?.nickname || null;
 
   let rankProfile;
   let usedApiCall = false;

@@ -1,0 +1,1581 @@
+﻿import { useEffect, useMemo, useState } from 'react';
+import './index.css';
+
+const PRICING = {
+  eventos: {
+    label: 'Pacote 5+ fotos',
+    shortLabel: 'Eventos',
+    description: 'R$ 15 por foto, cai para R$ 10 a partir de 5 fotos.',
+    unit: 15,
+    bulk: 10,
+    threshold: 5,
+  },
+  escola: {
+    label: 'Pacote 3+ fotos',
+    shortLabel: 'Escola / Corp',
+    description: 'R$ 15 por foto, cai para R$ 10 a partir de 3 fotos.',
+    unit: 15,
+    bulk: 10,
+    threshold: 3,
+  },
+};
+
+const API_BASE_URL = '';
+
+const PAYMENT_META = {
+  draft: { label: 'Montando sessao', tone: 'neutral' },
+  pending: { label: 'Aguardando PIX', tone: 'info' },
+  approved: { label: 'Pagamento aprovado', tone: 'success' },
+};
+
+const DELIVERY_META = {
+  idle: { label: 'Envio ainda não iniciado', tone: 'neutral' },
+  queued: { label: 'Fila de envio preparada', tone: 'info' },
+  sending: { label: 'Enviando no WhatsApp', tone: 'info' },
+  sent: { label: 'Fotos entregues', tone: 'success' },
+  failed: { label: 'Falha no envio', tone: 'danger' },
+};
+
+function createSessionId() {
+  return typeof crypto !== 'undefined' && crypto.randomUUID
+    ? `sess_${crypto.randomUUID()}`
+    : `sess_${Math.random().toString(36).slice(2, 11)}`;
+}
+
+function calcTotal(count, type) {
+  const pricing = PRICING[type];
+  const unit = count >= pricing.threshold ? pricing.bulk : pricing.unit;
+  return { unit, total: count * unit };
+}
+
+function formatMoney(value) {
+  return `R$\u00a0${value.toFixed(2).replace('.', ',')}`;
+}
+
+function normalizePhotoUrl(url) {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (typeof window === 'undefined') return url;
+  return new URL(url, window.location.origin).toString();
+}
+
+async function createThumbnailFile(file, index, maxSize = 480, quality = 0.72) {
+  if (typeof window === 'undefined') return null;
+
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = objectUrl;
+    });
+
+    const originalWidth = image.naturalWidth || image.width || maxSize;
+    const originalHeight = image.naturalHeight || image.height || maxSize;
+    const scale = Math.min(1, maxSize / Math.max(originalWidth, originalHeight));
+    const width = Math.max(1, Math.round(originalWidth * scale));
+    const height = Math.max(1, Math.round(originalHeight * scale));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+
+    const context = canvas.getContext('2d');
+    if (!context) return null;
+
+    context.drawImage(image, 0, 0, width, height);
+
+    const blob = await new Promise((resolve) => {
+      canvas.toBlob(resolve, 'image/jpeg', quality);
+    });
+
+    if (!blob) return null;
+    return new File([blob], `thumb-${index}.jpg`, { type: 'image/jpeg' });
+  } catch {
+    return null;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+function photoIdFromUrl(url, index) {
+  const normalizedUrl = normalizePhotoUrl(url);
+  const filename = normalizedUrl.split('/').pop();
+  return filename || `photo-${index}`;
+}
+
+function detectShareToken() {
+  if (typeof window === 'undefined') return '';
+
+  const pathnameMatch = window.location.pathname.match(/^\/s\/([^/]+)/);
+  if (pathnameMatch?.[1]) return pathnameMatch[1];
+
+  const params = new URLSearchParams(window.location.search);
+  return params.get('share') || '';
+}
+
+function normalizeShareCode(value) {
+  return String(value || '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .slice(0, 4);
+}
+
+
+function formatRemainingCountdown(isoDate, nowMs = Date.now()) {
+  if (!isoDate) return 'sem expiração';
+  const expiresAt = new Date(isoDate).getTime();
+  if (!Number.isFinite(expiresAt)) return 'sem expiração';
+
+  const diffMs = Math.max(0, expiresAt - nowMs);
+  const totalSeconds = Math.floor(diffMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  if (totalSeconds <= 0) return 'expira agora';
+  if (minutes === 0) return `${seconds}s`;
+  return `${minutes}m ${String(seconds).padStart(2, '0')}s`;
+}
+
+function buildShareWhatsAppMessage(link, code) {
+  return [
+    'Seu acesso SnapFlow foi liberado.',
+    `Link: ${link}`,
+    `Código: ${code}`,
+    'Acesso temporário com expiração automática.',
+    'Acesse pelo navegador e selecione suas fotos.',
+  ].join('\n');
+}
+
+async function readJsonResponse(response) {
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    return response.json();
+  }
+
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { error: text || 'Resposta invalida do servidor.' };
+  }
+}
+
+function ShareCountdown({ isoDate }) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const expiresAt = new Date(isoDate).getTime();
+  const diffMs = Math.max(0, expiresAt - now);
+  const totalMinutes = Math.floor(diffMs / 60000);
+  
+  let color = '#00C851';
+  if (totalMinutes <= 15) color = '#ffbb33';
+  if (totalMinutes <= 10) color = '#ff4444';
+  if (diffMs <= 0) color = '#888';
+
+  return <span style={{ color, fontWeight: 'bold', fontSize: '1.2em', padding: '4px 8px', background: 'rgba(0,0,0,0.3)', borderRadius: '6px', border: `1px solid ${color}`, display: 'inline-block' }}>{formatRemainingCountdown(isoDate, now)}</span>;
+}
+
+function SessionOpsCard({
+  title,
+  stage,
+  count,
+  total,
+  phone,
+  packageType,
+  paymentMethod,
+  paymentStatus,
+  deliveryStatus,
+  deliveryError,
+}) {
+  const paymentMeta = PAYMENT_META[paymentStatus] || PAYMENT_META.draft;
+  const deliveryMeta = DELIVERY_META[deliveryStatus] || DELIVERY_META.idle;
+  const packageLabel = packageType ? PRICING[packageType].shortLabel : 'Não definido';
+  const paymentMethodLabel = paymentMethod || 'Não definido';
+
+  return (
+    <div className="ops-card">
+      <div className="ops-header">
+        <div>
+          <strong>{title}</strong>
+          <small>{stage}</small>
+        </div>
+        <span className="ops-total">{formatMoney(total)}</span>
+      </div>
+
+      <div className="ops-grid">
+        <div className="ops-stat">
+          <span>Fotos</span>
+          <strong>{count}</strong>
+        </div>
+        <div className="ops-stat">
+          <span>Cliente</span>
+          <strong>{phone || 'Não informado'}</strong>
+        </div>
+        <div className="ops-stat">
+          <span>Pacote ativo</span>
+          <strong>{packageLabel}</strong>
+        </div>
+        <div className="ops-stat">
+          <span>Forma de pagamento</span>
+          <strong>{paymentMethodLabel}</strong>
+        </div>
+      </div>
+
+      <div className="ops-badges">
+        <span className={`ops-badge ${paymentMeta.tone}`}>{paymentMeta.label}</span>
+        <span className={`ops-badge ${deliveryMeta.tone}`}>{deliveryMeta.label}</span>
+      </div>
+
+      {paymentMethod === 'Dinheiro/Cartão' ? (
+        <div className="ops-warning">
+          Aguardando sua confirmação no painel para liberar o envio automático das fotos.
+        </div>
+      ) : null}
+
+      {deliveryError ? <div className="ops-error">{deliveryError}</div> : null}
+    </div>
+  );
+}
+
+export default function App() {
+  const [shareToken] = useState(() => detectShareToken());
+  const [screen, setScreen] = useState(() => (detectShareToken() ? 'share-lock' : 'dashboard'));
+  const [type, setType] = useState('eventos');
+  const [selected, setSelected] = useState([]);
+  const [period, setPeriod] = useState('hoje');
+  const [viewerIndex, setViewerIndex] = useState(null);
+  const [sessionId, setSessionId] = useState('');
+  const [qrCodeBase64, setQrCodeBase64] = useState('');
+  const [isGeneratingPix, setIsGeneratingPix] = useState(false);
+  const [clientPhone, setClientPhone] = useState('');
+  const [photos, setPhotos] = useState([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [brokenPhotoIds, setBrokenPhotoIds] = useState([]);
+  const [notice, setNotice] = useState(null);
+  const [shareSessionInfo, setShareSessionInfo] = useState(null);
+  const [shareCodeInput, setShareCodeInput] = useState('');
+  const [shareAccess, setShareAccess] = useState(() => {
+    if (typeof window === 'undefined') return null;
+
+    const savedShare = window.localStorage.getItem('snapflow-share-access');
+    if (!savedShare) return null;
+
+    try {
+      return JSON.parse(savedShare);
+    } catch {
+      return null;
+    }
+  });
+  const [shareActionLoading, setShareActionLoading] = useState(false);
+  const [shareDurationMinutes, setShareDurationMinutes] = useState(30);
+  const [liveOps, setLiveOps] = useState({
+    paymentStatus: 'draft',
+    deliveryStatus: 'idle',
+    deliveryError: null,
+    paymentMethod: null,
+  });
+  const [dashData, setDashData] = useState({
+    stats: {
+      hoje: { valor: 0, fotos: 0, sessoes: 0 },
+      semana: { valor: 0, fotos: 0, sessoes: 0 },
+      mes: { valor: 0, fotos: 0, sessoes: 0 },
+    },
+    recent: [],
+    shareRecent: [],
+  });
+
+  const toggle = (id) =>
+    setSelected((previous) =>
+      previous.includes(id) ? previous.filter((item) => item !== id) : [...previous, id]
+    );
+
+  const toggleAllPhotos = () => {
+    setSelected((previous) => (previous.length === photos.length ? [] : photos.map((photo) => photo.id)));
+  };
+
+  const count = selected.length;
+  const { unit, total } = calcTotal(count, type);
+  const pricing = PRICING[type];
+  const remaining = Math.max(0, pricing.threshold - count);
+  const hasDiscount = count >= pricing.threshold;
+  const allPhotosSelected = photos.length > 0 && selected.length === photos.length;
+  const selectedPhotoItems = useMemo(
+    () =>
+      selected
+        .map((id) => photos.find((photo) => photo.id === id))
+        .filter(Boolean),
+    [photos, selected]
+  );
+
+  const selectedPhotos = useMemo(
+    () => selectedPhotoItems.map((photo) => photo.url),
+    [selectedPhotoItems]
+  );
+
+  const selectedThumbs = useMemo(
+    () => selectedPhotoItems.map((photo) => photo.thumbUrl || photo.url),
+    [selectedPhotoItems]
+  );
+
+  const activeStage = {
+    dashboard: 'Pronto para iniciar uma nova venda',
+    gallery: 'Selecionando fotos para o cliente',
+    summary: 'Conferindo valor e WhatsApp',
+    pix: 'Aguardando confirmação do pagamento',
+    confirmed: 'Acompanhando entrega final',
+  }[screen];
+
+  const fetchDashboard = async ({ silent = false } = {}) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/dashboard`);
+      if (!response.ok) {
+        throw new Error(`Dashboard retornou ${response.status}`);
+      }
+
+      const data = await readJsonResponse(response);
+      setDashData(data);
+    } catch (error) {
+      if (!silent) {
+        console.error('Falha ao carregar dashboard:', error);
+      }
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadDashboard = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/dashboard`);
+        if (!response.ok) {
+          throw new Error(`Dashboard retornou ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (!cancelled) {
+          setDashData(data);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Falha ao carregar dashboard:', error);
+        }
+      }
+    };
+
+    loadDashboard();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!shareToken) return undefined;
+
+    const loadSharedSession = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/share-session/${shareToken}`);
+        if (!response.ok) {
+          throw new Error(`Compartilhamento retornou ${response.status}`);
+        }
+
+        const data = await response.json();
+        setShareSessionInfo(data);
+        if (data.expired || data.status === 'revoked') {
+          setNotice('Este link expirou ou foi revogado.');
+        }
+      } catch (error) {
+        console.error('Falha ao carregar link compartilhado:', error);
+        setShareSessionInfo({ error: 'Link não encontrado ou expirado.' });
+      }
+    };
+
+    loadSharedSession();
+
+    return undefined;
+  }, [shareToken]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return undefined;
+
+    if (Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+
+    return undefined;
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    if (shareAccess) {
+      window.localStorage.setItem('snapflow-share-access', JSON.stringify(shareAccess));
+    } else {
+      window.localStorage.removeItem('snapflow-share-access');
+    }
+
+    return undefined;
+  }, [shareAccess]);
+
+  useEffect(() => {
+    if (!notice) return undefined;
+
+    const timer = setTimeout(() => setNotice(null), 4500);
+    return () => clearTimeout(timer);
+  }, [notice]);
+
+  useEffect(() => {
+    if (viewerIndex === null) return undefined;
+    if (photos[viewerIndex]) return undefined;
+
+    setViewerIndex(photos.length ? 0 : null);
+    return undefined;
+  }, [photos, viewerIndex]);
+
+  useEffect(() => {
+    if (screen !== 'pix' || !sessionId) return undefined;
+
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/status/${sessionId}`);
+        if (!response.ok) {
+          throw new Error(`Status retornou ${response.status}`);
+        }
+
+        const data = await response.json();
+        setLiveOps((previous) => ({
+          ...previous,
+          paymentStatus: data.status === 'approved' ? 'approved' : 'pending',
+          deliveryStatus: data.deliveryStatus || previous.deliveryStatus,
+          deliveryError: data.deliveryError || null,
+          paymentMethod: data.paymentMethod || previous.paymentMethod,
+        }));
+
+        if (data.status === 'approved') {
+          if (liveOps.paymentStatus !== 'approved') {
+            setNotice('Pagamento confirmado e fotos liberadas.');
+            if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+              new Notification('SnapFlow', {
+                body: 'Pagamento confirmado e fotos liberadas.',
+              });
+            }
+          }
+          setScreen('confirmed');
+          fetchDashboard({ silent: true });
+        }
+      } catch (error) {
+        console.warn('Falha ao consultar status do pagamento:', error);
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [screen, sessionId, liveOps.paymentStatus]);
+
+  const markBrokenPhoto = (photoId) => {
+    setBrokenPhotoIds((previous) =>
+      previous.includes(photoId) ? previous : [...previous, photoId]
+    );
+  };
+
+  const resetSession = () => {
+    setPhotos([]);
+    setSelected([]);
+    setSessionId('');
+    setQrCodeBase64('');
+    setClientPhone('');
+    setViewerIndex(null);
+    setBrokenPhotoIds([]);
+    setNotice(null);
+    setLiveOps({
+      paymentStatus: 'draft',
+      deliveryStatus: 'idle',
+      deliveryError: null,
+      paymentMethod: null,
+    });
+  };
+
+  const startNewSession = () => {
+    document.getElementById('hidden-upload')?.click();
+  };
+
+  const handleFileUpload = async (event) => {
+    const { files } = event.target;
+    if (!files || !files.length) return;
+
+    setIsUploading(true);
+    const formData = new FormData();
+    const filesArray = Array.from(files);
+    const thumbnailFiles = await Promise.all(
+      filesArray.map(async (file, index) => (await createThumbnailFile(file, index)) || file)
+    );
+
+    for (let index = 0; index < filesArray.length; index += 1) {
+      const originalFile = filesArray[index];
+      const thumbnailFile = thumbnailFiles[index];
+      formData.append('photos', originalFile);
+      formData.append('thumbnails', thumbnailFile, `thumb-${index}.jpg`);
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Upload retornou ${response.status}`);
+      }
+
+      const data = await readJsonResponse(response);
+
+      if (Array.isArray(data.urls) && data.urls.length > 0) {
+        const uploadedPhotos = data.urls.map((url, index) => {
+          const normalizedUrl = normalizePhotoUrl(url);
+          const thumbUrl = Array.isArray(data.thumbUrls) ? normalizePhotoUrl(data.thumbUrls[index]) : '';
+          return {
+            id: photoIdFromUrl(normalizedUrl, index),
+            url: normalizedUrl,
+            thumbUrl: thumbUrl || normalizedUrl,
+          };
+        });
+
+        setPhotos(uploadedPhotos);
+        setSelected([]);
+        setBrokenPhotoIds([]);
+        setQrCodeBase64('');
+        setSessionId('');
+        setClientPhone('');
+        setViewerIndex(null);
+        setLiveOps({
+          paymentStatus: 'draft',
+          deliveryStatus: 'idle',
+          deliveryError: null,
+          paymentMethod: null,
+        });
+        setScreen('gallery');
+      }
+    } catch (error) {
+      console.error('Falha no upload:', error);
+      alert('Erro ao enviar fotos para o servidor.');
+    } finally {
+      event.target.value = '';
+      setIsUploading(false);
+    }
+  };
+
+  const handleGeneratePix = async () => {
+    setIsGeneratingPix(true);
+
+    try {
+      const generatedId = createSessionId();
+
+      setSessionId(generatedId);
+
+      const payload = {
+        total,
+        count,
+        sessionId: generatedId,
+        phone: clientPhone,
+        photos: selectedPhotos,
+        thumbs: selectedThumbs,
+        packageType: type,
+      };
+
+      const response = await fetch(`${API_BASE_URL}/api/pix`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await readJsonResponse(response);
+
+      if (response.ok && data.qr_code_base64) {
+        setQrCodeBase64(data.qr_code_base64);
+        setLiveOps({
+          paymentStatus: 'pending',
+          deliveryStatus: 'idle',
+          deliveryError: null,
+          paymentMethod: 'PIX',
+        });
+        setScreen('pix');
+      } else {
+        alert(`Erro ao gerar Pix: ${data.error || 'Erro desconhecido'}`);
+      }
+    } catch (error) {
+      console.error('Falha ao gerar Pix:', error);
+      alert('Erro no backend: a API não respondeu como esperado.');
+    } finally {
+      setIsGeneratingPix(false);
+    }
+  };
+
+  const handleManualPayment = async (paymentMethod) => {
+    setIsGeneratingPix(true);
+
+    try {
+      const generatedId = sessionId || createSessionId();
+      setSessionId(generatedId);
+
+      const response = await fetch(`${API_BASE_URL}/api/manual-payment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          total,
+          count,
+          sessionId: generatedId,
+          phone: clientPhone,
+          photos: selectedPhotos,
+          thumbs: selectedThumbs,
+          packageType: type,
+          paymentMethod,
+        }),
+      });
+
+      const data = await readJsonResponse(response);
+
+      if (response.ok && data.status === 'approved') {
+        setLiveOps({
+          paymentStatus: 'approved',
+          deliveryStatus: data.deliveryStatus || 'queued',
+          deliveryError: null,
+          paymentMethod: 'Dinheiro/Cartão',
+        });
+        setNotice('Pagamento em dinheiro/cartão confirmado pelo fotógrafo e fotos liberadas.');
+
+        if (
+          typeof window !== 'undefined' &&
+          'Notification' in window &&
+          Notification.permission === 'granted'
+        ) {
+          new Notification('SnapFlow', {
+            body: 'Pagamento em dinheiro/cartão confirmado pelo fotógrafo.',
+          });
+        }
+
+        setScreen('confirmed');
+        fetchDashboard({ silent: true });
+      } else {
+        alert(`Não foi possível registrar o pagamento: ${data.error || 'Erro desconhecido'}`);
+      }
+    } catch (error) {
+      console.error('Falha ao registrar pagamento manual:', error);
+      alert('Não foi possível registrar o pagamento manual.');
+    } finally {
+      setIsGeneratingPix(false);
+    }
+  };
+
+  const applySharedSession = (data) => {
+    const sharedPhotos = Array.isArray(data.photos)
+      ? data.photos.map((item, index) => {
+          const rawUrl = typeof item === 'string' ? item : item?.url;
+          const rawThumbUrl =
+            typeof item === 'string' ? data.thumbUrls?.[index] : item?.thumbUrl || data.thumbUrls?.[index];
+          const normalizedUrl = normalizePhotoUrl(rawUrl);
+          const normalizedThumbUrl = rawThumbUrl ? normalizePhotoUrl(rawThumbUrl) : '';
+          return {
+            id: photoIdFromUrl(normalizedUrl, index),
+            url: normalizedUrl,
+            thumbUrl: normalizedThumbUrl || normalizedUrl,
+          };
+        })
+      : [];
+
+    setPhotos(sharedPhotos);
+    setSelected([]);
+    setBrokenPhotoIds([]);
+    setQrCodeBase64('');
+    setSessionId('');
+    setClientPhone(data.phone || '');
+    setType(data.packageType || 'eventos');
+    setViewerIndex(null);
+    setLiveOps({
+      paymentStatus: 'draft',
+      deliveryStatus: 'idle',
+      deliveryError: null,
+      paymentMethod: null,
+    });
+    setScreen('gallery');
+  };
+
+  const handleUnlockSharedSession = async () => {
+    if (!shareToken) return;
+    const code = normalizeShareCode(shareCodeInput);
+    if (code.length !== 4) {
+      setNotice('Digite o código de 4 caracteres.');
+      return;
+    }
+
+    setShareActionLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/share-session/${shareToken}/unlock`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Não foi possível abrir o link.');
+      }
+
+      applySharedSession(data);
+      setNotice('Galeria compartilhada aberta.');
+    } catch (error) {
+      setNotice(error.message || 'Não foi possível abrir a galeria.');
+    } finally {
+      setShareActionLoading(false);
+    }
+  };
+
+  const handleCreateShareSession = async () => {
+    if (!selectedPhotos.length) {
+      setNotice('Selecione ao menos uma foto para gerar o link.');
+      return;
+    }
+
+    setShareActionLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/share-session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          photos: selectedPhotos,
+          thumbs: selectedThumbs,
+          phone: clientPhone,
+          packageType: type,
+          count,
+          total,
+          expiresMinutes: shareDurationMinutes,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Não foi possível gerar o link.');
+      }
+
+      const link = data.link || `${window.location.origin}/s/${data.token}`;
+      const shareRecord = {
+        token: data.token,
+        code: data.accessCode,
+        link,
+        expiresAt: data.expiresAt,
+        managementKey: data.managementKey,
+        whatsappMessage: buildShareWhatsAppMessage(link, data.accessCode),
+        sentToWhatsapp: Boolean(data.sentToWhatsapp),
+      };
+
+      setShareAccess(shareRecord);
+      setNotice(`Link gerado e enviado para WhatsApp com validade de ${shareDurationMinutes} minutos.`);
+
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareRecord.whatsappMessage);
+      }
+    } catch (error) {
+      setNotice(error.message || 'Não foi possível gerar o link.');
+    } finally {
+      setShareActionLoading(false);
+    }
+  };
+
+  const handleExtendShareSession = async () => {
+    if (!shareAccess?.token || !shareAccess?.managementKey) return;
+
+    setShareActionLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/share-session/${shareAccess.token}/extend`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          managementKey: shareAccess.managementKey,
+          minutes: 15,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Não foi possível estender o acesso.');
+      }
+
+      setShareAccess((previous) => ({
+        ...previous,
+        expiresAt: data.expiresAt,
+      }));
+      setNotice('Acesso estendido por mais 15 minutos.');
+    } catch (error) {
+      setNotice(error.message || 'Não foi possível estender o acesso.');
+    } finally {
+      setShareActionLoading(false);
+    }
+  };
+
+  const handleRevokeShareSession = async () => {
+    if (!shareAccess?.token || !shareAccess?.managementKey) return;
+
+    setShareActionLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/share-session/${shareAccess.token}/revoke`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          managementKey: shareAccess.managementKey,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Não foi possível revogar o acesso.');
+      }
+
+      setNotice('Acesso revogado.');
+      setShareAccess((previous) =>
+        previous
+          ? {
+              ...previous,
+              revokedAt: data.revokedAt,
+            }
+          : previous
+      );
+    } catch (error) {
+      setNotice(error.message || 'Não foi possível revogar o acesso.');
+    } finally {
+      setShareActionLoading(false);
+    }
+  };
+
+  const currentPhoto = viewerIndex !== null ? photos[viewerIndex] : null;
+  const hasActiveSession = photos.length > 0 || Boolean(sessionId);
+  const noticeBanner = notice ? <div className="floating-notice">{notice}</div> : null;
+
+  if (shareToken && screen === 'share-lock') {
+    const shareExpired = shareSessionInfo?.expired || shareSessionInfo?.status === 'revoked';
+
+    return (
+      <div className="screen center-screen share-screen">
+        <header className="topbar">
+          <span className="topbar-title">SnapFlow compartilhado</span>
+          <span />
+          <span />
+        </header>
+
+        <div className="summary-card share-lock-card">
+          <div className="summary-label">Acesso temporário do cliente</div>
+          <div className="summary-row">
+            <span>Fotos disponiveis</span>
+            <strong>{shareSessionInfo?.photoCount || '---'}</strong>
+          </div>
+          <div className="summary-row">
+            <span>Expiração</span>
+            <strong>
+              <ShareCountdown isoDate={shareSessionInfo?.expiresAt} />
+            </strong>
+          </div>
+          <div className="summary-row">
+            <span>Status</span>
+            <strong>{shareExpired ? 'Bloqueado' : 'Ativo'}</strong>
+          </div>
+
+          {shareSessionInfo?.error ? (
+            <div className="ops-error">{shareSessionInfo.error}</div>
+          ) : null}
+
+          <input
+            type="text"
+            inputMode="text"
+            placeholder="Código de 4 caracteres"
+            value={shareCodeInput}
+            onChange={(event) => setShareCodeInput(normalizeShareCode(event.target.value))}
+            className="phone-input"
+            style={{ marginTop: '12px', textTransform: 'uppercase' }}
+            maxLength={4}
+            disabled={shareExpired}
+          />
+
+          <button
+            className="btn-primary"
+            style={{ width: '100%', marginTop: '12px' }}
+            onClick={handleUnlockSharedSession}
+            disabled={shareActionLoading || shareExpired}
+          >
+            {shareActionLoading ? 'Abrindo acesso...' : 'Abrir galeria'}
+          </button>
+
+          <small className="summary-help">
+            Digite o código simbólico que acompanha o link para liberar a galeria desta venda.
+          </small>
+        </div>
+
+        {noticeBanner}
+      </div>
+    );
+  }
+
+  if (currentPhoto) {
+    const isSelected = selected.includes(currentPhoto.id);
+    const currentPhotoBroken = brokenPhotoIds.includes(currentPhoto.id);
+    const handlePrev = () =>
+      setViewerIndex((previous) => (previous > 0 ? previous - 1 : photos.length - 1));
+    const handleNext = () =>
+      setViewerIndex((previous) => (previous < photos.length - 1 ? previous + 1 : 0));
+
+    return (
+      <div className="viewer-screen">
+        <header className="viewer-topbar">
+          <button className="viewer-close" onClick={() => setViewerIndex(null)}>
+            Fechar
+          </button>
+          <div className="viewer-cart-preview">
+            <span className="cart-count">{count} foto(s)</span>
+            <strong className="cart-total">{formatMoney(total)}</strong>
+          </div>
+        </header>
+
+        <div className="viewer-body" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 10px', overflow: 'hidden' }}>
+          <div onClick={handlePrev} style={{ width: '44px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.1)', borderRadius: '50%', color: 'white', fontSize: '24px', cursor: 'pointer', zIndex: 10, flexShrink: 0 }}>&#8249;</div>
+
+          <div className={`viewer-image-container ${currentPhotoBroken ? 'image-broken-frame' : ''}`} style={{ flex: 1, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 10px' }}>
+            {currentPhotoBroken ? (
+              <div className="image-broken-message">Não foi possível carregar esta foto.</div>
+            ) : (
+              <img src={currentPhoto.url} alt="Foto selecionada" onError={() => markBrokenPhoto(currentPhoto.id)} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+            )}
+          </div>
+
+          <div onClick={handleNext} style={{ width: '44px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.1)', borderRadius: '50%', color: 'white', fontSize: '24px', cursor: 'pointer', zIndex: 10, flexShrink: 0 }}>&#8250;</div>
+        </div>
+
+        <footer className="viewer-bottom">
+          <button
+            className={`btn-giant ${isSelected ? 'btn-remove' : 'btn-add'}`}
+            onClick={() => toggle(currentPhoto.id)}
+          >
+            {isSelected ? 'Remover da sacola' : 'Adicionar foto a sacola'}
+          </button>
+        </footer>
+      </div>
+    );
+  }
+
+  if (screen === 'dashboard') {
+    const stats = dashData.stats[period];
+
+    return (
+      <div className="dashboard-screen screen">
+        <header className="dash-header">
+          <div className="logo brand-logo">
+            <img src="/logo-transparent.png" alt="SnapFlow" className="brand-logo-image" />
+          </div>
+        </header>
+
+        <main className="dash-main">
+          <div className="package-alert">
+            <span>Pacote ativo agora:</span>
+            <strong>{PRICING[type].label}</strong>
+          </div>
+
+          <div className="package-selector">
+            {Object.entries(PRICING).map(([key, packageConfig]) => (
+              <button
+                key={key}
+                className={`package-card ${type === key ? 'active' : ''}`}
+                onClick={() => setType(key)}
+              >
+                <strong>{packageConfig.label}</strong>
+                <small>{packageConfig.description}</small>
+              </button>
+            ))}
+          </div>
+
+          {hasActiveSession ? (
+            <main className="gallery-grid">
+          {photos.map((photo, index) => {
+            const isSelected = selected.includes(photo.id);
+            const isBroken = brokenPhotoIds.includes(photo.id);
+
+            return (
+              <div key={photo.id} className={`photo-tile ${isSelected ? 'sel' : ''}`}>
+                {isBroken ? (
+                  <div className="image-broken-message image-broken-tile">Imagem indisponivel</div>
+                ) : (
+                  <img
+                    src={photo.thumbUrl || photo.url}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    fetchPriority="low"
+                    onClick={() => setViewerIndex(index)}
+                    onError={() => markBrokenPhoto(photo.id)}
+                  />
+                )}
+                <div
+                  className={`tile-check-circle ${isSelected ? 'active' : ''}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    toggle(photo.id);
+                  }}
+                >
+                  {isSelected ? '●' : ''}
+                </div>
+              </div>
+            );
+          })}
+        </main>
+
+        <div className="info-bottom-area" style={{ padding: '0 16px 100px 16px' }}>
+<SessionOpsCard
+              title="Sessao atual"
+              stage={activeStage}
+              count={count}
+              total={total}
+              phone={clientPhone}
+              packageType={type}
+              paymentMethod={liveOps.paymentMethod}
+              paymentStatus={liveOps.paymentStatus}
+              deliveryStatus={liveOps.deliveryStatus}
+              deliveryError={liveOps.deliveryError}
+            />
+          ) : null}
+
+          {noticeBanner}
+
+          <div className="period-tabs">
+            <button className={period === 'hoje' ? 'active' : ''} onClick={() => setPeriod('hoje')}>
+              Hoje
+            </button>
+            <button
+              className={period === 'semana' ? 'active' : ''}
+              onClick={() => setPeriod('semana')}
+            >
+              Semana
+            </button>
+            <button className={period === 'mes' ? 'active' : ''} onClick={() => setPeriod('mes')}>
+              Mes
+            </button>
+          </div>
+
+          <div className="stats-card">
+            <div className="stats-title">Vendas ({period})</div>
+            <div className="stats-value">{formatMoney(stats.valor)}</div>
+            <div className="stats-subtitle">
+              {stats.sessoes} sessões • {stats.fotos} fotos vendidas
+            </div>
+          </div>
+
+          <div className="recent-sessions">
+            <div className="recent-header">
+              <h3>Sessões recentes</h3>
+            </div>
+
+            {dashData.recent.map((session) => {
+              const paymentMeta =
+                session.status === 'approved' ? PAYMENT_META.approved : PAYMENT_META.pending;
+              const deliveryMeta =
+                DELIVERY_META[session.deliveryStatus || 'idle'] || DELIVERY_META.idle;
+              const packageLabel = session.packageType
+                ? PRICING[session.packageType]?.shortLabel
+                : 'Sem pacote';
+
+              return (
+                <div key={session.id} className="session-item">
+                  <div className="session-info">
+                    <strong>{formatMoney(Number(session.amount) || 0)}</strong>
+                    <small>
+                      {session.photoCount} foto(s) • {packageLabel}
+                    </small>
+                  </div>
+                  <div className="session-status">
+                    <span className={`badge badge-${paymentMeta.tone}`}>{paymentMeta.label}</span>
+                    <span className={`badge badge-${deliveryMeta.tone}`}>{deliveryMeta.label}</span>
+                  </div>
+                </div>
+              );
+            })}
+
+            {dashData.recent.length === 0 ? (
+              <div className="empty-state">Nenhuma sessao recente</div>
+            ) : null}
+          </div>
+
+          <div className="recent-sessions" style={{ marginTop: '18px' }}>
+            <div className="recent-header">
+              <h3>Links compartilhados</h3>
+            </div>
+
+            {dashData.shareRecent?.map((shareSession) => {
+              const statusTone =
+                shareSession.status === 'revoked'
+                  ? 'danger'
+                  : shareSession.status === 'expired'
+                    ? 'neutral'
+                    : shareSession.status === 'opened'
+                      ? 'success'
+                      : 'info';
+              const statusLabel =
+                shareSession.status === 'revoked'
+                  ? 'Revogado'
+                  : shareSession.status === 'expired'
+                    ? 'Expirado'
+                    : shareSession.status === 'opened'
+                      ? 'Aberto'
+                      : 'Ativo';
+              const packageLabel = shareSession.packageType
+                ? PRICING[shareSession.packageType]?.shortLabel
+                : 'Sem pacote';
+
+              return (
+                <div key={shareSession.token} className="session-item">
+                  <div className="session-info">
+                    <strong>{packageLabel}</strong>
+                    <small>
+                      {shareSession.photoCount} foto(s) • código {shareSession.accessCode}
+                    </small>
+                    <small>
+                      Expira em <ShareCountdown isoDate={shareSession.expiresAt} />
+                    </small>
+                  </div>
+                  <div className="session-status" style={{ gap: '8px' }}>
+                    <span className={`badge badge-${statusTone}`}>{statusLabel}</span>
+                    <div className="share-quick-actions">
+                      <button
+                        className="share-quick-btn"
+                        onClick={() =>
+                          navigator.clipboard?.writeText(
+                            buildShareWhatsAppMessage(
+                              shareSession.link || `${window.location.origin}/s/${shareSession.token}`,
+                              shareSession.accessCode
+                            )
+                          )
+                        }
+                      >
+                        Copiar
+                      </button>
+                      {shareSession.status !== 'revoked' && shareSession.status !== 'expired' ? (
+                        <button
+                          className="share-quick-btn"
+                          onClick={async () => {
+                            try {
+                              await fetch(
+                                `${API_BASE_URL}/api/share-session/${shareSession.token}/extend`,
+                                {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    managementKey: shareSession.managementKey,
+                                    minutes: 15,
+                                  }),
+                                }
+                              );
+                              fetchDashboard({ silent: true });
+                            } catch (error) {
+                              console.error('Falha ao estender link:', error);
+                            }
+                          }}
+                        >
+                          +15
+                        </button>
+                      ) : null}
+                      {shareSession.status !== 'revoked' && shareSession.status !== 'expired' ? (
+                        <button
+                          className="share-quick-btn share-quick-btn-danger"
+                          onClick={async () => {
+                            try {
+                              await fetch(
+                                `${API_BASE_URL}/api/share-session/${shareSession.token}/revoke`,
+                                {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    managementKey: shareSession.managementKey,
+                                  }),
+                                }
+                              );
+                              fetchDashboard({ silent: true });
+                            } catch (error) {
+                              console.error('Falha ao revogar link:', error);
+                            }
+                          }}
+                        >
+                          Revogar
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {dashData.shareRecent?.length === 0 ? (
+              <div className="empty-state">Nenhum link compartilhado ainda</div>
+            ) : null}
+          </div>
+        </main>
+
+        <input
+          type="file"
+          id="hidden-upload"
+          multiple
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={handleFileUpload}
+        />
+
+        <div className="dash-bottom">
+          <button
+            className="btn-primary"
+            style={{ width: '100%', marginBottom: '16px' }}
+            onClick={startNewSession}
+            disabled={isUploading}
+          >
+            {isUploading ? 'Carregando imagens...' : 'Escolher fotos da câmera / galeria'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (screen === 'gallery') {
+    return (
+      <div className="screen">
+        <header className="topbar">
+          <button className="back-btn" onClick={() => setScreen('dashboard')}>
+            Encerrar
+          </button>
+        </header>
+
+        <SessionOpsCard
+          title="Sessao atual"
+          stage={activeStage}
+          count={count}
+          total={total}
+          phone={clientPhone}
+          packageType={type}
+          paymentMethod={liveOps.paymentMethod}
+          paymentStatus={liveOps.paymentStatus}
+          deliveryStatus={liveOps.deliveryStatus}
+          deliveryError={liveOps.deliveryError}
+        />
+
+        <div className="package-alert compact">
+          <span>Pacote em uso:</span>
+          <strong>{PRICING[type].label}</strong>
+        </div>
+
+        {count > 0 ? (
+          <div className={`promo-banner ${hasDiscount ? 'active' : ''}`}>
+            {hasDiscount
+              ? `Desconto ativo: ${formatMoney(unit)} por foto`
+              : `Faltam ${remaining} foto(s) para o desconto`}
+          </div>
+        ) : null}
+
+        <div className="gallery-toolbar">
+          <button className="gallery-toolbar-btn" onClick={toggleAllPhotos}>
+            {allPhotosSelected ? 'Limpar seleção' : 'Selecionar tudo'}
+          </button>
+          <span className="gallery-toolbar-hint">
+            {selected.length} de {photos.length} fotos selecionadas
+          </span>
+        </div>
+
+                </div>
+
+
+        <footer className="bottombar">
+          <div className="bottombar-info">
+            <span className="count-label">{count} foto(s)</span>
+            <span className="total-label">{formatMoney(total)}</span>
+          </div>
+          <button className="btn-primary" disabled={count === 0} onClick={() => setScreen('summary')}>
+            Finalizar pedido
+          </button>
+        </footer>
+      </div>
+    );
+  }
+
+  if (screen === 'summary') {
+    return (
+      <div className="screen center-screen">
+        <header className="topbar">
+          <button className="back-btn" onClick={() => setScreen('gallery')}>
+            Voltar
+          </button>
+          <span className="topbar-title">Cobrança final</span>
+          <span />
+        </header>
+
+        <SessionOpsCard
+          title="Sessao atual"
+          stage={activeStage}
+          count={count}
+          total={total}
+          phone={clientPhone}
+          packageType={type}
+          paymentMethod={liveOps.paymentMethod}
+          paymentStatus={liveOps.paymentStatus}
+          deliveryStatus={liveOps.deliveryStatus}
+          deliveryError={liveOps.deliveryError}
+        />
+
+        <div className="summary-card">
+          <div className="summary-row">
+            <span>Pacote escolhido</span>
+            <strong>{PRICING[type].label}</strong>
+          </div>
+          <div className="summary-row">
+            <span>Fotos a enviar</span>
+            <strong>{count} fotos originais</strong>
+          </div>
+          <div className="summary-row">
+            <span>Preco unitario</span>
+            <strong>{formatMoney(unit)}</strong>
+          </div>
+          <div className="summary-divider" />
+          <div className="summary-row total-row">
+            <span>Total</span>
+            <strong className="total-big">{formatMoney(total)}</strong>
+          </div>
+        </div>
+
+        <div className="summary-card" style={{ marginTop: '16px' }}>
+          <div className="summary-label">WhatsApp do cliente</div>
+          <input
+            type="tel"
+            placeholder="(11) 99999-9999"
+            value={clientPhone}
+            onChange={(event) => setClientPhone(event.target.value.replace(/\D/g, ''))}
+            className="phone-input"
+          />
+          <small className="summary-help">
+            Assim que o pagamento for confirmado por você no painel, as imagens serão
+            disparadas para ele em formato de documento, sem compressao.
+          </small>
+        </div>
+
+        <div className="action-stack">
+          <button
+            className="btn-primary"
+            disabled={isGeneratingPix || clientPhone.length < 10}
+            onClick={handleGeneratePix}
+          >
+            {isGeneratingPix ? 'Conectando ao banco...' : 'Gerar QR Code'}
+          </button>
+          <button
+            className="btn-manual btn-manual-cash"
+            disabled={isGeneratingPix || clientPhone.length < 10}
+            onClick={() => handleManualPayment('manual')}
+          >
+            Pagamento Dinheiro/Cartão
+          </button>
+        </div>
+
+        <div className="summary-card" style={{ marginTop: '16px' }}>
+          <div className="summary-label">Teste de link compartilhado</div>
+          <small className="summary-help">
+            Digite o WhatsApp do cliente, crie o link temporário e ele recebe automaticamente a
+            mensagem com o código de 4 caracteres.
+          </small>
+          <div style={{ marginTop: '12px' }}>
+            <label className="share-duration-label" htmlFor="share-duration">
+              Tempo de acesso em minutos
+            </label>
+            <input
+              id="share-duration"
+              type="number"
+              min="5"
+              max="180"
+              step="5"
+              value={shareDurationMinutes}
+              onChange={(event) =>
+                setShareDurationMinutes(
+                  Math.min(180, Math.max(5, Number(event.target.value) || 30))
+                )
+              }
+              className="phone-input"
+              style={{ marginTop: '6px' }}
+            />
+          </div>
+          <div className="action-stack" style={{ padding: '14px 0 0' }}>
+            <button
+              className="btn-manual btn-manual-cash"
+              disabled={shareActionLoading || selectedPhotos.length === 0}
+              onClick={handleCreateShareSession}
+            >
+              {shareActionLoading ? 'Gerando e enviando...' : 'Criar link e enviar WhatsApp'}
+            </button>
+          </div>
+
+          {shareAccess ? (
+            <div className="share-summary">
+              <div className="summary-row">
+                <span>Link</span>
+                <strong className="share-link-text">{shareAccess.link}</strong>
+              </div>
+              <div className="summary-row">
+                <span>Código</span>
+                <strong>{shareAccess.code}</strong>
+              </div>
+              <div className="summary-row">
+                <span>Expira em</span>
+                <strong>
+                  <ShareCountdown isoDate={shareAccess.expiresAt} />
+                </strong>
+              </div>
+              <div className="share-actions">
+                <button
+                  className="btn-manual btn-manual-card"
+                  onClick={() =>
+                    navigator.clipboard?.writeText(
+                      shareAccess.whatsappMessage ||
+                        buildShareWhatsAppMessage(shareAccess.link, shareAccess.code)
+                    )
+                  }
+                >
+                  Copiar mensagem WhatsApp
+                </button>
+                <button
+                  className="btn-manual btn-manual-card"
+                  onClick={handleExtendShareSession}
+                  disabled={shareActionLoading}
+                >
+                  Estender +15 min
+                </button>
+                <button
+                  className="btn-manual btn-manual-cash"
+                  onClick={handleRevokeShareSession}
+                  disabled={shareActionLoading}
+                >
+                  Revogar acesso
+                </button>
+              </div>
+              <small className="summary-help" style={{ marginTop: '12px' }}>
+                {shareAccess.whatsappMessage ||
+                  buildShareWhatsAppMessage(shareAccess.link, shareAccess.code)}
+              </small>
+            </div>
+          ) : null}
+        </div>
+
+        {noticeBanner}
+      </div>
+    );
+  }
+
+  if (screen === 'pix') {
+    return (
+      <div className="screen center-screen">
+        <header className="topbar">
+          <button className="back-btn" onClick={() => setScreen('summary')}>
+            Voltar
+          </button>
+          <span className="topbar-title">Pagamento Pix real</span>
+          <span />
+        </header>
+
+        <SessionOpsCard
+          title="Sessao atual"
+          stage={activeStage}
+          count={count}
+          total={total}
+          phone={clientPhone}
+          packageType={type}
+          paymentStatus={liveOps.paymentStatus}
+          deliveryStatus={liveOps.deliveryStatus}
+          deliveryError={liveOps.deliveryError}
+        />
+
+        <div className="qr-box">
+          <div className="qr-code-area">
+            {qrCodeBase64 ? (
+              <img
+                src={`data:image/png;base64,${qrCodeBase64}`}
+                style={{ width: '200px', height: '200px' }}
+                alt="QR Code Pix"
+              />
+            ) : (
+              <div className="qr-fake">
+                <span className="spinner">...</span>
+              </div>
+            )}
+          </div>
+          <div className="pix-total">{formatMoney(total)}</div>
+          <div className="pix-sub">{count} foto(s) selecionadas</div>
+        </div>
+
+        <div className="pix-status">
+          <span className="spinner">...</span> Processando pelo aplicativo do banco...
+        </div>
+        {noticeBanner}
+      </div>
+    );
+  }
+
+  if (screen === 'confirmed') {
+    const deliveryMeta = DELIVERY_META[liveOps.deliveryStatus] || DELIVERY_META.idle;
+    const isPix = liveOps.paymentMethod === 'PIX';
+
+    return (
+      <div className="screen confirmed-screen">
+        <div className="confirmed-icon">✓</div>
+        <h1 className="confirmed-title">{isPix ? 'Pix aprovado' : 'Pagamento aprovado'}</h1>
+        <p className="confirmed-sub" style={{ color: '#00C851', marginBottom: '30px' }}>
+          {isPix
+            ? 'Pagamento confirmado.'
+            : 'Pagamento confirmado pelo fotógrafo. Fotos liberadas após validação no painel.'}
+        </p>
+
+        <SessionOpsCard
+          title="Sessao atual"
+          stage={activeStage}
+          count={count}
+          total={total}
+          phone={clientPhone}
+          packageType={type}
+          paymentMethod={liveOps.paymentMethod}
+          paymentStatus={liveOps.paymentStatus}
+          deliveryStatus={liveOps.deliveryStatus}
+          deliveryError={liveOps.deliveryError}
+        />
+
+        <div className="delivery-options">
+          <button className="delivery-btn" style={{ borderColor: '#25D366' }}>
+            <span>💬</span>
+            <div>
+              <strong style={{ color: '#25D366' }}>{deliveryMeta.label}</strong>
+              <small>Fotos sendo tratadas para {clientPhone || 'o cliente'}</small>
+            </div>
+          </button>
+        </div>
+
+        <button
+          className="btn-outline-white"
+          style={{ marginTop: '30px' }}
+          onClick={() => {
+            resetSession();
+            setScreen('dashboard');
+            fetchDashboard({ silent: true });
+          }}
+        >
+          Finalizar e abordar próximo cliente
+        </button>
+        {noticeBanner}
+      </div>
+    );
+  }
+
+  return null;
+}

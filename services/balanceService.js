@@ -1,8 +1,15 @@
 const DEFAULT_CUSTOM_POINTS = 1000;
 const RATING_VERSION = 2;
 
+// Peso usado no balanceamento de times: apenas o elo do LoL (baseMmr).
+// A pontuacao custom (internalRating/modo) e so visual (perfil, placar, embeds)
+// e NAO influencia a montagem dos times.
+function getBalanceWeight(player = {}) {
+  return Math.max(0, Number(player.baseMmr || 0));
+}
+
 function calculateTeamMmr(team) {
-  return team.reduce((total, player) => total + player.mmr, 0);
+  return team.reduce((total, player) => total + getBalanceWeight(player), 0);
 }
 
 function calculateSeedRating(baseMmr = 0) {
@@ -111,7 +118,7 @@ function createBalancedTeams(players) {
     throw new Error('O balanceamento exige uma quantidade par de jogadores.');
   }
 
-  const sortedPlayers = [...players].sort((a, b) => b.mmr - a.mmr);
+  const sortedPlayers = [...players].sort((a, b) => getBalanceWeight(b) - getBalanceWeight(a));
   const bestCombination = findBestSnakeArrangement(sortedPlayers);
 
   if (!bestCombination) {
@@ -189,6 +196,7 @@ function applySnakeDraft(players) {
 module.exports = {
   DEFAULT_CUSTOM_POINTS,
   RATING_VERSION,
+  getBalanceWeight,
   createBalancedTeams,
   calculateTeamMmr,
   calculateHybridMmr,

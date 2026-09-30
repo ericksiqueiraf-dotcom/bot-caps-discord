@@ -358,10 +358,28 @@ function getBaseQueueChannelIdByMode(mode) {
 
 function getPostMatchVoiceChannelId(mode) {
   const waitingChannelId = config.voiceChannels.postMatchWaitingChannelId;
-  if (mode === QUEUE_MODES.CLASSIC && waitingChannelId) {
+  if (waitingChannelId) {
     return waitingChannelId;
   }
   return getBaseQueueChannelIdByMode(mode);
+}
+
+async function ensureNamedRole(guild, name) {
+  const existing = findRoleByNames(guild, [name]);
+  if (existing) {
+    return existing;
+  }
+
+  try {
+    return await guild.roles.create({
+      name,
+      mentionable: true,
+      reason: 'Cargo automatico do CAPS Bot'
+    });
+  } catch (error) {
+    console.warn(`[ROLES] Nao foi possivel criar o cargo ${name}:`, error.message);
+    return null;
+  }
 }
 
 function findRoleByNames(guild, names = []) {
@@ -375,8 +393,16 @@ function findMvpRole(guild) {
   return findRoleByNames(guild, MVP_ROLE_NAMES);
 }
 
+async function ensureMvpRole(guild) {
+  return findMvpRole(guild) || ensureNamedRole(guild, config.roles?.mvpPlayerRoleName || 'MVP player');
+}
+
 function findInfernalRole(guild) {
   return findRoleByNames(guild, [INFERNAL_ROLE_NAME]);
+}
+
+async function ensureInfernalRole(guild) {
+  return findInfernalRole(guild) || ensureNamedRole(guild, INFERNAL_ROLE_NAME);
 }
 
 function getNextEightAmSaoPauloIso(from = new Date()) {
@@ -632,7 +658,7 @@ async function syncMvpRole(guild, mvpId) {
   if (!guild || !mvpId) return;
 
   try {
-    const mvpRole = findMvpRole(guild);
+    const mvpRole = await ensureMvpRole(guild);
     if (!mvpRole) {
       console.warn('[MVP] Cargo MVP player / ⭐ MVP nao encontrado.');
       return;
@@ -663,12 +689,13 @@ async function clearMvpRoles(guild) {
 }
 
 async function syncInfernalRolesAfterMatch(guild, winners = [], losers = []) {
-  if (!guild) return;
+  const newlyAwarded = [];
+  if (!guild) return newlyAwarded;
 
-  const infernalRole = findInfernalRole(guild);
+  const infernalRole = await ensureInfernalRole(guild);
   if (!infernalRole) {
     console.warn('[INFERNAL] Cargo INFERNAL nao encontrado. Crie o cargo no Discord.');
-    return;
+    return newlyAwarded;
   }
 
   const statsData = await loadPlayerStats();
@@ -698,10 +725,45 @@ async function syncInfernalRolesAfterMatch(guild, winners = [], losers = []) {
       await member.roles.add(infernalRole).catch((err) =>
         console.error(`[INFERNAL] Erro ao atribuir cargo a ${member.user.tag}:`, err.message)
       );
+      newlyAwarded.push({
+        discordId: winner.discordId,
+        nickname: winner.nickname,
+        winStreak: Number(winner.winStreak || 0),
+        infernalExpiresAt
+      });
     }
   }
 
   await savePlayerStats(statsData);
+  return newlyAwarded;
+}
+
+async function postInfernalAnnouncement(guild, awarded = []) {
+  if (!guild || !Array.isArray(awarded) || awarded.length === 0) return;
+
+  const channelId = config.textChannels.mvpAnnouncementsChannelId || config.textChannels.matchHistoryChannelId;
+  const channel = await guild.channels.fetch(channelId).catch(() => null);
+  if (!channel?.isTextBased()) {
+    console.warn('[INFERNAL] Canal de anuncio nao encontrado.');
+    return;
+  }
+
+  const mentions = awarded.map((p) => `<@${p.discordId}>`).join(' ');
+  const lines = awarded
+    .map((p) => `• **${p.nickname || p.discordId}** — \`${p.winStreak}\` vitorias seguidas (vale ate ${formatDateTimeForHistory(p.infernalExpiresAt)})`)
+    .join('\n');
+
+  const embed = new EmbedBuilder()
+    .setColor(THEME.RANK)
+    .setTitle('🔥 NOVO INFERNAL 🔥')
+    .setDescription(`${mentions}\nChegou a **${INFERNAL_STREAK} vitorias seguidas** e conquistou o cargo **${INFERNAL_ROLE_NAME}**!`)
+    .addFields({ name: 'Conquistas', value: lines || 'Sem detalhes' })
+    .setFooter({ text: `${FOOTER_PREFIX} • Streak INFERNAL` })
+    .setTimestamp();
+
+  await channel.send({ embeds: [embed] }).catch((err) =>
+    console.error('[INFERNAL] Erro ao postar anuncio:', err.message)
+  );
 }
 
 async function expireInfernalRolesIfDue(guild) {
@@ -747,10 +809,25 @@ function countMvpVotes(session) {
   return tallies;
 }
 
+function pickAutomaticMvp(session) {
+  const candidates = (session.players || []).filter((player) => player.wasWinner);
+  const pool = candidates.length > 0 ? candidates : (session.players || []);
+  let best = null;
+  for (const player of pool) {
+    if (!best || (player.ratingDelta || 0) > (best.ratingDelta || 0)) {
+      best = player;
+    }
+  }
+  if (!best || (best.ratingDelta || 0) <= 0) {
+    return null;
+  }
+  return { ...best, votes: 0, automatic: true };
+}
+
 function pickMvpWinner(session) {
   const tallies = countMvpVotes(session);
   if (tallies.size === 0) {
-    return null;
+    return pickAutomaticMvp(session);
   }
 
   let best = null;
@@ -818,13 +895,14 @@ async function finalizeMvpVote(voteId) {
   }
 
   if (message) {
+    const winnerDescription = winner
+      ? (winner.automatic
+        ? `<@${winner.discordId}> ficou com o MVP pelo maior ganho de rating (ninguem votou).`
+        : `<@${winner.discordId}> foi o mais votado (**${winner.votes}** voto(s)).`)
+      : 'Nenhum voto foi registrado.';
     const resultEmbed = EmbedBuilder.from(message.embeds[0] || new EmbedBuilder())
       .setTitle(winner ? `MVP: ${winner.nickname}` : 'Votacao de MVP encerrada')
-      .setDescription(
-        winner
-          ? `<@${winner.discordId}> foi o mais votado (**${winner.votes}** voto(s)).`
-          : 'Nenhum voto foi registrado.'
-      )
+      .setDescription(winnerDescription)
       .spliceFields(0, 25, { name: 'Placar', value: voteLines || 'Sem votos' });
 
     await message.edit({ embeds: [resultEmbed], components: [] }).catch(() => null);
@@ -1149,19 +1227,19 @@ function buildTeamsEmbed(teams) {
     .setColor(THEME.SUCCESS)
     .setTitle('⚔️ Times Balanceados')
     .setDescription(
-      `Os times foram montados automaticamente com base no MMR dos jogadores.\nModo: **${formatQueueMode(teams.mode)}** | Formato: **${teams.teamOne.length}x${teams.teamTwo.length}**`
+      `Os times foram montados automaticamente com base no elo do LoL dos jogadores.\nModo: **${formatQueueMode(teams.mode)}** | Formato: **${teams.teamOne.length}x${teams.teamTwo.length}**`
     )
     .addFields(
       {
-        name: `Equipe 1 | MMR total: ${teams.teamOneMmr}`,
+        name: `Equipe 1 | Elo total: ${teams.teamOneMmr}`,
         value: teamOneText || 'Sem jogadores'
       },
       {
-        name: `Equipe 2 | MMR total: ${teams.teamTwoMmr}`,
+        name: `Equipe 2 | Elo total: ${teams.teamTwoMmr}`,
         value: teamTwoText || 'Sem jogadores'
       },
       {
-        name: 'Diferenca de MMR',
+        name: 'Diferenca de Elo',
         value: `${teams.difference}`
       }
     )
@@ -1685,6 +1763,9 @@ function startDailyRankScheduler() {
 
       lastDailyRankPostKey = now.key;
       await postDailyRankUpdates();
+      for (const guild of global.discordClient?.guilds.cache.values() || []) {
+        await expireInfernalRolesIfDue(guild);
+      }
     } catch (error) {
       console.error('Erro ao publicar ranking diario:', error);
     }
@@ -2286,6 +2367,7 @@ module.exports = {
   getReservedLobbyLetters,
   getNextLobbyLetter,
   getBaseQueueChannelIdByMode,
+  getPostMatchVoiceChannelId,
   getOpenLobby,
   findLobbyByChannelId,
   findLobbyByPlayer,
@@ -2308,6 +2390,12 @@ module.exports = {
   syncMemberRankRole,
   syncMvpRole,
   clearMvpRoles,
+  syncInfernalRolesAfterMatch,
+  postInfernalAnnouncement,
+  expireInfernalRolesIfDue,
+  startMvpVote,
+  handleMvpVoteInteraction,
+  resumePendingMvpVotes,
   THEME,
   FOOTER_PREFIX,
   buildQueueEmbed,

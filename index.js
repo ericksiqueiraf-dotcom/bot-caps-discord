@@ -351,6 +351,9 @@ const {
   getSaoPauloDateParts,
   postDailyRankUpdates,
   postMatchHistoryLog,
+  handleMvpVoteInteraction,
+  resumePendingMvpVotes,
+  expireInfernalRolesIfDue,
   startDailyRankScheduler,
   movePlayersToTeamChannels,
   movePlayersToVoiceChannel,
@@ -381,6 +384,22 @@ client.once('ready', async () => {
   console.log(`Bot conectado como ${client.user.tag} | ${BOT_VERSION}`);
   await registerSlashCommands();
   startDailyRankScheduler();
+
+  // Retoma votacoes de MVP pendentes (se o bot reiniciou no meio de uma votacao)
+  try {
+    await resumePendingMvpVotes();
+  } catch (err) {
+    console.error('[RESTART] Erro ao retomar votacoes de MVP:', err);
+  }
+
+  // Expira cargos INFERNAL vencidos (08h) logo na inicializacao
+  try {
+    for (const guild of client.guilds.cache.values()) {
+      await expireInfernalRolesIfDue(guild);
+    }
+  } catch (err) {
+    console.error('[RESTART] Erro ao expirar cargos INFERNAL:', err);
+  }
 
   // Item 3: Recuperar auto-starts pendentes (se a sala estiver cheia no BD e reiniciou)
   try {
@@ -504,7 +523,7 @@ async function processCommand(message, rawContent) {
         await handlers.handleStartCommand(message, args);
         break;
       case 'rematch':
-        await handlers.handleRematchCommand(message);
+        await handlers.handleRematchCommand(message, args);
         break;
       case 'cadastrar':
         await handlers.handleRegisterCommand(message, args);
@@ -634,6 +653,22 @@ client.on('interactionCreate', async (interaction) => {
       }
       return;
     }
+  }
+
+  if (interaction.isStringSelectMenu()) {
+    try {
+      if (String(interaction.customId || '').startsWith('mvpvote:')) {
+        await handleMvpVoteInteraction(interaction);
+        return;
+      }
+    } catch (error) {
+      console.error('[MVP] Erro ao processar voto:', error);
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({ content: 'Nao consegui registrar seu voto agora.', ephemeral: true }).catch(() => null);
+      }
+      return;
+    }
+    return;
   }
 
   if (!interaction.isChatInputCommand()) {

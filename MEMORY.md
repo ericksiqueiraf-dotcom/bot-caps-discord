@@ -7,8 +7,8 @@
 
 ## 🗓️ Última Sessão
 
-- **Data:** 2026-09-29
-- **Foco:** Balanço 1000+elo, perfil separado, alerta de smurf
+- **Data:** 2026-09-30
+- **Foco:** Recuperação de cadastros, Sala de Espera pós-partida, INFERNAL, votação MVP, balanceamento por elo LoL, partidas simultâneas + backup de segurança
 - **Status:** ✅ Concluído
 
 ---
@@ -16,11 +16,12 @@
 ## 📍 Ponto de Parada Atual
 
 ### Onde paramos:
-Balanço: **1000 (custom) + elo LoL + W/L**. Perfil mostra Elo LoL e Pontos Custom (base 1000) separados. Alerta de smurf ativo no PM2. Cargos: **Mestre**, **Esmeralda**, **Grão Mestre**. Sync: `!sync todos`. Extração do `legacyCommands.js` segue pendente.
+Banco íntegro no Docker (`caps-mongo`, 140 jogadores). Pós-`!vitoria` move todos para a **Sala de Espera (1490385246775017572)**. Cargo **INFERNAL** automático (5+ winstreak, sai na derrota, expira 08h SP). **Votação de MVP** de 2 min pós-partida + cargo **MVP player** ao mais votado (fallback automático se ninguém votar). **Balanceamento só pelo elo LoL** (`getBalanceWeight` = `baseMmr`); pontos custom só visuais. Locks de vitória/voto por guild (partidas A+B simultâneas testadas, suite em 28/28). **Backups em `backups/`** (ZIP do código + JSON do Mongo). Bot online no PM2. Extração do `legacyCommands.js` segue pendente.
 
 ### Próximo passo imediato:
+- Testar em produção: `!vitoria` (mover p/ Sala de Espera, INFERNAL, votação MVP)
 - Continuar extração de lógica de negócio do `legacyCommands.js`
-- Identificar quais comandos ainda não foram movidos para handlers
+- Limitar lobby classic a 10 pessoas + mutar sala (config manual no Discord, fora do bot)
 
 ---
 
@@ -44,13 +45,14 @@ Balanço: **1000 (custom) + elo LoL + W/L**. Perfil mostra Elo LoL e Pontos Cust
 - [x] `domain/ranking/playerStats.js`
 
 ### Infraestrutura
-- [x] MongoDB Atlas como banco principal
-- [x] Fallback JSON local em `database/`
+- [x] MongoDB local via Docker (`caps-mongo`, `mongodb://localhost:27017/caps-bot`) como banco principal
+- [x] Fallback JSON local em `database/` (sincronizado com o Mongo)
 - [x] `services/dataService.js` com lock em memória
 - [x] `services/riotService.js` com cache em memória (1h)
-- [x] `services/balanceService.js` com pontuação `1000 + elo LoL + W/L`
+- [x] `services/balanceService.js`: balanceamento só pelo elo LoL (`getBalanceWeight` = `baseMmr`); pontos custom `1000 + W/L` só visuais
 - [x] `workers/` pasta criada (sem worker ativo ainda)
-- [x] `Ativar Bot.bat` inicia manualmente o `caps-bot` pelo PM2 com dois cliques
+- [x] `Ativar Bot.bat` com `restart --update-env` (reinicia mesmo se já ativo e recarrega o `.env`)
+- [x] Backups em `backups/` (ZIP do código + export JSON do Mongo) — ver "Backup e recuperação"
 
 ### Comandos com fluxo isolado em handlers/use-cases
 - [x] `!entrar`
@@ -59,6 +61,19 @@ Balanço: **1000 (custom) + elo LoL + W/L**. Perfil mostra Elo LoL e Pontos Cust
 - [x] `!votar`
 - [x] `!reset`
 - [x] `!cancelarstart`
+- [x] `!rematch` (consertado em 2026-09-30: lia `recentVictory.match` que nunca era salvo; agora `!vitoria` salva `teamOne/teamTwo` e o rematch recria a sala com pesos de balance)
+- [x] `!rematch <letra>` (2026-09-30: `!rematch A/B/C` mira a sala certa via `recentVictories` (últimas 5, janela 2 min); sem letra mantém último resultado; helper `findRecentVictoryByLetter` exportado e testado)
+- [x] `!rematch` = rebalance rápido (2026-09-30: NÃO é revanche fixa; os 10 voltam pra fila e, se completar, os times são remontados por elo e a partida inicia na hora, sem contagem; se faltar gente, avisa quantos faltam)
+- [x] `!cancelarstart <letra>` (2026-09-30: `!cancelarstart A/B/C` cancela a contagem de auto-start do lobby cheio (jogadores ficam na fila); sem letra só resolve com pendente único; sem pendente cai no cancelamento de partida ativa + limpa timer residual; helper `findPendingAutoStartLobby` exportado e testado)
+
+### Testes automatizados
+- [x] `tests/` com `node:test` nativo (`npm test`): `helpers.js` + `victory-selector` (7) + `register-victory` (3) + `balance` (3) + `rematch` (5) + `cancel-start` (4) + `cleanup-rooms` (6) = 28/28 verdes
+- [x] `!limparsalas A/B/C` (2026-09-30: filtra a sala pela letra; move ocupantes pra Sala de Espera antes de apagar; mutação sob lock; recusa com partida ativa; sem letra limpa tudo como antes; helper `resolveCleanupTargets` exportado e testado)
+- [x] `!ajuda` atualizado (2026-09-30: documenta `!rematch [sala]`, `!cancelarstart [sala]`, `!limparsalas [sala]`, votação de MVP e cargo INFERNAL)
+- [x] Mocks em memória com semântica fiel ao banco (load = clone, save = sobrescreve)
+
+### Anúncios pós-partida
+- [x] `postInfernalAnnouncement`: embed 🔥 no canal do MVP quando alguém conquista o INFERNAL (5+ streak, validade até 08h); `syncInfernalRolesAfterMatch` retorna os recém-premiados
 
 ### Fila de espera
 - [x] `!espera` e `/espera` inscrevem jogadores na espera da próxima partida e mostram a ordem de entrada (`joinedAt`)
@@ -71,10 +86,25 @@ Balanço: **1000 (custom) + elo LoL + W/L**. Perfil mostra Elo LoL e Pontos Cust
 
 ### Pontuação e balanceamento
 - [x] Seed inicial: `1000 + MMR do elo Solo/Duo cadastrado`
-- [x] Snake draft usa essa pontuação (não só o elo da Riot)
-- [x] Vitória/derrota altera `internalRating` via Elo; mudança de elo LoL ajusta a parte de ranked
+- [x] Snake draft usa **só o elo do LoL** (`baseMmr` via `getBalanceWeight`); pontos custom NÃO influenciam os times
+- [x] Vitória/derrota altera `internalRating` via Elo (pontuação visual); mudança de elo LoL ajusta a parte de ranked
 - [x] Stats antigas (seed 1000 sem LoL) migram com `ratingVersion: 2`
 - [x] `!perfil`: Elo LoL e Pontos Custom separados; custom começa em **1000** (sobe/desce com as personalizadas)
+- [x] Embed "Times Balanceados" mostra "Elo total / Diferenca de Elo"
+
+### Backup e recuperação
+- [x] Pasta `backups/` na raiz do projeto
+- [x] `backups/codigo-2026-09-30-1215.zip` (4,48 MB, 80 arquivos: código + `.env` + `database/` + `MEMORY.md`, sem `node_modules`/`.git`)
+- [x] `backups/mongo-data-2026-09-30-1515.json` (export da collection `data`: 135 jogadores, 1 partida ativa, 3 temporadas)
+- [x] `backups/codigo-2026-09-30-1328.zip` + `backups/mongo-data-2026-09-30-1628.json` (pós testes/INFERNAL/rematch: 135 jogadores, 0 partidas ativas, 3 temporadas)
+- [x] `backups/codigo-2026-09-30-1456.zip` + `backups/mongo-data-2026-09-30-1756.json` (pós `!rematch <letra>`: 139 jogadores, 2 partidas ativas, 3 temporadas)
+- [x] `backups/codigo-2026-09-30-1500.zip` + `backups/mongo-data-2026-09-30-1800.json` (pós `!cancelarstart <letra>`: 139 jogadores, 2 partidas ativas, 3 temporadas)
+- [x] `backups/codigo-2026-09-30-1504.zip` + `backups/mongo-data-2026-09-30-1804.json` (pós `!rematch` rebalance: 139 jogadores, 2 partidas ativas, 3 temporadas)
+- [x] `backups/codigo-2026-09-30-1512.zip` + `backups/mongo-data-2026-09-30-1812.json` (pós `!limparsalas` por letra: 140 jogadores, 1 lobby, 1 partida ativa, 3 temporadas)
+- [x] `backups/codigo-2026-09-30-1516.zip` + `backups/mongo-data-2026-09-30-1816.json` (pós `!ajuda` atualizado: 140 jogadores, 1 lobby, 1 partida ativa, 3 temporadas)
+- [x] `database/playerStats.backup-2026-09-30.json` (pré-migração `nickname` → `registeredNickname`)
+- [x] Como restaurar o banco: `node migrateToMongo.js` (sobe `database/` p/ o Mongo) com `caps-mongo` rodando; como restaurar o código: extrair o ZIP por cima
+- [x] `mongodump` não instalado — export via script Node (`backup-mongo-temp.js`, removido após uso); refazer quando precisar
 
 ### Alerta de smurf
 - [x] Bot **não detecta conta main** automaticamente. Smurf = staff (`!nick` da main ou Base MMR no admin)
@@ -178,6 +208,20 @@ database/                    ← fallback JSON local
 
 ### 2026-09-25 — Ativação manual
 - Criado `Ativar Bot.bat` na raiz do projeto para iniciar o `caps-bot` pelo PM2 ao receber dois cliques.
+
+### 2026-09-30 — Pós-partida, INFERNAL e MVP
+- **`commands/handlers/victoryCommandHandlers.js`**: pós-`!vitoria` agora move winners+losers para `getPostMatchVoiceChannelId()` = Sala de Espera `1490385246775017572` (antes: lobby base da fila). Chama `syncInfernalRolesAfterMatch(guild, winners, losers)` e `startMvpVote(guild, match, winners, losers)`; MVP automático por rating removido do fluxo.
+- **`utils/lobbyUtils.js`**: `finalizeMvpVote` ganhou fallback `pickAutomaticMvp()` (maior `ratingDelta` do time vencedor) quando ninguém vota; embed do resultado diferencia voto x automático.
+- **`index.js`**: handler de `StringSelectMenu` `mvpvote:*` → `handleMvpVoteInteraction`; `ready` agora chama `resumePendingMvpVotes()` + `expireInfernalRolesIfDue()` por guild.
+- **INFERNAL**: `INFERNAL_STREAK = 5`, expira às 08h SP (`getNextEightAmSaoPauloIso`), sai na derrota, expiração diária no scheduler 08h + na inicialização. Cargo criado automaticamente se não existir (`ensureInfernalRole`). `config.roles.infernalRoleName = "INFERNAL"`.
+- **MVP**: votação 2 min (`MVP_VOTE_DURATION_MS`), só participantes votam, 1 voto por pessoa (pode trocar), empate desempatado por rating. Canal: `mvpAnnouncementsChannelId` (fallback match history). Cargo `MVP player` ao vencedor.
+- **Banco**: Docker `caps-mongo` religado; migrados 52 jogadores no Mongo + 63 no JSON (`nickname` → `registeredNickname`); 134/134 no Mongo. `.env` de volta pra `localhost`. Fallback local sincronizado com o Mongo. Correção de código com fallback `registeredNickname || nickname` em `enterQueue.js` + `legacyCommands.js` (sincronizarelo, espera, sync todos).
+- **`Ativar Bot.bat`**: agora faz `restart --update-env` (reinicia mesmo se já ativo e recarrega o `.env`).
+- Bot reiniciado no PM2, online como `CAPS BOT LOL#6241 v1.8.0`, `[DB] Conectado`.
+- **Balanceamento só pelo elo LoL (2026-09-30):** `services/balanceService.js` ganhou `getBalanceWeight()` = `baseMmr`; `createBalancedTeams` ordena e soma por elo, ignorando pontos custom. Embed de times mostra "Elo total / Diferenca de Elo". Pontos custom seguem só visuais (`!perfil`, `!placar`, `!top10`, `!topstreak`, dashboard, "Pontos" nos embeds). Teste: 10 jogadores mock com elo x custom invertidos → elo 6900x6900 dif 0.
+- **Partidas simultâneas (2026-09-30):** teste com 2 partidas ativas (A e B) provou que `!vitoria 1 A` mira só a A (seletor por letra; sem letra e com 2 ativas não resolve sozinho = seguro). Achado e corrigido: vitórias REALMENTE simultâneas se apagavam (lock era por partida, saves do doc inteiro colidiam) → lock do `registerVictory` virou por guild (`${guildId}:victory`). `!votar` também registra o voto sob o mesmo lock e a vitória automática agora repassa a letra (`[time, letra]`) pra mirar a partida certa. 13/13 testes passaram.
+- **Backup de segurança (2026-09-30):** `backups/codigo-2026-09-30-1215.zip` (código completo para restore) + `backups/mongo-data-2026-09-30-1515.json` (135 jogadores, 1 partida ativa, 3 temporadas). Bot segue online no PM2 (`caps-bot`, `CAPS BOT LOL#6241 v1.8.0`).
+- **Testes + INFERNAL + rematch (2026-09-30):** criados `tests/helpers.js`, `victory-selector.test.js`, `register-victory.test.js`, `balance.test.js`, `rematch.test.js` + script `npm test` (15/15 verdes, `node:test` nativo, sem deps novas). `syncInfernalRolesAfterMatch` retorna recém-premiados; `postInfernalAnnouncement` posta 🔥 no canal do MVP; `!vitoria` chama ambos com try/catch. `!rematch` consertado: `recentVictory` agora salva `teamOne/teamTwo`, rematch cria a sala se não houver, enriquece os 10 com `baseMmr/mmr` do cadastro e roda sob lock da fila. Bot reiniciado e online.
 
 ### 2026-09-29 — Pontuação 1000 + elo LoL
 - Seed: `calculateSeedRating(baseMmr) = 1000 + MMR Solo/Duo` (Gold IV unranked continua 1200 de elo → 2200 pontos).

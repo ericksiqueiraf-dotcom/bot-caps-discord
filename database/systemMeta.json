@@ -1,3 +1,12 @@
 {
-  "lastQueueMessageId": "1489271956099436614"
+  "lastQueueMessageId": "1552541945455312947",
+  "recentVictory": {
+    "guildId": "1273653944169660427",
+    "matchId": "classic-5x5-a",
+    "winnerTeam": "1",
+    "mode": "classic",
+    "format": "5x5",
+    "letter": "A",
+    "finishedAt": "2026-09-29T23:56:24.171Z"
+  }
 }

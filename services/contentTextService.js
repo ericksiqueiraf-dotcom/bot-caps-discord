@@ -13,7 +13,7 @@ const DEFAULT_CONTENT_TEMPLATES = {
     footerText: 'Caps Bot - Acesso inicial'
   },
   onboarding: {
-    title: 'Arena Caps - Guia de Inicio Rapido',
+    title: 'CAPS Arena - Guia de Inicio Rapido',
     description: 'Partidas personalizadas com fila persistente, times balanceados por MMR interno e historico completo de resultados.\n\n**Fluxo rapido: cadastrar, entrar na call, jogar, votar e acompanhar sua evolucao.**',
     registrationTitle: 'PASSO 1 - Cadastre sua conta (uma unica vez)',
     registrationText: 'Vincule seu Nick da Riot ao seu Discord:\n```\n!cadastrar SeuNick#TAG\n```\nApos isso, voce nunca mais precisara digitar seu nick.\n> Se trocar de nick na Riot: `!nick NovoNick#TAG`',

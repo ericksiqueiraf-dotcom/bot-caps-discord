@@ -100,7 +100,7 @@ async function ensureDataFiles() {
 
   const col = database.collection('data');
   const defaults = [
-    { _id: 'queue', data: { lobbies: {} } },
+    { _id: 'queue', data: { lobbies: {}, waitingLists: {} } },
     { _id: 'playerStats', data: { players: {} } },
     { _id: 'currentMatch', data: { matches: {} } },
     {
@@ -170,9 +170,11 @@ async function withQueueOperationLock(lockKey, operation) {
 }
 
 async function loadQueue() {
-  const parsed = await readDoc('queue', { lobbies: {} });
-  if (parsed.lobbies && typeof parsed.lobbies === 'object') return { lobbies: parsed.lobbies };
-  return { lobbies: {} };
+  const parsed = await readDoc('queue', { lobbies: {}, waitingLists: {} });
+  return {
+    lobbies: parsed?.lobbies && typeof parsed.lobbies === 'object' ? parsed.lobbies : {},
+    waitingLists: parsed?.waitingLists && typeof parsed.waitingLists === 'object' ? parsed.waitingLists : {}
+  };
 }
 
 async function saveQueue(data) {
