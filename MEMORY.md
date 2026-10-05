@@ -7,8 +7,8 @@
 
 ## 🗓️ Última Sessão
 
-- **Data:** 2026-09-30
-- **Foco:** Recuperação de cadastros, Sala de Espera pós-partida, INFERNAL, votação MVP, balanceamento por elo LoL, partidas simultâneas + backup de segurança
+- **Data:** 2026-10-05
+- **Foco:** Lobby TIER S (Esmeralda+) + `!top10`/`!placar tiers` + INFERNAL até 08h com prioridade + `!roleta` instantânea + `!roletasair` + `!regras` + `!staff` + abertura da Temporada Oficial #1
 - **Status:** ✅ Concluído
 
 ---
@@ -16,12 +16,12 @@
 ## 📍 Ponto de Parada Atual
 
 ### Onde paramos:
-Banco íntegro no Docker (`caps-mongo`, 140 jogadores). Pós-`!vitoria` move todos para a **Sala de Espera (1490385246775017572)**. Cargo **INFERNAL** automático (5+ winstreak, sai na derrota, expira 08h SP). **Votação de MVP** de 2 min pós-partida + cargo **MVP player** ao mais votado (fallback automático se ninguém votar). **Balanceamento só pelo elo LoL** (`getBalanceWeight` = `baseMmr`); pontos custom só visuais. Locks de vitória/voto por guild (partidas A+B simultâneas testadas, suite em 28/28). **Backups em `backups/`** (ZIP do código + JSON do Mongo). Bot online no PM2. Extração do `legacyCommands.js` segue pendente.
+Banco no MongoDB Atlas (185 jogadores). Pós-`!vitoria` move todos para a **Sala de Espera (1490385246775017572)**. **Lobby TIER S** (`1556124976359415919`, gate Esmeralda IV+ por elo/cargo, sem bypass de `!entrar` p/ staff). **Top10/placar tiers** (mesmo PDL, filtro `baseMmr >= 2000`). Cargo **INFERNAL** automático (5+ winstreak, vale até 08h SP mesmo com derrota; prioridade posição 5 na `!espera` + imunidade na roleta). **`!roleta N A`** instantânea (1 comando, anti-duplo por `matchId`, anúncio no canal fila `1489237001013297182`) + **`!roletasair A`** (opt-out). **`!regras`** (jogadores) + **`!staff`** (restrito). Alias `!iniciarseason`. **Temporada Oficial #1 ativa** (`!resetgeral` → `!iniciartemporada` em 2026-10-05). Suite em **40/40**. Bot online no PM2 (`caps-bot`, `CAPS BOT LOL#6241 v1.8.0`, `[DB] Conectado`). Extração do `legacyCommands.js` segue pendente.
 
 ### Próximo passo imediato:
-- Testar em produção: `!vitoria` (mover p/ Sala de Espera, INFERNAL, votação MVP)
+- **Pendente do admin no Discord:** subir `CAPS BOT LOL` acima do `INFERNAL` (hierarquia) + remover o INFERNAL órfão do maggot 1x
+- Testar em produção: `!entrar` Tier S, `!top10 tiers`, `!roleta 2 A`, `!regras`, `!staff`
 - Continuar extração de lógica de negócio do `legacyCommands.js`
-- Limitar lobby classic a 10 pessoas + mutar sala (config manual no Discord, fora do bot)
 
 ---
 
@@ -85,12 +85,27 @@ Banco íntegro no Docker (`caps-mongo`, 140 jogadores). Pós-`!vitoria` move tod
 - [x] Registro do comando slash e ajuda atualizados
 
 ### Pontuação e balanceamento
-- [x] Seed inicial: `1000 + MMR do elo Solo/Duo cadastrado`
+- [x] Seed inicial: `1000 + MMR do elo Solo/Duo cadastrado` (`calculateSeedRating`); pontos puros começam em **1000** para todos (`customScore = internalRating - baseMmr`)
 - [x] Snake draft usa **só o elo do LoL** (`baseMmr` via `getBalanceWeight`); pontos custom NÃO influenciam os times
-- [x] Vitória/derrota altera `internalRating` via Elo (pontuação visual); mudança de elo LoL ajusta a parte de ranked
+- [x] Vitória/derrota altera `internalRating` via Elo (pontuação visual); mudança de elo LoL ajusta a parte de ranked sem mexer no `customScore` (soma espelhada em `internalRating` + `baseMmr`)
 - [x] Stats antigas (seed 1000 sem LoL) migram com `ratingVersion: 2`
 - [x] `!perfil`: Elo LoL e Pontos Custom separados; custom começa em **1000** (sobe/desce com as personalizadas)
 - [x] Embed "Times Balanceados" mostra "Elo total / Diferenca de Elo"
+- [x] TOP RANK CLASSIC (2026-10-01, `domain/ranking/playerStats.js`): `getPureCustomScore()` + `customScore` no ranking; **só CLASSIC** ordena por `pontos puros → winrate → total de jogos → vitórias`; ARAM e demais mantêm `vitórias → derrotas → MMR`. `!placar` / `!top10` no CLASSIC exibem os pontos puros. Nenhum comando novo criado; `!ajuda` atualizado só no texto (`!placar`/`!top10` CLASSIC = pontos custom, desempate winrate)
+
+### Lobby TIER S e rankings filtrados (2026-10-05)
+- [x] Canal `Lobby TIER S` (`1556124976359415919`) com gate Esmeralda IV+ (elo Riot ou cargo); Classic normal segue aberto; Tier S joga nos dois
+- [x] `!top10 tiers` / `!placar tiers` (mesmo PDL, filtro `baseMmr >= 2000`) + opções `CLASSIC TIER S` nos slash
+- [x] `!entrar` exige canal de voz Lobby (Classic/TIER S/ARAM); Sala de Espera não vale
+
+### INFERNAL com validade até 08h + prioridades (2026-10-05)
+- [x] Derrota não tira na hora; expira às 08h (scheduler + boot + `!sync infernal`); reconciliação com `members.fetch()` e alerta de hierarquia
+- [x] `!espera` com INFERNAL na posição 5 (🔥); `!entrar` libera INFERNAL no top5; `!remover` protege INFERNAL (só Admin tira)
+
+### Roleta + docs (2026-10-05)
+- [x] `!roleta N A` instantânea (anti-duplo por partida, anúncio no canal fila) + `!roletasair A` (opt-out, inclui winners)
+- [x] `!regras` (jogadores) + `!staff` (restrito) + alias `!iniciarseason`; regulamento e JSON da imagem em `ALTERAÇÕES BOT.txt`
+- [x] Testes 40/40 (`tiers-roulette`, `rules`); Temporada Oficial #1 aberta (`!resetgeral` → `!iniciartemporada`)
 
 ### Backup e recuperação
 - [x] Pasta `backups/` na raiz do projeto
@@ -222,6 +237,22 @@ database/                    ← fallback JSON local
 - **Partidas simultâneas (2026-09-30):** teste com 2 partidas ativas (A e B) provou que `!vitoria 1 A` mira só a A (seletor por letra; sem letra e com 2 ativas não resolve sozinho = seguro). Achado e corrigido: vitórias REALMENTE simultâneas se apagavam (lock era por partida, saves do doc inteiro colidiam) → lock do `registerVictory` virou por guild (`${guildId}:victory`). `!votar` também registra o voto sob o mesmo lock e a vitória automática agora repassa a letra (`[time, letra]`) pra mirar a partida certa. 13/13 testes passaram.
 - **Backup de segurança (2026-09-30):** `backups/codigo-2026-09-30-1215.zip` (código completo para restore) + `backups/mongo-data-2026-09-30-1515.json` (135 jogadores, 1 partida ativa, 3 temporadas). Bot segue online no PM2 (`caps-bot`, `CAPS BOT LOL#6241 v1.8.0`).
 - **Testes + INFERNAL + rematch (2026-09-30):** criados `tests/helpers.js`, `victory-selector.test.js`, `register-victory.test.js`, `balance.test.js`, `rematch.test.js` + script `npm test` (15/15 verdes, `node:test` nativo, sem deps novas). `syncInfernalRolesAfterMatch` retorna recém-premiados; `postInfernalAnnouncement` posta 🔥 no canal do MVP; `!vitoria` chama ambos com try/catch. `!rematch` consertado: `recentVictory` agora salva `teamOne/teamTwo`, rematch cria a sala se não houver, enriquece os 10 com `baseMmr/mmr` do cadastro e roda sob lock da fila. Bot reiniciado e online.
+
+### 2026-10-05 — TIER S + roleta instantânea + regras/staff + Temporada Oficial #1
+- **Lobby TIER S:** `config.voiceChannels.classicTierSQueueChannelId = 1556124976359415919` + `config.tierS` (min 2000); gate por elo/cargo em `enterQueue.js` (staff organiza mas NÃO joga sem elo); salas `Lobby TIER S X`; `getOpenLobby` filtra por tier.
+- **Top10/placar tiers:** `parseModeAndFormatArgs` aceita `tiers`; `getRankedPlayersByMode(..., {tierSOnly})` filtra `baseMmr >= 2000` (mesmo PDL); slash `/top10` e `/placar` ganharam opção `CLASSIC TIER S`. Causa do "não funciona": bot rodava código antigo no PM2 (2 dias uptime) — restart resolveu.
+- **INFERNAL até 08h:** derrota não remove mais (`syncInfernalRolesAfterMatch` só registra); expira via scheduler/boot/`!sync infernal`; `reconcileInfernalRoles` com `guild.members.fetch()` + aviso de hierarquia. **Achado (caso maggot):** bot (pos 25) abaixo do INFERNAL (pos 29) → Discord recusa remover; banco zerado + cargo órfão. Pendente: admin subir o cargo do bot.
+- **Prioridades:** `!espera` insere INFERNAL na posição 5 (`splice(4,0)`, marca 🔥); `!entrar` libera INFERNAL no top5; `!remover` recusa INFERNAL sem Admin.
+- **Roleta:** `drawRoulette.js` (crypto) + `rouletteCommandHandlers.js`; `!roleta N A` (alias `!roletar`) sorteia na hora entre losers − INFERNAL − `!roletasair`; anti-duplo por `matchId` em `roletaHistory`; staying + winners movidos ao lobby de origem; anúncio no canal fila. `!roletasair A` (opt-out, vale p/ winners também).
+- **Docs:** `!regras` (+`/regras`, aliases) e `!staff` (restrito) via `buildRulesEmbed`/`buildStaffEmbed`; regulamento + JSON da imagem de divulgação em `ALTERAÇÕES BOT.txt`.
+- Validação: `npm test` 40/40 (`tiers-roulette` + `rules` novos); bot reiniciado ~13x no PM2 e online.
+- `!rematch` mantido como rebalance (decisão do dono).
+
+### 2026-10-01 — Reativação + ranking CLASSIC puro + !ajuda
+- Bot estava fora do PM2 (`caps-bot doesn't exist`); religado com `pm2 start index.js --name caps-bot` + `pm2 save`. Docker `caps-mongo` subiu depois do bot e o `dataService` travou em modo local (`storageMode = 'local'` não tenta de novo); `pm2 restart caps-bot` resolveu → `[DB] Conectado ao MongoDB Atlas` + `Bot conectado como CAPS BOT LOL#6241 | v1.8.0`.
+- **Ranking CLASSIC em 2 passos:** (1) pontos custom (`adjustedMmr`) + winrate, só CLASSIC; (2) correção pedida: estava usando pontos com elo LoL embutido → trocado para **pontos puros base 1000** (`getPureCustomScore = internalRating - baseMmr`, mesma conta do `getCustomDisplayScore` da ficha). Arquivos: `domain/ranking/playerStats.js` (`customScore` no entry + sort CLASSIC), `utils/lobbyUtils.js` (`buildLeaderboardEmbed`/`buildTopTenEmbed` exibem `customScore` no CLASSIC).
+- Nenhum comando novo; `!ajuda` (`commands/legacyCommands.js:handleHelpCommand`) atualizado só no texto: `!perfil` = Pontos Custom + Elo, `!placar` = geral (CLASSIC = pontos custom), `!top10` = Top 10 CLASSIC por pontos custom com desempate por winrate.
+- Validação: `npm test` 28/28 + script temporário (removido após uso) com empate puro 1100: `80% WR > 60% WR` na frente e elo alto (2000) com pura 1050 atrás de elo baixo (500) com pura 1100. Bot reiniciado no PM2 e online.
 
 ### 2026-09-29 — Pontuação 1000 + elo LoL
 - Seed: `calculateSeedRating(baseMmr) = 1000 + MMR Solo/Duo` (Gold IV unranked continua 1200 de elo → 2200 pontos).

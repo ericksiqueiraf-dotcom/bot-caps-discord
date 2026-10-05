@@ -6,7 +6,9 @@ async function enterQueue({
   selectedFormat,
   providedNick,
   riotService,
-  deps
+  deps,
+  selectedTier = null,
+  member = null
 }) {
   const {
     loadPlayerStats,
@@ -77,10 +79,16 @@ async function enterQueue({
     const waitingPosition = waitingList.findIndex((player) => player.discordId === author.id);
 
     if (waitingList.length > 0 && waitingPosition !== 0) {
-      return {
-        status: 'waiting_list_priority',
-        position: waitingPosition === -1 ? null : waitingPosition + 1
-      };
+      // INFERNAL no top5 pode entrar mesmo sem ser o 1o (furo da !espera converte em vaga)
+      const meEntry = Object.values(freshStats.players || {}).find((entry) => entry.discordId === author.id) || null;
+      const infernalValid = meEntry?.infernalExpiresAt && new Date(meEntry.infernalExpiresAt).getTime() > Date.now();
+      const inTop5 = waitingPosition >= 0 && waitingPosition < 5;
+      if (!(infernalValid && inTop5)) {
+        return {
+          status: 'waiting_list_priority',
+          position: waitingPosition === -1 ? null : waitingPosition + 1
+        };
+      }
     }
 
     const storedStats = getStoredPlayerStats(freshStats, {
@@ -88,6 +96,19 @@ async function enterQueue({
       nickname: rankProfile.nickname,
       puuid: rankProfile.puuid
     });
+    // Gate TIER S: lobby S exige Esmeralda IV+ (elo ou cargo). Sem bypass:
+    // staff sem o elo pode organizar (voz/comandos), mas NAO entra com !entrar.
+    if (selectedTier === 'S' && selectedMode === 'classic') {
+      const { isTierSEligibleByStats, isTierSEligibleMember } = deps;
+      const eligibleByStats = isTierSEligibleByStats
+        ? isTierSEligibleByStats({ baseMmr: Number(rankProfile.mmr || 0), tier: rankProfile.tier })
+          || isTierSEligibleByStats({ baseMmr: Number(storedStats?.baseMmr || 0), tier: storedStats?.tier })
+        : true;
+      const eligibleByRole = !isTierSEligibleMember || !member ? true : isTierSEligibleMember(member, storedStats);
+      if (!eligibleByStats && !eligibleByRole) {
+        return { status: 'tierS_denied' };
+      }
+    }
     const storedModeStats = getModeStats(storedStats, selectedMode, selectedFormat);
     const leagueMmr = Number(rankProfile.mmr || storedModeStats.baseMmr || 1200);
     const balancedModeStats = applyLeagueMmrChange(storedModeStats, leagueMmr);
@@ -106,16 +127,25 @@ async function enterQueue({
       return { status: 'duplicate_nickname' };
     }
 
-    let lobby = getOpenLobby(queueData, selectedMode, selectedFormat)
-      || findReusableWaitingLobby(guild, queueData, currentMatchData, selectedMode, selectedFormat);
+    const tierFilter = selectedMode === 'classic' ? (selectedTier === 'S' ? 'S' : 'normal') : null;
+    let lobby = (getOpenLobby(queueData, selectedMode, selectedFormat, tierFilter)
+      || findReusableWaitingLobby(guild, queueData, currentMatchData, selectedMode, selectedFormat));
+
+    // Reuso pode trazer lobby do tier errado; garante o tier certo
+    if (lobby && selectedMode === 'classic') {
+      const { getLobbyTier } = deps;
+      const lobbyTier = getLobbyTier ? getLobbyTier(lobby) : 'normal';
+      if ((selectedTier === 'S' ? 'S' : 'normal') !== lobbyTier) lobby = null;
+    }
 
     if (!lobby) {
       const letter = getNextLobbyLetter(queueData, currentMatchData, selectedMode, selectedFormat);
-      const createdLobby = await createLobbyChannels(guild, selectedMode, selectedFormat, letter);
+      const createdLobby = await createLobbyChannels(guild, selectedMode, selectedFormat, letter, selectedTier === 'S' ? 'S' : null);
       lobby = {
-        id: `${selectedMode}-${selectedFormat}-${letter.toLowerCase()}`,
+        id: `${selectedMode}-${selectedFormat}-${selectedTier === 'S' ? 's-' : ''}${letter.toLowerCase()}`,
         mode: selectedMode,
         format: selectedFormat,
+        tier: selectedTier === 'S' ? 'S' : 'normal',
         letter,
         waitingChannelId: createdLobby.waitingChannelId,
         parentId: createdLobby.parentId,

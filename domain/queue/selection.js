@@ -7,10 +7,13 @@ function parseModeAndFormatArgs(args = []) {
   const mode = normalizedArgs.includes(QUEUE_MODES.ARAM) || Boolean(detectedFormat)
     ? QUEUE_MODES.ARAM
     : QUEUE_MODES.CLASSIC;
+  const tierSOnly = normalizedArgs.some((arg) => ['tiers', 'tier-s', 'tierss', 's', 'tier s'].includes(arg))
+    && mode === QUEUE_MODES.CLASSIC;
 
   return {
     mode,
-    format: mode === QUEUE_MODES.ARAM ? detectedFormat : null
+    format: mode === QUEUE_MODES.ARAM ? detectedFormat : null,
+    tierSOnly
   };
 }
 

@@ -4,12 +4,22 @@
   "roles": {
     "registeredPlayerRoleId": "1487820221694742651",
     "infernalRoleName": "INFERNAL",
-    "mvpPlayerRoleName": "MVP player"
+    "mvpPlayerRoleName": "MVP player",
+    "captainRoleId": "1487819172783325255"
   },
   "voiceChannels": {
     "classicQueueChannelId": "1489240283051856023",
+    "classicTierSQueueChannelId": "1556124976359415919",
     "aramQueueChannelId": "1489240459875455169",
     "postMatchWaitingChannelId": "1490385246775017572"
+  },
+  "tierS": {
+    "minBaseMmr": 2000,
+    "tiers": ["EMERALD", "DIAMOND", "MASTER", "GRANDMASTER", "CHALLENGER"]
+  },
+  "roulette": {
+    "timeoutSeconds": 300,
+    "warnSeconds": 240
   },
   "textChannels": {
     "rankUpdatesChannelId": "1489247981155651645",

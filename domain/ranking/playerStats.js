@@ -95,11 +95,21 @@ function getTopStreakModeStats(player, mode, format = null) {
   return getModeStats(player, mode, format);
 }
 
+function getPureCustomScore(modeStats) {
+  // Pontuacao pura base 1000, sem o elo do LoL:
+  // internalRating = 1000 + baseMmr + deltas  =>  pura = internalRating - baseMmr
+  const baseMmr = Number(modeStats?.baseMmr || 0);
+  const raw = Number(modeStats?.internalRating);
+  const internal = Number.isFinite(raw) ? raw : calculateSeedRating(baseMmr);
+  return Math.round(internal - baseMmr);
+}
+
 function mapPlayerRankingEntry(player, modeStats) {
   const baseMmr = Number(modeStats.baseMmr || 0);
   const customWins = Number(modeStats.customWins || 0);
   const customLosses = Number(modeStats.customLosses || 0);
   const totalGames = customWins + customLosses;
+  const internalRating = Number(modeStats.internalRating || calculateSeedRating(baseMmr));
 
   return {
     ...player,
@@ -107,21 +117,76 @@ function mapPlayerRankingEntry(player, modeStats) {
     customWins,
     customLosses,
     totalGames,
-    adjustedMmr: Number(modeStats.internalRating || calculateSeedRating(baseMmr)),
+    adjustedMmr: internalRating,
+    customScore: getPureCustomScore({ ...modeStats, baseMmr, internalRating }),
     winRate: totalGames > 0 ? ((customWins / totalGames) * 100).toFixed(0) : '0',
-    internalRating: Number(modeStats.internalRating || calculateSeedRating(baseMmr)),
+    internalRating,
     winStreak: Number(modeStats.winStreak || 0)
   };
 }
 
-function getRankedPlayersByMode(statsData, mode, format = null, seasonMeta = null) {
+function getWinRateValue(player) {
+  const total = Number(player.totalGames || 0);
+  if (total <= 0) return 0;
+  return Number(player.customWins || 0) / total;
+}
+
+const TIER_S_MIN_MMR_RANK = 2000;
+
+function isTierSRankedEntry(entry) {
+  const classicBase = Number(entry?.modes?.classic?.baseMmr ?? entry?.baseMmr ?? 0);
+  if (Number.isFinite(classicBase) && classicBase >= TIER_S_MIN_MMR_RANK) return true;
+  return false;
+}
+
+function getRankedPlayersByMode(statsData, mode, format = null, seasonMeta = null, options = {}) {
   const players = Object.values(statsData.players || {});
   const minGames = seasonMeta?.phase === 'official' ? 10 : 5;
 
-  return players
+  const ranked = players
     .map((player) => mapPlayerRankingEntry(player, getModeStats(player, mode, format)))
     .filter((player) => player.totalGames >= minGames)
-    .sort((a, b) => {
+    .filter((player) => {
+      if (options?.tierSOnly && mode === QUEUE_MODES.CLASSIC) {
+        const raw = Object.values(statsData.players || {}).find((entry) =>
+          (entry.discordId && entry.discordId === player.discordId) || entry.nickname === player.nickname);
+        return isTierSRankedEntry(raw || player);
+      }
+      return true;
+    });
+
+  // CLASSIC: ordena por pontos custom puros (base 1000, sem elo LoL),
+  // desempatando por winrate e depois por total de jogos.
+  if (mode === QUEUE_MODES.CLASSIC) {
+    return ranked.sort((a, b) => {
+      const bScore = Number.isFinite(Number(b.customScore)) ? Number(b.customScore) : 1000;
+      const aScore = Number.isFinite(Number(a.customScore)) ? Number(a.customScore) : 1000;
+      if (bScore !== aScore) {
+        return bScore - aScore;
+      }
+
+      const winRateDiff = getWinRateValue(b) - getWinRateValue(a);
+      if (winRateDiff !== 0) {
+        return winRateDiff;
+      }
+
+      if (b.totalGames !== a.totalGames) {
+        return b.totalGames - a.totalGames;
+      }
+
+      if (b.customWins !== a.customWins) {
+        return b.customWins - a.customWins;
+      }
+
+      if (b.customLosses !== a.customLosses) {
+        return a.customLosses - b.customLosses;
+      }
+
+      return b.internalRating - a.internalRating;
+    });
+  }
+
+  return ranked.sort((a, b) => {
       if (b.customWins !== a.customWins) {
         return b.customWins - a.customWins;
       }
@@ -162,6 +227,9 @@ module.exports = {
   normalizePlayerModes,
   getModeStats,
   getTopStreakModeStats,
+  getPureCustomScore,
   getRankedPlayersByMode,
-  getRankedPlayersByStreak
+  getRankedPlayersByStreak,
+  TIER_S_MIN_MMR_RANK,
+  isTierSRankedEntry
 };

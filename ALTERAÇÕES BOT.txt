@@ -1,5 +1,125 @@
-Quero ajustar o seguinte. A sala 1489240283051856023 (ID lobby classic) é a sala aonde dá o comando para iniciar as partidas. pós iniciada e finalizada e dá o comando de !vitoria 1 ou 2 ou !vitoria 1 A ou 1 B... Todos os jogadores dessa partida são movidos para sala lobby classic novamente, certo ? Eu gostaria de mover para outra sala chamada Sala de Espera (ID: 1490385246775017572). Porque ? sala lobby eu vou limitar a 10 pessoas, para que fique masi organizado e vai ser uma sala aonde não poderão falar apenas moderadores e administradores.
+ID canal - lobby-tier S - 1556124976359415919
 
-Outra coisa também é, eu quero criar um cargo chamado INFERNAL, que é o jogador com 5 win streak, 5 vitorias seguidas e ele permanecerá até 08:00h do outro dia ou até perder uma partida. Gostaria que você atribuisse automático o cargo para esse membro que obter essa conquista.
+============================================================
+AVISO PARA O SERVIDOR — NOVIDADES DO BOT (copiar p/ Discord)
+============================================================
 
-MVP da partida eu gostaria de saber se ao finalizar a partida tem como os jogadores da partida votar em quem foi o mvp e atribuir também o cargo de MVP player a esse jogador mais votado
+Pessoal, o bot ganhou 4 novidades. Tudo simples, sem mudar seus pontos:
+
+1) LOBBY TIER S (novo canal de voz)
+- Criamos o canal "Lobby TIER S" para quem é Esmeralda IV ou maior (vale elo ou cargo: Esmeralda, Diamante, Mestre, Grão-Mestre e Desafiante).
+- Quem é Tier S pode jogar nos DOIS: no Classic normal e no Tier S entre si. Quem não é Tier S continua no Classic normal.
+- Staff (admin, moderadores e capitães) SEM o elo pode organizar (voz e comandos), mas NÃO entra com !entrar para jogar no Tier S.
+- É só entrar no canal de voz do lobby que você quer e dar !entrar.
+- Por que? Jogar só entre elos parecidos deixa os pontos (PDL) mais justos: antes o elo alto ganhava pouquinho e perdia muito contra elo baixo.
+
+2) TOP 10 TIER S (mesmos pontos, só filtrado)
+- Seus pontos NÃO mudaram e NÃO separaram. É o mesmo PDL de sempre.
+- Agora tem dois rankings: !top10 (geral) e !top10 tiers (só Esmeralda+). Mesma coisa no !placar e !placar tiers.
+- O top Tier S serve para os elos altos se compararem entre si de forma justa.
+
+3) CARGO INFERNAL (5 vitórias seguidas) — corrigido + com prioridade
+- Regra: quem faz 5 vitórias seguidas ganha o cargo e mantém até as 08h da manhã do dia seguinte, mesmo se perder no caminho. A derrota não tira na hora; o bot limpa sozinho às 08h (e com !sync infernal).
+- Quem tem INFERNAL tem prioridade:
+  a) Na !espera, entra direto na posição 5 (o 5º vai para 6º). Marcado com 🔥 na lista. Vale até as 08h (mesmo se perder antes).
+  b) Na roleta, o INFERNAL NÃO entra no sorteio (protegido). Staff pode tirar se precisar.
+- A streak zera na derrota (para conquistar de novo precisa de 5 seguidas), mas o cargo e a prioridade valem até as 08h.
+
+4) !ROLETA (quem sai da próxima partida)
+- Acabou a roleta no grito. Agora é o bot que sorteia, e o resultado sai sempre no canal de texto "fila".
+- É 1 COMANDO SÓ: !roleta 3 A sorteia na hora 3 perdedores para sair da sala A (N de 1 a 5). Sem confirmações, sem espera.
+- Não quer jogar a próxima? !roletasair A deixa você fora do sorteio e da subida ao lobby.
+- Quem pode digitar: um loser da partida ou a staff. Só losers entram no sorteio (INFERNAL é imune).
+- Cada sala só pode ser roletada 1 vez (anti-duplo).
+- Depois do sorteio: quem saiu fica na Sala de Espera. Quem ficou + os 5 que ganharam sobem juntos para o lobby (Classic ou Tier S, o mesmo onde jogaram). As vagas abrem para a !espera.
+- Exemplo com 5 na espera e N=5: saem os 5 losers, sobem 5 winners + 5 da espera.
+
+Dúvidas? Chama a staff. Bom jogo! 🔥
+
+============================================================
+REGULAMENTO DA TEMPORADA — CAPS ARENA (copiar p/ Discord)
+(também disponível no bot com !regras)
+============================================================
+
+🏆 TEMPORADA OFICIAL — REGRAS GERAIS
+
+📝 1. CADASTRO (uma vez só)
+• !cadastrar Nick#TAG vincula sua conta Riot (ex: !cadastrar Faker#BR1).
+• Mudou de conta? !nick Nick#TAG atualiza.
+• !perfil mostra seu elo do LoL e seus pontos custom.
+
+🎮 2. COMO JOGAR
+• Entre no canal de voz Lobby Classic, Lobby TIER S ou Lobby ARAM e digite !entrar (!entrar só vale dentro desses canais — na Sala de Espera não funciona, troque de canal primeiro).
+• Com 10 jogadores a partida começa sozinha (times montados pelo elo).
+• !fila mostra quem está na sala. !sair tira você da fila.
+• Sem briga por time: o bot monta os times para equilibrar o elo.
+
+💎 3. LOBBY TIER S (Esmeralda IV ou maior)
+• Só joga no Tier S quem tem elo ou cargo Esmeralda, Diamante, Mestre, Grão-Mestre ou Desafiante.
+• Quem é Tier S pode jogar nos DOIS lobbies. Quem não é, joga o Classic normal.
+• Staff sem o elo pode organizar (voz e comandos), mas NÃO entra para jogar no Tier S.
+
+🏆 4. PONTOS E RANKINGS
+• Todo mundo começa com 1000 pontos custom + o elo da ranked.
+• Vitória e derrota mexem no PDL: ganhar de time mais forte vale MAIS, ganhar de time mais fraco vale MENOS (e perder cobra o contrário).
+• !top10 e !placar = ranking geral. !top10 tiers e !placar tiers = só Esmeralda+ (mesmos pontos, só filtrado).
+• Desempate: pontos, depois winrate.
+• Na temporada oficial precisa de 10 JOGOS para aparecer no ranking — jogue desde o dia 1.
+
+🔥 5. CARGO INFERNAL (5 vitórias seguidas)
+• Fez 5 wins seguidas? Ganha o cargo até as 08h da manhã seguinte (perder no caminho não tira antes).
+• Prioridades: entra direto na posição 5 da !espera (marcado com 🔥) e NÃO entra na roleta.
+• Para conquistar de novo depois de perder, precisa de outras 5 seguidas.
+
+⏳ 6. ESPERA E 🎯 ROLETA
+• !espera guarda seu lugar para a próxima partida. !espera ver mostra a ordem, !espera sair desiste.
+• Após cada jogo todos vão para a Sala de Espera.
+• Um comando !roleta 2 A sorteia na hora 2 perdedores para sair da sala A (só losers entram, INFERNAL é imune). Não quer a próxima? !roletasair A.
+• Quem não digitar fica de fora automaticamente. O bot sorteia (até 5 min) e anuncia no canal fila.
+• Quem ficou + os 5 vencedores sobem para o lobby. Atrasou? Vai de !espera para as vagas.
+
+🗳️ 7. FIM DE JOGO E MVP
+• Durante a partida vote com !votar 1 ou !votar 2.
+• Depois do jogo vote no MVP no canal de destaques (2 minutos; se ninguém votar, o bot escolhe quem mais ganhou PDL e dá o cargo MVP player).
+• Staff: !vitoria 1 A registra, !rematch A reabre a sala com os mesmos 10.
+
+📊 8. TEMPORADA
+• Os pontos zeram a cada temporada (volta aos 1000 + elo) e os campeões ficam registrados no histórico (!temporadas).
+• Jogue sério desde o primeiro dia: cada vitória conta para o top 10.
+
+Boa temporada a todos! Qualquer dúvida, digite !regras ou chame a staff. 🔥
+
+============================================================
+JSON DA IMAGEM DE DIVULGAÇÃO (copiar p/ gerador de imagem)
+============================================================
+{
+  "imagem": {
+    "uso": "Post de divulgacao da temporada das personalizadas (Discord e Instagram)",
+    "tamanho": { "largura": 1080, "altura": 1350, "formato": "PNG" },
+    "fundo": {
+      "estilo": "Arena escura de League of Legends, tons de roxo e azul profundo com particulas douradas",
+      "referencia_logo": "logo CAPS.png (elmo dourado no topo, centralizado)"
+    },
+    "cabecalho": {
+      "selo": "CAPS ARENA",
+      "titulo": "TEMPORADA OFICIAL",
+      "destaque": "COMEÇA 05/10",
+      "cores_titulo": ["#FFD700", "#FFFFFF"]
+    },
+    "blocos": [
+      { "icone": "💎", "titulo": "LOBBY TIER S", "texto": "Novo lobby só para Esmeralda IV ou maior" },
+      { "icone": "🏆", "titulo": "TOP 10 TIER S", "texto": "!top10 tiers com ranking justo entre elos altos" },
+      { "icone": "🔥", "titulo": "CARGO INFERNAL", "texto": "5 wins seguidas = prioridade na fila até as 08h" },
+      { "icone": "🎯", "titulo": "ROLETA NO BOT", "texto": "!roleta N A com sorteio automático no canal fila" }
+    ],
+    "rodape": {
+      "texto": "Cadastre-se com !cadastrar Nick#TAG • Digite !regras para o regulamento",
+      "cor_fundo_rodape": "#0B0B1A",
+      "cor_texto_rodape": "#FFD700"
+    },
+    "estilo_texto": {
+      "fonte": "Negrito, caixa alta nos títulos",
+      "paleta": ["#FFD700", "#FFFFFF", "#7B2FF7", "#00C3FF", "#0B0B1A"]
+    }
+  }
+}

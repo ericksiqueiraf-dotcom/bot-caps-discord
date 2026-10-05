@@ -1,3 +1,5 @@
+const config = require('../../config.json');
+
 async function handleVictoryCommandFlow({
   message,
   args,
@@ -40,13 +42,16 @@ async function handleVictoryCommandFlow({
   const winningTeam = teamArgs[0];
   const selectorArgs = args.filter((arg) => String(arg) !== winningTeam);
 
-  // Verifica se o usuário tem permissão de staff (ManageMessages ou Administrator)
+  // Verifica se o usuário tem permissão de staff (ManageMessages ou Administrator) ou cargo de capitão
   // _isAutoVote é true quando a vitória foi disparada automaticamente pelo sistema de votos
+  const captainRoleId = config.roles?.captainRoleId;
+  const hasCaptainRole = captainRoleId && message.member?.roles?.cache?.has(captainRoleId);
   const hasStaffPermission = message._isAutoVote === true ||
                              message.member?.permissions?.has('ManageMessages') ||
-                             message.member?.permissions?.has('Administrator');
+                             message.member?.permissions?.has('Administrator') ||
+                             hasCaptainRole;
   if (!hasStaffPermission) {
-    await replyToMessage(message, '❌ Apenas staff pode registrar vitórias manualmente. Use `!votar 1` ou `!votar 2` para votar.');
+    await replyToMessage(message, '❌ Apenas staff ou capitães podem registrar vitórias manualmente. Use `!votar 1` ou `!votar 2` para votar.');
     return;
   }
 
@@ -88,11 +93,14 @@ async function handleVictoryCommandFlow({
 
   const { winners, losers } = match;
 
-  // INFERNAL: cargo automatico para 5+ vitorias seguidas (sai na derrota, expira as 08h)
+  // INFERNAL: cargo automatico para 5+ vitorias seguidas (vale ate as 08h; derrota nao tira na hora)
   // + anuncio dos recem-premiados no canal de destaques. Nunca quebra o !vitoria.
   try {
     const infernalAwarded = await syncInfernalRolesAfterMatch(message.guild, winners, losers);
     await postInfernalAnnouncement(message.guild, infernalAwarded);
+    if (Array.isArray(infernalAwarded?.failed) && infernalAwarded.failed.length > 0) {
+      await replyToMessage(message, `⚠️ INFERNAL com ${infernalAwarded.failed.length} falha(s): ${infernalAwarded.failed.map((f) => `${f.discordId} (${f.error})`).join(', ')}`);
+    }
   } catch (err) {
     console.error('[INFERNAL] Falha no pos-jogo:', err.message);
   }

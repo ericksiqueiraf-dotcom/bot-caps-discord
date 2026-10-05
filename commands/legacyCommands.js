@@ -30,8 +30,8 @@ const {
   getRankedPlayersByMode, archiveCurrentSeason, resetStatsForNewSeason, 
   buildLobbyFromMatch, upsertPlayerStats, normalizePlayerModes, 
   movePlayersToTeamChannels, sendMatchStartAnnouncement, syncMvpRole, clearMvpRoles,
-  syncInfernalRolesAfterMatch, postInfernalAnnouncement, startMvpVote,
-  postMvpAnnouncement, postMatchHistoryLog, buildPlayerCardEmbed, 
+  syncInfernalRolesAfterMatch, hasInfernalPriority, reconcileInfernalRoles, postInfernalAnnouncement, postRouletteAnnouncement, buildRulesEmbed, buildStaffEmbed, startMvpVote,
+  postMvpAnnouncement, postMatchHistoryLog, buildPlayerCardEmbed,
   buildSeasonHistoryEmbed, formatCustomRecord,
   postPlayerLogs, postMatchSummaryToSeasonLog, postSeasonSummaryToSeasonLog, postSmurfAlerts,
   getCustomPointsDelta, getCustomDisplayScore
@@ -125,7 +125,10 @@ function createEnterQueueDeps() {
     upsertPlayerStats,
     calculateHybridMmr,
     calculateSeedRating,
-    applyLeagueMmrChange
+    applyLeagueMmrChange,
+    isTierSEligibleByStats: require('../utils/lobbyUtils').isTierSEligibleByStats,
+    isTierSEligibleMember: require('../utils/lobbyUtils').isTierSEligibleMember,
+    getLobbyTier: require('../utils/lobbyUtils').getLobbyTier
   };
 }
 
@@ -293,6 +296,7 @@ async function handleEnterCommand(message, args) {
         getFormatFromArgs,
         getNicknameArgs,
         isMemberInQueueVoiceChannel,
+        isMemberInTierSVoiceChannel: require('../utils/lobbyUtils').isMemberInTierSVoiceChannel,
         enterQueue,
         createEnterQueueDeps,
         replyToMessage,
@@ -599,12 +603,20 @@ async function handleWaitingListCommand(message, args = []) {
           return;
         }
 
-        currentList.push({
+        const isInfernal = await hasInfernalPriority(message.guild, message.author.id, playerStats).catch(() => false);
+        const newEntry = {
           discordId: message.author.id,
           discordUsername: message.author.username,
           nickname: registeredPlayer.registeredNickname || registeredPlayer.nickname || message.author.username,
-          joinedAt: new Date().toISOString()
-        });
+          joinedAt: new Date().toISOString(),
+          isInfernalBoost: Boolean(isInfernal)
+        };
+        // INFERNAL fura para a posicao 5 (empurra 5o -> 6o). Lista curta (<5): append normal.
+        if (isInfernal && currentList.length >= 5) {
+          currentList.splice(4, 0, newEntry);
+        } else {
+          currentList.push(newEntry);
+        }
         queueData.waitingLists[listKey] = currentList;
         await saveQueue(queueData);
       }
@@ -629,11 +641,9 @@ async function handleWaitingListCommand(message, args = []) {
       return;
     }
 
-    const orderedPlayers = [...players].sort(
-      (first, second) => new Date(first.joinedAt || 0) - new Date(second.joinedAt || 0)
-    );
+    const orderedPlayers = [...players];
     const entries = orderedPlayers.map(
-      (player, index) => `**${index + 1}.** <@${player.discordId}> - \`${player.nickname}\``
+      (player, index) => `**${index + 1}.** <@${player.discordId}> - \`${player.nickname}\`${player.isInfernalBoost ? ' 🔥' : ''}`
     );
     const embed = new EmbedBuilder()
       .setColor(THEME.INFO)
@@ -658,8 +668,13 @@ async function handleWaitingListCommand(message, args = []) {
   }
 }
 
+function hasCaptainRole(member) {
+  const captainRoleId = config.roles?.captainRoleId;
+  return Boolean(captainRoleId && member?.roles?.cache?.has(captainRoleId));
+}
+
 async function handleClearWaitingListsCommand(message) {
-  if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+  if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages) && !hasCaptainRole(message.member)) {
     return await replyToMessage(message, '❌ Voce nao tem permissao para limpar filas de espera.');
   }
 
@@ -700,16 +715,16 @@ async function handlePingCommand(message) {
 
 async function handleLeaderboardCommand(message, args = []) {
   const statsData = await loadPlayerStats();
-  const { mode, format } = parseModeAndFormatArgs(args);
-  const embed = buildLeaderboardEmbed(statsData, mode, format);
+  const { mode, format, tierSOnly } = parseModeAndFormatArgs(args);
+  const embed = buildLeaderboardEmbed(statsData, mode, format, { tierSOnly });
   await sendToMessageChannel(message, { embeds: [embed] });
 }
 
 async function handleTopTenCommand(message, args = []) {
   const statsData = await loadPlayerStats();
   const seasonMeta = await loadSeasonMeta();
-  const { mode, format } = parseModeAndFormatArgs(args);
-  const embed = buildTopTenEmbed(statsData, seasonMeta, mode, format);
+  const { mode, format, tierSOnly } = parseModeAndFormatArgs(args);
+  const embed = buildTopTenEmbed(statsData, seasonMeta, mode, format, { tierSOnly });
   await sendToMessageChannel(message, { embeds: [embed] });
 }
 
@@ -735,8 +750,8 @@ async function handleHelpCommand(message) {
     .setDescription('Aqui estao os comandos para gerenciar a CAPS Arena.')
     .addFields(
       { name: '🕹️ Cadastro (1x)', value: '`!cadastrar Nick#TAG` • Vincula sua conta Riot\n`!nick Nick#TAG` • Atualiza seu nick' },
-      { name: '🎮 Jogador', value: '`!entrar` • Fila Classic\n`!entrar aram` • Fila ARAM\n`!entrar aram 2x2` • ARAM formato\n`!fila` • Mostra jogadores em sala\n`!espera` • Entra na espera\n`!espera ver` • Mostra a ordem\n`!espera sair` • Sai da espera\n`!sair` • Sai da sala\n`!votar 1/2` • Vota no vencedor\n`!perfil` • Seu MMR e Elo\n`!top10` • Ranking MMR\n`!topstreak` • Ranking Streak 🔥\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL' },
-      { name: '🛠️ Staff', value: '`!remover @u`, `!limpar [qnt]`, `!limparsalas [sala]` • Limpa sala A/B/C (sem letra = todas)\n`!sincronizarelo @u`, `!sincronizartodos` (ou `!sync todos`), `!sync`, `!onboarding`' },
+      { name: '🎮 Jogador', value: '`!regras` • Regulamento completo\n`!entrar` • Fila Classic (no canal Lobby Classic ou Lobby TIER S)\n`!entrar aram` • Fila ARAM\n`!entrar aram 2x2` • ARAM formato\n`!fila` • Mostra jogadores em sala\n`!espera` • Entra na espera (🔥 INFERNAL entra na posição 5)\n`!espera ver` • Mostra a ordem\n`!espera sair` • Sai da espera\n`!sair` • Sai da sala\n`!votar 1/2` • Vota no vencedor\n`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking geral (CLASSIC = pontos custom)\n`!placar tiers` • Só Esmeralda+\n`!top10` • Top 10 CLASSIC por pontos custom, desempate por winrate\n`!top10 tiers` • Top 10 só Esmeralda+\n`!topstreak` • Ranking Streak 🔥\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
+      { name: '🛠️ Staff', value: '`!staff` • Guia completo da staff\n`!remover @u`, `!limpar [qnt]`, `!limparsalas [sala]` • Limpa sala A/B/C (sem letra = todas)\n`!sincronizarelo @u`, `!sincronizartodos` (ou `!sync todos`), `!sync`, `!onboarding`' },
       { name: '⚙️ Partida (Staff)', value: '`!start [sala]`, `!vitoria [1|2] [sala]`, `!cancelarstart [sala]`\n`!rematch [sala]` • Volta os 10 pra fila, rebalanceia e inicia na hora' },
       { name: '📊 Temporada', value: '`!temporadas`, `!resetgeral` (Admin)' }
     )
@@ -807,6 +822,17 @@ async function handleRemoveCommand(message, targetUserOverride = null) {
     }
     const targetUser = targetUserOverride || message.mentions.users.first();
     if (!targetUser) return await replyToMessage(message, 'Mencione um jogador.');
+
+    // Anti-roleta INFERNAL: staff com ManageMessages pode tirar, Admin sempre pode.
+    // Sem permissao de Admin, a remocao de INFERNAL e recusada para proteger a prioridade.
+    const isAdmin = message.member.permissions.has(PermissionFlagsBits.Administrator);
+    if (!isAdmin) {
+      const statsForCheck = await loadPlayerStats();
+      const protectedInfernal = await hasInfernalPriority(message.guild, targetUser.id, statsForCheck).catch(() => false);
+      if (protectedInfernal) {
+        return await replyToMessage(message, '🔥 Jogador com cargo INFERNAL está protegido da roleta. Apenas um Admin pode removê-lo.');
+      }
+    }
 
     await withQueueOperationLock(`${message.guild.id}:global:queue`, async () => {
       const queueData = await loadQueue();
@@ -891,7 +917,7 @@ function resolveCleanupTargets(queueData, currentMatchData, args = [], options =
 }
 
 async function handleCleanupRoomsCommand(message, args = [], options = {}) {
-  if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+  if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages) && !hasCaptainRole(message.member)) {
     return await replyToMessage(message, '❌ Voce nao tem permissao para limpar salas.');
   }
 
@@ -1154,15 +1180,25 @@ async function handleSeasonHistoryCommand(message, args = []) {
   }
 }
 
-async function handleSyncAllRolesCommand(message) {
+async function handleSyncAllRolesCommand(message, args = []) {
   if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
     return await replyToMessage(message, '❌ Voce nao tem permissao para sincronizar cargos.');
+  }
+  if (String(args[0] || '').toLowerCase() === 'infernal') {
+    await expireInfernalRolesIfDueSafe(message.guild);
+    const { removedOrphans } = await reconcileInfernalRoles(message.guild);
+    return await replyToMessage(message, `🔥 INFERNAL reconciliado: ${removedOrphans} cargo(s) órfão(s) removido(s).`);
   }
   const statsData = await loadPlayerStats();
   const players = Object.values(statsData.players || {});
   await replyToMessage(message, `Sincronizando cargos de ${players.length} jogadores (elo ja cadastrado)...`);
   for(const p of players) await syncMemberRankRole(message.guild, p.discordId, p.baseMmr || 1200);
   await replyToMessage(message, 'Sincronizacao de cargos concluida.');
+}
+
+async function expireInfernalRolesIfDueSafe(guild) {
+  const { expireInfernalRolesIfDue } = require('../utils/lobbyUtils');
+  await expireInfernalRolesIfDue(guild);
 }
 
 function collectUniqueRegisteredPlayers(statsData) {
@@ -1528,6 +1564,96 @@ async function handleRematchCommand(message, args = []) {
   }
 }
 
+async function handleRulesCommand(message) {
+  try {
+    await sendToMessageChannel(message, { embeds: [buildRulesEmbed()] });
+  } catch (error) {
+    console.error('[ERRO] !regras:', error);
+    await replyToMessage(message, `❌ Erro ao mostrar regras: \`${error.message}\``);
+  } finally {
+    if (message.deletable) await message.delete().catch(() => null);
+  }
+}
+
+function isStaffViewer(member) {
+  if (!member) return false;
+  try {
+    if (member.permissions?.has('ManageMessages') || member.permissions?.has('Administrator')) return true;
+  } catch { /* noop */ }
+  return Boolean(config.roles?.captainRoleId && member.roles?.cache?.has(config.roles.captainRoleId));
+}
+
+async function handleStaffCommand(message) {
+  try {
+    if (!isStaffViewer(message.member)) {
+      return await replyToMessage(message, '❌ Guia restrito à staff. Jogadores: usem `!regras`.');
+    }
+    await sendToMessageChannel(message, { embeds: [buildStaffEmbed()] });
+  } catch (error) {
+    console.error('[ERRO] !staff:', error);
+    await replyToMessage(message, `❌ Erro ao mostrar guia da staff: \`${error.message}\``);
+  } finally {
+    if (message.deletable) await message.delete().catch(() => null);
+  }
+}
+
+async function handleRoletaSairCommand(message, args = []) {
+  const { handleRouletteOptOutFlow } = require('./handlers/rouletteCommandHandlers');
+  try {
+    await handleRouletteOptOutFlow({ message, args, deps: { loadSystemMeta, replyToMessage } });
+  } catch (error) {
+    console.error('[ERRO] !roletasair:', error);
+    await replyToMessage(message, `❌ Erro ao sair da roleta: \`${error.message}\``);
+  } finally {
+    if (message.deletable) await message.delete().catch(() => null);
+  }
+}
+
+async function handleRouletteCommand(message, args = [], targetUserOverride = null) {
+  const { handleRouletteCommandFlow } = require('./handlers/rouletteCommandHandlers');
+  if (targetUserOverride && !message.mentions?.users?.first?.()) {
+    message.mentions = message.mentions || {};
+    const col = new Map([[targetUserOverride.id, targetUserOverride]]);
+    col.first = () => targetUserOverride;
+    message.mentions.users = col;
+  }
+  try {
+    await handleRouletteCommandFlow({
+      message,
+      args,
+      deps: {
+        loadSystemMeta,
+        saveSystemMeta,
+        loadQueue,
+        loadCurrentMatch,
+        loadPlayerStats,
+        saveQueue,
+        withQueueOperationLock,
+        getOpenLobby,
+        createLobbyChannels,
+        getNextLobbyLetter,
+        getRequiredPlayersByModeAndFormat,
+        getStoredPlayerStats,
+        getModeStats,
+        calculateHybridMmr: require('../services/balanceService').calculateHybridMmr,
+        movePlayersToVoiceChannel,
+        updateQueueDashboard,
+        postRouletteAnnouncement,
+        hasInfernalPriority,
+        replyToMessage,
+        getLobbyTier: require('../utils/lobbyUtils').getLobbyTier,
+        getRouletteTimeoutMs: require('../utils/lobbyUtils').getRouletteTimeoutMs,
+        getRouletteWarnMs: require('../utils/lobbyUtils').getRouletteWarnMs
+      }
+    });
+  } catch (error) {
+    console.error('[ERRO] !roleta:', error);
+    await replyToMessage(message, `❌ Erro na roleta: \`${error.message}\``);
+  } finally {
+    if (message.deletable) await message.delete().catch(() => null);
+  }
+}
+
 module.exports = {
   handleEnterCommand, handleListCommand, handleWaitingListCommand, handleClearWaitingListsCommand, handleStatsCommand, handlePingCommand, handleLeaderboardCommand, handleTopTenCommand,
   handleTopStreakCommand, handleSeasonHistoryCommand, handlePlayerCardCommand, handleHelpCommand, handleLeaveCommand, handleRemoveCommand,
@@ -1535,7 +1661,7 @@ module.exports = {
   handleUndoSeasonResetCommand, handleRestoreArchivedPeriodCommand, handleCancelStartCommand, handleStartCommand,
   handleSyncAllRolesCommand, handleSyncAllPlayersEloCommand, handleVictoryCommand, handleOnboardingCommand, handleClearCommand,
   handleRegisterCommand, handleNickUpdateCommand, handleSyncPlayerRankCommand, handleVoteCommand, pendingAutoStarts, triggerAutoStart,
-  handleRematchCommand,
+  handleRematchCommand, handleRouletteCommand, handleRoletaSairCommand, handleRulesCommand, handleStaffCommand,
   findRecentVictoryByLetter,
   findPendingAutoStartLobby,
   resolveCleanupTargets

@@ -8,6 +8,7 @@ async function handleEnterCommandFlow({
     getFormatFromArgs,
     getNicknameArgs,
     isMemberInQueueVoiceChannel,
+    isMemberInTierSVoiceChannel,
     enterQueue,
     createEnterQueueDeps,
     replyToMessage,
@@ -22,9 +23,10 @@ async function handleEnterCommandFlow({
     : QUEUE_MODES.CLASSIC;
   const selectedFormat = getFormatFromArgs(selectedMode, args);
   const providedNick = getNicknameArgs(selectedMode, args, selectedFormat).join(' ').trim();
+  const selectedTier = selectedMode === QUEUE_MODES.CLASSIC && isMemberInTierSVoiceChannel && isMemberInTierSVoiceChannel(message.member) ? 'S' : null;
 
   if (!isMemberInQueueVoiceChannel(message.member, selectedMode)) {
-    const expectedChannelName = selectedMode === QUEUE_MODES.ARAM ? 'Lobby ARAM' : 'Lobby Classic';
+    const expectedChannelName = selectedMode === QUEUE_MODES.ARAM ? 'Lobby ARAM' : 'Lobby Classic ou Lobby TIER S';
     await replyToMessage(message, `Voce precisa estar no canal de voz \`${expectedChannelName}\` para entrar nessa fila.`);
     return;
   }
@@ -37,8 +39,15 @@ async function handleEnterCommandFlow({
     selectedFormat,
     providedNick,
     riotService: global.riotService,
-    deps: createEnterQueueDeps()
+    deps: createEnterQueueDeps(),
+    selectedTier,
+    member: message.member
   });
+
+  if (result.status === 'tierS_denied') {
+    await replyToMessage(message, '⛔ Lobby TIER S exige elo **Esmeralda IV ou superior** (ou cargo Esmeralda+). Use o `Lobby Classic` normal.');
+    return;
+  }
 
   if (result.status === 'missing_registration') {
     await replyToMessage(

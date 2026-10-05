@@ -117,6 +117,10 @@ function buildSlashCommands() {
   return [
     new SlashCommandBuilder().setName('ping').setDescription('Verifica se o bot esta online.'),
     new SlashCommandBuilder().setName('ajuda').setDescription('Mostra a lista de comandos.'),
+    new SlashCommandBuilder().setName('regras').setDescription('Mostra o regulamento da CAPS Arena.'),
+    new SlashCommandBuilder().setName('staff').setDescription('Guia de comandos da staff.'),
+    new SlashCommandBuilder().setName('roletasair').setDescription('Fica fora da próxima partida (sem sorteio nem subida).')
+      .addStringOption((option) => option.setName('sala').setDescription('Letra da sala, ex.: A').setRequired(false)),
     new SlashCommandBuilder()
       .setName('entrar')
       .setDescription('Entra na fila CLASSIC ou ARAM.')
@@ -162,6 +166,7 @@ function buildSlashCommands() {
           .setRequired(false)
           .addChoices(
             { name: 'CLASSIC', value: 'classic' },
+            { name: 'CLASSIC TIER S', value: 'tiers' },
             { name: 'ARAM', value: 'aram' }
           )
       )
@@ -187,6 +192,7 @@ function buildSlashCommands() {
           .setRequired(false)
           .addChoices(
             { name: 'CLASSIC', value: 'classic' },
+            { name: 'CLASSIC TIER S', value: 'tiers' },
             { name: 'ARAM', value: 'aram' }
           )
       )
@@ -215,6 +221,10 @@ function buildSlashCommands() {
       .setDescription('Remove um usuario da fila.')
       .addUserOption((option) => option.setName('usuario').setDescription('Usuario a remover').setRequired(true)),
     addModeAndLobbyOptions(new SlashCommandBuilder().setName('limparsalas').setDescription('Limpa salas automaticas ou uma sala especifica.')),
+    new SlashCommandBuilder().setName('roleta').setDescription('Participa da roleta de quem sai (losers).')
+      .addIntegerOption((option) => option.setName('quantidade').setDescription('Quantos saem (1-5)').setRequired(false))
+      .addStringOption((option) => option.setName('sala').setDescription('Letra da sala, ex.: A').setRequired(false))
+      .addUserOption((option) => option.setName('jogador').setDescription('Staff: inscreve o loser (AFK/dificuldade)').setRequired(false)),
     new SlashCommandBuilder().setName('reset').setDescription('Limpa todas as filas e partidas ativas.'),
     new SlashCommandBuilder().setName('resetgeral').setDescription('Arquiva a fase atual e inicia uma nova.'),
     new SlashCommandBuilder().setName('sincronizar-cargos').setDescription('Força a atualização dos cargos de todos os jogadores.'),
@@ -392,10 +402,12 @@ client.once('ready', async () => {
     console.error('[RESTART] Erro ao retomar votacoes de MVP:', err);
   }
 
-  // Expira cargos INFERNAL vencidos (08h) logo na inicializacao
+  // Expira cargos INFERNAL vencidos (08h) logo na inicializacao + reconcilia orfaos
   try {
+    const { reconcileInfernalRoles } = require('./utils/lobbyUtils');
     for (const guild of client.guilds.cache.values()) {
       await expireInfernalRolesIfDue(guild);
+      await reconcileInfernalRoles(guild).catch(() => null);
     }
   } catch (err) {
     console.error('[RESTART] Erro ao expirar cargos INFERNAL:', err);
@@ -484,6 +496,7 @@ async function processCommand(message, rawContent) {
         await handlers.handleSeasonHistoryCommand(message, args);
         break;
       case 'iniciartemporada':
+      case 'iniciarseason':
         await handlers.handleOfficialSeasonStartCommand(message);
         break;
       case 'sair':
@@ -524,6 +537,22 @@ async function processCommand(message, rawContent) {
         break;
       case 'rematch':
         await handlers.handleRematchCommand(message, args);
+        break;
+      case 'roleta':
+      case 'roletar':
+        await handlers.handleRouletteCommand(message, args);
+        break;
+      case 'roletasair':
+        await handlers.handleRoletaSairCommand(message, args);
+        break;
+      case 'regras':
+      case 'regra':
+      case 'rules':
+        await handlers.handleRulesCommand(message);
+        break;
+      case 'staff':
+      case 'staffhelp':
+        await handlers.handleStaffCommand(message);
         break;
       case 'cadastrar':
         await handlers.handleRegisterCommand(message, args);
@@ -751,6 +780,25 @@ client.on('interactionCreate', async (interaction) => {
       case 'remover':
         await handlers.handleRemoveCommand(context, targetUser);
         break;
+      case 'regras':
+        await handlers.handleRulesCommand(context);
+        break;
+      case 'staff':
+        await handlers.handleStaffCommand(context);
+        break;
+      case 'roletasair': {
+        const salaSair = interaction.options.getString('sala');
+        await handlers.handleRoletaSairCommand(context, salaSair ? [salaSair] : []);
+        break;
+      }
+      case 'roleta': {
+        const qtd = interaction.options.getInteger('quantidade');
+        const sala = interaction.options.getString('sala');
+        const rJogador = interaction.options.getUser('jogador');
+        const rArgs = [...(qtd != null ? [String(qtd)] : []), ...(sala ? [sala] : [])];
+        await handlers.handleRouletteCommand(context, rArgs, rJogador || null);
+        break;
+      }
       case 'limparespera':
         await handlers.handleClearWaitingListsCommand(context);
         break;

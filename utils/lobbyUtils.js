@@ -177,6 +177,51 @@ function getQueueChannel(guild) {
 }
 
 
+const TIER_S_MIN_MMR = Number(config.tierS?.minBaseMmr || 2000);
+const TIER_S_TIERS = (config.tierS?.tiers || ['EMERALD', 'DIAMOND', 'MASTER', 'GRANDMASTER', 'CHALLENGER'])
+  .map((tier) => String(tier || '').toUpperCase());
+
+function isTierSTier(tier) {
+  return TIER_S_TIERS.includes(String(tier || '').toUpperCase());
+}
+
+function isTierSEligibleByStats({ baseMmr, tier } = {}) {
+  if (isTierSTier(tier)) return true;
+  return Number(baseMmr || 0) >= TIER_S_MIN_MMR;
+}
+
+function isTierSEligibleMember(member, storedEntry) {
+  if (isTierSEligibleByStats({ baseMmr: storedEntry?.baseMmr, tier: storedEntry?.tier })) return true;
+  if (isTierSEligibleByStats({ baseMmr: storedEntry?.modes?.classic?.baseMmr, tier: storedEntry?.tier })) return true;
+  if (!member?.roles?.cache) return false;
+  for (const role of member.roles.cache.values()) {
+    const rankTier = getRankTierFromRoleName(role.name);
+    if (!rankTier) continue;
+    // getRankTierFromRoleName retorna 'GraoMestre'; normaliza para GRANDMASTER
+    const normalized = String(rankTier).toUpperCase() === 'GRAOMESTRE' ? 'GRANDMASTER' : String(rankTier).toUpperCase();
+    // Esmeralda vem como 'Esmeralda' -> EMERALD
+    const mapped = normalized === 'ESMERALDA' ? 'EMERALD' : normalized === 'DESAFIANTE' ? 'CHALLENGER' : normalized === 'MESTRE' ? 'MASTER' : normalized;
+    if (TIER_S_TIERS.includes(mapped)) return true;
+  }
+  return false;
+}
+
+function getClassicTierSQueueChannelId() {
+  return config.voiceChannels.classicTierSQueueChannelId || null;
+}
+
+function isTierSVoiceChannel(channelId) {
+  const tierSId = getClassicTierSQueueChannelId();
+  return Boolean(tierSId && channelId && String(channelId) === String(tierSId));
+}
+
+function getLobbyTier(lobby) {
+  if (!lobby) return 'normal';
+  if (lobby.tier === 'S') return 'S';
+  if (isTierSVoiceChannel(lobby.waitingChannelId)) return 'S';
+  return 'normal';
+}
+
 function isMemberInQueueVoiceChannel(member, mode) {
   const voiceChannel = member.voice?.channel;
 
@@ -188,7 +233,24 @@ function isMemberInQueueVoiceChannel(member, mode) {
     return voiceChannel.id === config.voiceChannels.aramQueueChannelId;
   }
 
-  return voiceChannel.id === config.voiceChannels.classicQueueChannelId;
+  return voiceChannel.id === config.voiceChannels.classicQueueChannelId
+    || isTierSVoiceChannel(voiceChannel.id);
+}
+
+function isMemberInTierSVoiceChannel(member) {
+  return Boolean(member?.voice?.channel && isTierSVoiceChannel(member.voice.channel.id));
+}
+
+function isStaffBypass(member) {
+  if (!member) return false;
+  try {
+    if (member.permissions?.has('ManageMessages') || member.permissions?.has('Administrator')) return true;
+  } catch { /* sem permissoes resolvidas */ }
+  const captainRoleId = config.roles?.captainRoleId;
+  try {
+    if (captainRoleId && member.roles?.cache?.has(captainRoleId)) return true;
+  } catch { /* sem cargos */ }
+  return false;
 }
 
 function formatRank(player) {
@@ -352,8 +414,22 @@ function getNextLobbyLetter(queueData, currentMatchData, mode, format) {
   return numberToLobbyLetter(index);
 }
 
-function getBaseQueueChannelIdByMode(mode) {
-  return mode === QUEUE_MODES.ARAM ? config.voiceChannels.aramQueueChannelId : config.voiceChannels.classicQueueChannelId;
+function getBaseQueueChannelIdByMode(mode, tier = null) {
+  if (mode === QUEUE_MODES.ARAM) return config.voiceChannels.aramQueueChannelId;
+  if (tier === 'S' || tier === 'TIERS') return getClassicTierSQueueChannelId() || config.voiceChannels.classicQueueChannelId;
+  return config.voiceChannels.classicQueueChannelId;
+}
+
+function getRouletteTimeoutMs() {
+  return Number(config.roulette?.timeoutSeconds || 300) * 1000;
+}
+
+function getRouletteWarnMs() {
+  return Number(config.roulette?.warnSeconds || 240) * 1000;
+}
+
+function getRouletteAnnounceChannelId() {
+  return config.textChannels?.queueStatusChannelId || null;
 }
 
 function getPostMatchVoiceChannelId(mode) {
@@ -411,9 +487,10 @@ function getNextEightAmSaoPauloIso(from = new Date()) {
   return new Date(eightAmTodayUtc + 24 * 60 * 60 * 1000).toISOString();
 }
 
-function getOpenLobby(queueData, mode, format) {
+function getOpenLobby(queueData, mode, format, tier = null) {
   return Object.values(queueData.lobbies || {}).find(
     (lobby) => lobby.mode === mode && lobby.format === format && lobby.status === 'waiting' && lobby.players.length < lobby.requiredPlayers
+      && (tier == null || getLobbyTier(lobby) === tier)
   );
 }
 
@@ -530,15 +607,15 @@ function findActiveMatchBySelector(currentMatchData, args = []) {
   );
 }
 
-async function createLobbyChannels(guild, mode, format, letter) {
-  const baseChannel = guild.channels.cache.get(getBaseQueueChannelIdByMode(mode));
+async function createLobbyChannels(guild, mode, format, letter, tier = null) {
+  const baseChannel = guild.channels.cache.get(getBaseQueueChannelIdByMode(mode, tier));
 
   if (!baseChannel || baseChannel.type !== ChannelType.GuildVoice) {
     throw new Error(`Canal base do modo ${formatQueueMode(mode)} nao encontrado no config.json.`);
   }
 
   const parent = baseChannel.parentId || null;
-  const waitingName = getExpectedWaitingRoomName(mode, format, letter);
+  const waitingName = getExpectedWaitingRoomName(mode, format, letter, tier);
   const existingWaitingChannels = guild.channels.cache
     .filter((channel) => channel.type === ChannelType.GuildVoice && channel.name === waitingName)
     .sort((left, right) => left.createdTimestamp - right.createdTimestamp);
@@ -576,7 +653,7 @@ async function createLobbyChannels(guild, mode, format, letter) {
 }
 
 async function createTeamChannelsForLobby(guild, lobby) {
-  const baseChannel = guild.channels.cache.get(getBaseQueueChannelIdByMode(lobby.mode));
+  const baseChannel = guild.channels.cache.get(getBaseQueueChannelIdByMode(lobby.mode, getLobbyTier(lobby)));
 
   if (!baseChannel || baseChannel.type !== ChannelType.GuildVoice) {
     throw new Error(`Canal base do modo ${formatQueueMode(lobby.mode)} nao encontrado no config.json.`);
@@ -688,25 +765,49 @@ async function clearMvpRoles(guild) {
   }
 }
 
+async function hasInfernalPriority(guild, discordId, statsData = null) {
+  if (!guild || !discordId) return false;
+  try {
+    const data = statsData || await loadPlayerStats();
+    const stored = Object.values(data.players || {}).find((entry) => entry.discordId === discordId) || null;
+    const validDb = stored?.infernalExpiresAt && new Date(stored.infernalExpiresAt).getTime() > Date.now();
+    if (!validDb) return false;
+    const member = await guild.members.fetch(discordId).catch(() => null);
+    const role = findInfernalRole(guild);
+    if (!role) return true; // banco válido mesmo sem cargo no servidor
+    return Boolean(member?.roles.cache.has(role.id));
+  } catch {
+    return false;
+  }
+}
+
 async function syncInfernalRolesAfterMatch(guild, winners = [], losers = []) {
   const newlyAwarded = [];
-  if (!guild) return newlyAwarded;
+  const removed = [];
+  const failed = [];
+  if (!guild) return Object.assign(newlyAwarded, { removed, failed });
 
   const infernalRole = await ensureInfernalRole(guild);
   if (!infernalRole) {
     console.warn('[INFERNAL] Cargo INFERNAL nao encontrado. Crie o cargo no Discord.');
-    return newlyAwarded;
+    return Object.assign(newlyAwarded, { removed, failed });
   }
 
-  const statsData = await loadPlayerStats();
+  const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
 
+  // Regra: derrota NAO tira o INFERNAL na hora. O cargo vale até as 08h do dia seguinte
+  // (expira via expireInfernalRolesIfDue/reconcile). Aqui só registramos quem perdeu
+  // tendo o cargo, sem remover nada.
   for (const loser of losers) {
-    upsertPlayerStats(statsData, loser, { infernalExpiresAt: null });
-    const member = await guild.members.fetch(loser.discordId).catch(() => null);
-    if (member?.roles.cache.has(infernalRole.id)) {
-      await member.roles.remove(infernalRole).catch((err) =>
-        console.error(`[INFERNAL] Erro ao remover cargo de ${member.user.tag}:`, err.message)
-      );
+    try {
+      const statsData = await loadPlayerStats();
+      const stored = getStoredPlayerStats(statsData, loser);
+      const stillValid = stored?.infernalExpiresAt && new Date(stored.infernalExpiresAt).getTime() > Date.now();
+      if (stillValid) {
+        removed.push({ discordId: loser.discordId, nickname: loser.nickname, keptUntil: stored.infernalExpiresAt });
+      }
+    } catch (err) {
+      failed.push({ discordId: loser.discordId, action: 'read_db', error: err.message });
     }
   }
 
@@ -715,27 +816,74 @@ async function syncInfernalRolesAfterMatch(guild, winners = [], losers = []) {
       continue;
     }
 
+    const statsData = await loadPlayerStats();
     const stored = getStoredPlayerStats(statsData, winner);
     const stillValid = stored.infernalExpiresAt && new Date(stored.infernalExpiresAt).getTime() > Date.now();
     const infernalExpiresAt = stillValid ? stored.infernalExpiresAt : getNextEightAmSaoPauloIso();
-    upsertPlayerStats(statsData, winner, { infernalExpiresAt });
+    try {
+      upsertPlayerStats(statsData, winner, { infernalExpiresAt });
+      await savePlayerStats(statsData);
+    } catch (err) {
+      failed.push({ discordId: winner.discordId, action: 'save_db', error: err.message });
+      continue;
+    }
 
     const member = await guild.members.fetch(winner.discordId).catch(() => null);
-    if (member && !member.roles.cache.has(infernalRole.id)) {
-      await member.roles.add(infernalRole).catch((err) =>
-        console.error(`[INFERNAL] Erro ao atribuir cargo a ${member.user.tag}:`, err.message)
-      );
-      newlyAwarded.push({
-        discordId: winner.discordId,
-        nickname: winner.nickname,
-        winStreak: Number(winner.winStreak || 0),
-        infernalExpiresAt
-      });
+    if (!member) {
+      failed.push({ discordId: winner.discordId, action: 'add_role', error: 'member_not_found' });
+      continue;
+    }
+    if (!member.roles.cache.has(infernalRole.id)) {
+      if (botMember && infernalRole.position >= botMember.roles.highest.position) {
+        failed.push({ discordId: winner.discordId, action: 'add_role', error: 'hierarchy' });
+        continue;
+      }
+      try {
+        await member.roles.add(infernalRole);
+        newlyAwarded.push({
+          discordId: winner.discordId,
+          nickname: winner.nickname,
+          winStreak: Number(winner.winStreak || 0),
+          infernalExpiresAt
+        });
+      } catch (err) {
+        failed.push({ discordId: winner.discordId, action: 'add_role', error: err.message });
+      }
     }
   }
 
-  await savePlayerStats(statsData);
-  return newlyAwarded;
+  if (failed.length > 0) {
+    console.warn('[INFERNAL] Falhas no pos-jogo:', failed.map((f) => `${f.discordId}:${f.action}:${f.error}`).join(' | '));
+  }
+  return Object.assign(newlyAwarded, { removed, failed });
+}
+
+async function reconcileInfernalRoles(guild) {
+  // Limpa órfãos: membro com role no Discord mas sem infernalExpiresAt válida no banco
+  if (!guild) return { removedOrphans: 0, failed: [] };
+  const infernalRole = findInfernalRole(guild);
+  if (!infernalRole) return { removedOrphans: 0, failed: [] };
+  // role.members depende de cache: busca geral p/ enxergar todos (servidor pequeno, 1 chamada)
+  await guild.members.fetch().catch(() => null);
+  const statsData = await loadPlayerStats();
+  let removedOrphans = 0;
+  for (const [, member] of infernalRole.members) {
+    const stored = Object.values(statsData.players || {}).find((entry) => entry.discordId === member.id) || null;
+    const valid = stored?.infernalExpiresAt && new Date(stored.infernalExpiresAt).getTime() > Date.now();
+    if (!valid) {
+      const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
+      if (botMember && infernalRole.position >= botMember.roles.highest.position) {
+        failed.push({ discordId: member.id, action: 'remove_orphan', error: 'hierarchy_bot_below_infernal' });
+        continue;
+      }
+      await member.roles.remove(infernalRole).catch((err) => failed.push({ discordId: member.id, action: 'remove_orphan', error: err.message }));
+      removedOrphans += 1;
+    }
+  }
+  if (failed.length > 0) {
+    console.warn('[INFERNAL] Reconciliacao com falhas (verifique a hierarquia: cargo do bot precisa ficar ACIMA do INFERNAL):', failed.map((f) => `${f.discordId}:${f.error}`).join(' | '));
+  }
+  return { removedOrphans, failed };
 }
 
 async function postInfernalAnnouncement(guild, awarded = []) {
@@ -764,6 +912,27 @@ async function postInfernalAnnouncement(guild, awarded = []) {
   await channel.send({ embeds: [embed] }).catch((err) =>
     console.error('[INFERNAL] Erro ao postar anuncio:', err.message)
   );
+}
+
+async function postRouletteAnnouncement(guild, { letter, leaving = [], staying = [], winners = [], vacancies = 0, destinationLabel = '' } = {}) {
+  const channelId = getRouletteAnnounceChannelId();
+  if (!guild || !channelId) return;
+  const channel = await guild.channels.fetch(channelId).catch(() => null);
+  if (!channel?.isTextBased()) return;
+  const fmt = (list) => (list.length > 0 ? list.map((p) => `<@${p.discordId}>`).join(' ') : '—');
+  const embed = new EmbedBuilder()
+    .setColor(THEME.WARNING)
+    .setTitle(`🎯 Roleta — Sala ${letter || '?'}`)
+    .setDescription(destinationLabel ? `Destino: **${destinationLabel}**` : 'Sorteio de quem sai da próxima partida.')
+    .addFields(
+      { name: `❌ Saem (${leaving.length})`, value: fmt(leaving).slice(0, 1024) },
+      { name: `✅ Ficam (${staying.length})`, value: fmt(staying).slice(0, 1024) },
+      { name: `🏆 Winners movidos (${winners.length})`, value: fmt(winners).slice(0, 1024) },
+      { name: '⏳ Vagas abertas', value: `\`${vacancies}\` — use \`!espera\`` }
+    )
+    .setFooter({ text: `${FOOTER_PREFIX} • Roleta` })
+    .setTimestamp();
+  await channel.send({ embeds: [embed] }).catch(() => null);
 }
 
 async function expireInfernalRolesIfDue(guild) {
@@ -1114,8 +1283,10 @@ function buildQueueEmbed(lobby, allLobbies = []) {
     const overview = waitingLobbies.length
       ? waitingLobbies
           .map(
-            (entry) =>
-              `**${entry.letter || '?'}** | ${formatQueueMode(entry.mode)} ${entry.mode === QUEUE_MODES.ARAM ? entry.format || '5x5' : '5x5'} | ${Array.isArray(entry.players) ? entry.players.length : 0}/${entry.requiredPlayers || 0}`
+            (entry) => {
+              const tierTag = entry.mode === QUEUE_MODES.CLASSIC && getLobbyTier(entry) === 'S' ? ' TIER S' : '';
+              return `**${entry.letter || '?'}** | ${formatQueueMode(entry.mode)}${tierTag} ${entry.mode === QUEUE_MODES.ARAM ? entry.format || '5x5' : '5x5'} | ${Array.isArray(entry.players) ? entry.players.length : 0}/${entry.requiredPlayers || 0}`;
+            }
           )
           .join('\n')
       : 'Nenhuma sala de espera ativa no momento.';
@@ -1128,10 +1299,13 @@ function buildQueueEmbed(lobby, allLobbies = []) {
     return embed;
   }
 
+  const lobbyModeLabel = normalizedLobby.mode === QUEUE_MODES.CLASSIC && getLobbyTier(normalizedLobby) === 'S'
+    ? 'CLASSIC TIER S'
+    : formatQueueMode(normalizedLobby.mode);
   embed
     .addFields(
       { name: 'Lobby', value: `\`${normalizedLobby.letter || '?'}\``, inline: true },
-      { name: 'Modo', value: `\`${formatQueueMode(normalizedLobby.mode)}\``, inline: true },
+      { name: 'Modo', value: `\`${lobbyModeLabel}\``, inline: true },
       { name: 'Formato', value: `\`${normalizedLobby.format || '5x5'}\``, inline: true },
       {
         name: 'Status da fila',
@@ -1208,6 +1382,90 @@ function splitEmbedFieldChunks(entries, maxLength = 1024) {
   return chunks;
 }
 
+const RULES_SECTIONS = [
+  {
+    name: '📝 1. Cadastro (uma vez só)',
+    value: '`!cadastrar Nick#TAG` vincula sua conta Riot (ex: `!cadastrar Faker#BR1`). Depois, `!nick Nick#TAG` atualiza se mudar de conta. `!perfil` mostra seu elo e seus pontos.'
+  },
+  {
+    name: '🎮 2. Como jogar',
+    value: 'Entre no canal de voz **Lobby Classic**, **Lobby TIER S** ou **Lobby ARAM** e digite `!entrar` (só vale dentro desses canais — na Sala de Espera não funciona, troque de canal primeiro). Com 10 jogadores a partida inicia sozinha. `!fila` mostra quem está na sala, `!sair` tira você dela.'
+  },
+  {
+    name: '💎 3. Lobby TIER S (Esmeralda IV ou mais)',
+    value: 'Só entra com `!entrar` quem tem elo ou cargo **Esmeralda, Diamante, Mestre, Grão-Mestre ou Desafiante**. Quem é Tier S pode jogar nos dois lobbies; os demais, só no Classic. Staff sem o elo organiza, mas não joga no Tier S.'
+  },
+  {
+    name: '🏆 4. Pontos e rankings',
+    value: 'Todo mundo começa com **1000 pontos custom + elo**. Ganhar de time mais forte vale mais PDL; ganhar de time mais fraco vale menos. `!top10` e `!placar` = geral; `!top10 tiers` e `!placar tiers` = só Esmeralda+. Desempate por winrate. Na temporada oficial, precisa de **10 jogos** para aparecer no ranking.'
+  },
+  {
+    name: '🔥 5. Cargo INFERNAL (5 vitórias seguidas)',
+    value: 'Fez 5 wins seguidas? Ganha o cargo até as **08h da manhã seguinte** (perder no caminho não tira). Dá prioridade: entra direto na **posição 5 da `!espera`** e **não cai na roleta**. `!sync infernal` (admin) conserta casos travados.'
+  },
+  {
+    name: '⏳ 6. Espera e 🎯 roleta',
+    value: '`!espera` guarda seu lugar para a próxima (🔥 = prioridade INFERNAL). Após a partida todos vão à **Sala de Espera**: um comando `!roleta N A` sorteia na hora quem sai (N = 1–5, letra da sala; só losers entram, 🔥 INFERNAL é imune). Não quer a próxima? `!roletasair A` (fora do sorteio e da subida). Resultado sai no canal **fila**; vagas restantes vão para a `!espera`.'
+  },
+  {
+    name: '🗳️ 7. Fim de jogo e MVP',
+    value: 'Durante a partida vote com `!votar 1` ou `!votar 2`. Depois, vote no **MVP** no canal de destaques (2 min; sem votos, o bot escolhe o maior PDL ganho). Staff registra com `!vitoria 1 A` e reabre com `!rematch A`.'
+  },
+  {
+    name: '📊 8. Temporada',
+    value: 'Os pontos zeram a cada temporada (volta aos 1000 + elo) e os campeões ficam no histórico (`!temporadas`). Jogue sério desde o dia 1: cada vitória conta para o top 10.'
+  }
+];
+
+const STAFF_SECTIONS = [
+  {
+    name: '⚔️ Partida — conduzir o jogo',
+    value: '`!start A` • Inicia a sala A manualmente (quando não iniciou sozinha).\n`!cancelarstart A` • Cancela a contagem de início (jogadores ficam na fila).\n`!vitoria 1 A` • Registra o time 1 como vencedor da sala A (pós-jogo).\n`!rematch A` • Volta os 10 da sala A para novo lobby, com times reequilibrados.'
+  },
+  {
+    name: '🎯 Roleta — vagas da próxima (Sala de Espera)',
+    value: '`!roleta N A` • Sorteia NA HORA N losers para sair (1–5, letra da sala).\nQuem pode: um loser da partida ou staff. Só losers entram; 🔥 INFERNAL é imune (só com `--com-infernal`).\nCada sala só pode ser roletada 1x (anti-duplo).\n`!roletasair A` • Jogador fora da próxima (staff: `!roletasair @jogador A`).'
+  },
+  {
+    name: '🧹 Filas e salas — organizar e limpar',
+    value: '`!remover @jogador` • Tira alguém da fila (🔥 INFERNAL só sai com Admin).\n`!limparsalas A` • Apaga a sala A vazia/travada (sem letra = todas; com partida ativa, recusa).\n`!limpar 10` • Apaga 10 mensagens do canal.\n`!espera` + `!limparespera` • Ver a espera e (staff) zerá-la.\n`!reset` • Emergência: limpa filas e partidas (não mexe em pontos).'
+  },
+  {
+    name: '🎖️ Elos e cargos — manter atualizado',
+    value: '`!sincronizarelo @jogador` • Atualiza elo Riot + cargo de um jogador (mostra se o cargo falhou).\n`!sincronizartodos` • Atualiza TODO MUNDO (demora ~2,5s por jogador; use com calma).\n`!sync` • Reaplica cargos pelo elo já salvo (sem chamar a Riot).\n`!sync infernal` • Limpa INFERNALs travados/órfãos.'
+  },
+  {
+    name: '📊 Temporada — só Admin, com fila vazia',
+    value: '`!temporadas` • Ver períodos arquivados.\n`!resetgeral` • Arquiva o período e ZERA os pontos (sem volta!).\n`!iniciartemporada` (ou `!iniciarseason`) • Liga a fase oficial.\nAbertura: `!resetgeral` e depois `!iniciartemporada`, antes dos primeiros jogos.'
+  }
+];
+
+function buildStaffEmbed() {
+  const embed = new EmbedBuilder()
+    .setColor(THEME.WARNING)
+    .setTitle('🛠️ Guia da Staff — CAPS Arena')
+    .setDescription('Quando e como usar cada comando. Jogadores: usem `!regras`.')
+    .setFooter({ text: `${FOOTER_PREFIX} • Staff` })
+    .setTimestamp();
+  for (const section of STAFF_SECTIONS) {
+    embed.addFields({ name: section.name, value: section.value });
+  }
+  return embed;
+}
+
+function buildRulesEmbed() {
+  const embed = new EmbedBuilder()
+    .setColor(THEME.INFO)
+    .setTitle('📚 Regras — CAPS Arena')
+    .setDescription('Resumo de como o bot funciona. Dúvidas? Chame a staff.')
+    .setFooter({ text: `${FOOTER_PREFIX} • Regras` })
+    .setTimestamp();
+  for (const section of RULES_SECTIONS) {
+    embed.addFields({ name: section.name, value: section.value });
+  }
+  return embed;
+}
+
 function buildTeamsEmbed(teams) {
   const teamOneText = teams.teamOne
     .map(
@@ -1247,16 +1505,19 @@ function buildTeamsEmbed(teams) {
     .setTimestamp();
 }
 
-function buildLeaderboardEmbed(statsData, mode = QUEUE_MODES.CLASSIC, format = null) {
-  const rankedPlayers = getRankedPlayersByMode(statsData, mode, format);
+function buildLeaderboardEmbed(statsData, mode = QUEUE_MODES.CLASSIC, format = null, options = {}) {
+  const rankedPlayers = getRankedPlayersByMode(statsData, mode, format, null, options);
   const modeLabel = getStatsBucketLabel(mode, format);
+  const titleLabel = options?.tierSOnly && mode === QUEUE_MODES.CLASSIC ? 'CLASSIC TIER S (Esmeralda+)' : modeLabel;
   const medals = ['🥇', '🥈', '🥉'];
 
   const embed = new EmbedBuilder()
     .setColor(THEME.RANK)
-    .setTitle(`🏆 Placar Geral - ${modeLabel}`)
-    .setDescription(`Ranking interno de **${modeLabel}** baseado no histórico.`)
-    .setFooter({ text: `${FOOTER_PREFIX} • Ranking ${modeLabel}` })
+    .setTitle(`🏆 Placar Geral - ${titleLabel}`)
+    .setDescription(options?.tierSOnly
+      ? 'Mesmo PDL do Classic, filtrado para **Esmeralda IV ou superior**.'
+      : `Ranking interno de **${modeLabel}** baseado no histórico.`)
+    .setFooter({ text: `${FOOTER_PREFIX} • Ranking ${titleLabel}` })
     .setTimestamp();
 
   if (rankedPlayers.length === 0) {
@@ -1267,14 +1528,18 @@ function buildLeaderboardEmbed(statsData, mode = QUEUE_MODES.CLASSIC, format = n
     return embed;
   }
 
+  const isClassicRank = mode === QUEUE_MODES.CLASSIC;
   const rawEntries = rankedPlayers
     .slice(0, 15)
     .map((player, index) => {
       const medal = medals[index] || `#${index + 1}`;
       const rankName = getRankName(player.baseMmr);
       const label = player.discordId ? `<@${player.discordId}>` : `\`${player.nickname}\``;
+      const displayScore = isClassicRank
+        ? (Number.isFinite(Number(player.customScore)) ? Number(player.customScore) : player.adjustedMmr)
+        : player.adjustedMmr;
 
-      return `${medal} ${label}\n**${rankName} (${player.adjustedMmr} pts)** • ${player.customWins}V / ${player.customLosses}D`;
+      return `${medal} ${label}\n**${rankName} (${displayScore} pts)** • ${player.customWins}V / ${player.customLosses}D`;
     });
 
   const { decoratedEntries, streakFooter } = decorateWithLeaderIcons(rawEntries, rankedPlayers.slice(0, 15));
@@ -1293,16 +1558,19 @@ function buildLeaderboardEmbed(statsData, mode = QUEUE_MODES.CLASSIC, format = n
   return embed;
 }
 
-function buildTopTenEmbed(statsData, seasonMeta, mode, format = null) {
-  const rankedPlayers = getRankedPlayersByMode(statsData, mode, format, seasonMeta).slice(0, 10);
+function buildTopTenEmbed(statsData, seasonMeta, mode, format = null, options = {}) {
+  const rankedPlayers = getRankedPlayersByMode(statsData, mode, format, seasonMeta, options).slice(0, 10);
   const modeLabel = getStatsBucketLabel(mode, format);
+  const titleLabel = options?.tierSOnly && mode === QUEUE_MODES.CLASSIC ? 'CLASSIC TIER S (Esmeralda+)' : modeLabel;
   const medals = ['🥇', '🥈', '🥉'];
 
   const embed = new EmbedBuilder()
     .setColor(THEME.RANK)
-    .setTitle(`🏆 Top 10 - ${modeLabel}`)
-    .setDescription(`Período atual: **${getSeasonDisplayLabel(seasonMeta)}**`)
-    .setFooter({ text: `${FOOTER_PREFIX} • Top 10 ${modeLabel}` })
+    .setTitle(`🏆 Top 10 - ${titleLabel}`)
+    .setDescription(options?.tierSOnly
+      ? `Mesmo PDL do Classic, filtrado para **Esmeralda IV ou superior**. Período: **${getSeasonDisplayLabel(seasonMeta)}**`
+      : `Período atual: **${getSeasonDisplayLabel(seasonMeta)}**`)
+    .setFooter({ text: `${FOOTER_PREFIX} • Top 10 ${titleLabel}` })
     .setTimestamp();
 
   if (rankedPlayers.length === 0) {
@@ -1314,6 +1582,7 @@ function buildTopTenEmbed(statsData, seasonMeta, mode, format = null) {
     return embed;
   }
 
+  const isClassicTop = mode === QUEUE_MODES.CLASSIC;
   const rawEntries = rankedPlayers
     .map(
       (player, index) => {
@@ -1321,8 +1590,11 @@ function buildTopTenEmbed(statsData, seasonMeta, mode, format = null) {
         const rankName = getRankName(player.baseMmr);
         const totalGames = player.customWins + player.customLosses;
         const winRate = totalGames > 0 ? ((player.customWins / totalGames) * 100).toFixed(0) : '0';
+        const displayScore = isClassicTop
+          ? (Number.isFinite(Number(player.customScore)) ? Number(player.customScore) : player.adjustedMmr)
+          : player.adjustedMmr;
 
-        return `${medal} <@${player.discordId}>\n**${rankName} (${player.adjustedMmr} pts)** • ${player.customWins}V / ${player.customLosses}D • ${winRate}% WR`;
+        return `${medal} <@${player.discordId}>\n**${rankName} (${displayScore} pts)** • ${player.customWins}V / ${player.customLosses}D • ${winRate}% WR`;
       }
     );
 
@@ -1765,6 +2037,7 @@ function startDailyRankScheduler() {
       await postDailyRankUpdates();
       for (const guild of global.discordClient?.guilds.cache.values() || []) {
         await expireInfernalRolesIfDue(guild);
+        await reconcileInfernalRoles(guild).catch(() => null);
       }
     } catch (error) {
       console.error('Erro ao publicar ranking diario:', error);
@@ -1871,6 +2144,7 @@ function isManagedDynamicChannel(channel) {
 
   return (
     channel.name.startsWith('Lobby CLASSIC ') ||
+    channel.name.startsWith('Lobby TIER S ') ||
     channel.name.startsWith('Lobby ARAM ') ||
     channel.name.startsWith('CLASSIC 1 ') ||
     channel.name.startsWith('CLASSIC 2 ') ||
@@ -1878,8 +2152,10 @@ function isManagedDynamicChannel(channel) {
   );
 }
 
-function getExpectedWaitingRoomName(mode, format, letter) {
-  return mode === QUEUE_MODES.ARAM ? `Lobby ARAM ${format} ${letter}` : `Lobby CLASSIC ${letter}`;
+function getExpectedWaitingRoomName(mode, format, letter, tier = null) {
+  if (mode === QUEUE_MODES.ARAM) return `Lobby ARAM ${format} ${letter}`;
+  if (tier === 'S') return `Lobby TIER S ${letter}`;
+  return `Lobby CLASSIC ${letter}`;
 }
 
 function getExpectedTeamRoomNames(mode, format, letter) {
@@ -1888,8 +2164,8 @@ function getExpectedTeamRoomNames(mode, format, letter) {
     : [`CLASSIC 1 ${letter}`, `CLASSIC 2 ${letter}`];
 }
 
-async function deleteManagedChannelsForLobby(guild, mode, format, letter, extraChannelIds = []) {
-  const expectedNames = [getExpectedWaitingRoomName(mode, format, letter), ...getExpectedTeamRoomNames(mode, format, letter)];
+async function deleteManagedChannelsForLobby(guild, mode, format, letter, extraChannelIds = [], tier = null) {
+  const expectedNames = [getExpectedWaitingRoomName(mode, format, letter, tier), getExpectedWaitingRoomName(mode, format, letter, tier === 'S' ? null : 'S'), ...getExpectedTeamRoomNames(mode, format, letter)];
   const channelIds = new Set(extraChannelIds.filter(Boolean));
 
   for (const channel of guild.channels.cache.values()) {
@@ -2391,8 +2667,21 @@ module.exports = {
   syncMvpRole,
   clearMvpRoles,
   syncInfernalRolesAfterMatch,
+  hasInfernalPriority,
+  reconcileInfernalRoles,
   postInfernalAnnouncement,
+  postRouletteAnnouncement,
   expireInfernalRolesIfDue,
+  isTierSEligibleByStats,
+  isTierSEligibleMember,
+  isTierSVoiceChannel,
+  isMemberInTierSVoiceChannel,
+  isStaffBypass,
+  getClassicTierSQueueChannelId,
+  getLobbyTier,
+  getRouletteTimeoutMs,
+  getRouletteWarnMs,
+  getRouletteAnnounceChannelId,
   startMvpVote,
   handleMvpVoteInteraction,
   resumePendingMvpVotes,
@@ -2407,6 +2696,10 @@ module.exports = {
   decorateWithLeaderIcons,
   buildTopTenEmbed,
   buildTopStreakEmbed,
+  buildRulesEmbed,
+  RULES_SECTIONS,
+  buildStaffEmbed,
+  STAFF_SECTIONS,
   buildSeasonHistoryEmbed,
   resetStatsForNewSeason,
   deepClone,
