@@ -8,11 +8,11 @@
     "captainRoleId": "1558224992821575792"
   },
   "voiceChannels": {
-    "classicQueueChannelId": "1558225042893181028",
-    "classicTierSQueueChannelId": "1558225044327370942",
-    "aramQueueChannelId": "1558225045531402411",
-    "postMatchWaitingChannelId": "1558225051353092289",
-    "postMatchTierSWaitingChannelId": "1558225053747773491"
+    "classicQueueChannelId": "1558440536447393814",
+    "classicTierSQueueChannelId": "1558440538049482833",
+    "aramQueueChannelId": "1558440539383267421",
+    "postMatchWaitingChannelId": "1558446935797399623",
+    "postMatchTierSWaitingChannelId": "1558440530579300352"
   },
   "tierS": {
     "minBaseMmr": 2000,
@@ -29,16 +29,19 @@
     "warnSeconds": 240
   },
   "textChannels": {
-    "rankUpdatesChannelId": "1558225032084328570",
-    "matchHistoryChannelId": "1558225025495076904",
-    "mvpAnnouncementsChannelId": "1558225027047100558",
-    "queueStatusChannelId": "1558225019430244352",
-    "matchOngoingChannelId": "1558225022382776400",
+    "rankUpdatesChannelId": "1558440503291154442",
+    "matchHistoryChannelId": "1558440508056018995",
+    "mvpAnnouncementsChannelId": "1558440509914087524",
+    "queueStatusChannelId": "1558440522115326042",
+    "matchOngoingChannelId": "1558440518881382400",
     "welcomeChannelId": "1558225015063978044",
-    "playerLogChannelId": "1558225028758118570",
-    "seasonLogChannelId": "1558225030486294558",
+    "playerLogChannelId": "1558440511424168017",
+    "seasonLogChannelId": "1558440512913014845",
     "smurfAlertChannelId": ""
   },
+  "allowedGuildIds": [
+    "1558217291123138561"
+  ],
   "automation": {
     "dailyRankUpdatesHour": 8,
     "dailyRankUpdatesMinute": 0

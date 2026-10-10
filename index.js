@@ -304,6 +304,7 @@ async function registerSlashCommands() {
   const commands = buildSlashCommands();
 
   for (const guild of client.guilds.cache.values()) {
+    if (!isGuildAllowed(guild.id)) continue;
     await guild.commands.set(commands).catch((error) => {
       console.error(`[SLASH] Nao foi possivel registrar os comandos na guild ${guild.id}:`, error);
     });
@@ -316,6 +317,7 @@ global.discordClient = client;
 global.riotService = riotService;
 
 const {
+  isGuildAllowed,
   getSeasonDisplayLabel,
   formatDateTimeForHistory,
   getArchivedSeasonLabel,
@@ -414,6 +416,7 @@ client.once('ready', async () => {
   try {
     const { reconcileInfernalRoles } = require('./utils/lobbyUtils');
     for (const guild of client.guilds.cache.values()) {
+      if (!isGuildAllowed(guild.id)) continue;
       await expireInfernalRolesIfDue(guild);
       await reconcileInfernalRoles(guild).catch(() => null);
     }
@@ -425,6 +428,7 @@ client.once('ready', async () => {
   try {
     const queueData = await loadQueue();
     for (const guild of client.guilds.cache.values()) {
+      if (!isGuildAllowed(guild.id)) continue;
       for (const [lobbyId, lobby] of Object.entries(queueData.lobbies || {})) {
         if (lobby.players && lobby.players.length >= lobby.requiredPlayers) {
           console.log(`[RESTART] Retomando auto-start pendente para lobby ${lobbyId}`);
@@ -621,6 +625,9 @@ client.on('messageCreate', async (message) => {
   if (message.author.bot || !message.guild) {
     return;
   }
+  if (!isGuildAllowed(message.guild.id)) {
+    return;
+  }
 
   const lines = message.content
     .split(/\r?\n/)
@@ -638,6 +645,9 @@ client.on('messageCreate', async (message) => {
 
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.guild) {
+    return;
+  }
+  if (!isGuildAllowed(interaction.guild.id)) {
     return;
   }
 

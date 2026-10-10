@@ -4,7 +4,8 @@ const { MongoClient } = require('mongodb');
 const { QUEUE_MODES } = require('../domain/constants/queueModes');
 
 const MONGODB_URI = process.env.MONGODB_URI;
-const DB_NAME = 'caps-bot';
+// Banco separado por ambiente (ex: MONGODB_DB=caps-bot-teste). Sem a var, usa o da producao.
+const DB_NAME = process.env.MONGODB_DB || 'caps-bot';
 const DATA_DIR = path.join(__dirname, '..', 'database');
 
 const LOCAL_FILES = {
@@ -80,7 +81,7 @@ async function getDb() {
     await client.connect();
     db = client.db(DB_NAME);
     storageMode = 'mongo';
-    console.log('[DB] Conectado ao MongoDB Atlas.');
+    console.log(`[DB] Conectado ao MongoDB (${DB_NAME}).`);
     return db;
   } catch (error) {
     storageMode = 'local';

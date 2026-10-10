@@ -28,6 +28,15 @@ const THEME = {
 
 const FOOTER_PREFIX = 'Caps Bot';
 
+// Escopo de guilds: `allowedGuildIds` no config restringe onde o bot atua.
+// Vazio/ausente = todas (comportamento da producao). O ambiente de teste
+// fixa só a guild de teste para não cruzar comandos com a principal.
+function isGuildAllowed(guildId) {
+  const allowed = config.allowedGuildIds;
+  if (!Array.isArray(allowed) || allowed.length === 0) return true;
+  return allowed.map(String).includes(String(guildId));
+}
+
 let lastDailyRankPostKey = null;
 
 function getRankName(mmr) {
@@ -2049,6 +2058,7 @@ function startDailyRankScheduler() {
       lastDailyRankPostKey = now.key;
       await postDailyRankUpdates();
       for (const guild of global.discordClient?.guilds.cache.values() || []) {
+        if (!isGuildAllowed(guild.id)) continue;
         await expireInfernalRolesIfDue(guild);
         await reconcileInfernalRoles(guild).catch(() => null);
       }
@@ -2681,6 +2691,7 @@ async function postSeasonSummaryToSeasonLog(guild, archivedSeason) {
 }
 
 module.exports = {
+  isGuildAllowed,
   getSeasonDisplayLabel,
   formatDateTimeForHistory,
   getArchivedSeasonLabel,
