@@ -1,7 +1,8 @@
-require('dotenv').config();
+const path = require('path');
+// .env sempre da pasta do bot (nao depende de onde o terminal foi aberto).
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const fs = require('fs');
-const path = require('path');
 const {
   Client,
   GatewayIntentBits,
