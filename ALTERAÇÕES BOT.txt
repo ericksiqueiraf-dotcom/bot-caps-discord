@@ -1,4 +1,65 @@
-ID canal - lobby-tier S - 1556124976359415919
+ID canal - sala de espera - tier S: 1556764496658300988
+
+============================================================
+ANÚNCIO LIVE TWITCH (copiar p/ Discord)
+============================================================
+
+🔴 **ESTAMOS AO VIVO NA TWITCH — CAPS ARENA** 🔥
+
+As partidas personalizadas do **CAPS ARENA** estão sendo streamadas agora! Vem ver os melhores lances, torcer e aprender com os monos da arena. 🏆
+
+📺 Assista aqui: https://twitch.tv/capsarenatv
+
+✅ Siga o canal e ative o sininho pra não perder nenhuma live!
+
+============================================================
+BIO TWITCH capsarenatv (painel "Sobre")
+============================================================
+
+🏆 CAPS ARENA — Personalizadas de League of Legends no Discord!
+Entre na arena: filas Classic e Tier S (só Esmeralda+), ranking por PDL, cargo INFERNAL 🔥 pra sequência de 5 wins e MVP toda partida.
+Quer jogar? Arrasta pro Discord, cadastra seu nick com !cadastrar e digita !entrar. Te vejo na arena! 🎮
+
+============================================================
+TÍTULOS ATRATIVOS P/ LIVE (escolha 1 por transmissão)
+============================================================
+
+🔥 CAPS ARENA AO VIVO | Personalizadas LoL com a comunidade — entra que tem vaga!
+🏆 LOBBY TIER S PEGANDO FOGO | Só Esmeralda+ na arena — CAPS ARENA AO VIVO
+🎮 PERSONALIZADAS LoL COM VIEWERS | CAPS ARENA — vem jogar e aparecer na live!
+
+============================================================
+BIO INSTAGRAM @capsarenatv (limite: 150 caracteres)
+============================================================
+
+🏆 CAPS ARENA | Personalizadas de LoL no Discord: entre, jogue e suba no ranking! 👇
+
+============================================================
+COMUNICADO DISCORD — NOVAS MUDANÇAS (copiar p/ Discord)
+(1 mensagem, dentro do limite de 2000 caracteres do Discord)
+============================================================
+
+📢 **ATUALIZAÇÃO DO BOT — CAPS ARENA** 🔥
+
+Fala, tropa! 3 melhorias no pós-jogo pra acabar com a bagunça:
+
+**1) ⏳ TRAVA DE 3 MIN NO `!entrar` (anti-furo da roleta)**
+Após o `!vitoria`, o `!entrar` fica bloqueado por **3 minutos** na mesma fila até sair a `!roleta`. Quem tentar furar recebe: `⏳ Aguarde a !roleta da sala A`.
+✅ Evita misturar quem devia sair no sorteio com quem chegou depois.
+✅ A trava é **por fila**: Classic não trava ARAM nem Tier S (e vice-versa). Sala A não trava sala de outro modo.
+✅ Libera sozinho após a roleta ou após 3 min. Ordem certa: `!vitoria` → `!roleta N A` → `!entrar` / `!espera`.
+
+**2) 💎 SALA DE ESPERA TIER S SEPARADA**
+Quem jogou no **Lobby TIER S** agora volta pra **Sala de Espera Tier S** ao finalizar, não mais pra espera normal. Sem misturar elos! Classic normal e ARAM seguem nas suas. `!sair` / `!remover` também devolvem pro lobby certo (Tier S volta pro Lobby Tier S).
+
+**3) 📋 NOVO `!esperatiers` (espera do Tier S, só Esmeralda+)**
+O Tier S ganhou **fila de espera própria**, separada do `!espera` normal:
+• `!esperatiers` → entra na espera (exige **Esmeralda IV+** por elo ou cargo, igual ao lobby)
+• `!esperatiers ver` → mostra a ordem • `!esperatiers sair` → sai da espera (`!espera tiers` também mostra a lista)
+✅ `!entrar` no Lobby Tier S respeita a ordem (só o 1º entra; 🔥 INFERNAL fura pro top 5, como sempre).
+✅ As duas esperas são independentes, mas só dá pra estar em **uma por vez**. Sem Esmeralda? O bot barra e manda pro `!espera` normal.
+
+Dúvidas? Chama a staff. Bom jogo! 🏆
 
 ============================================================
 AVISO PARA O SERVIDOR — NOVIDADES DO BOT (copiar p/ Discord)
@@ -53,6 +114,7 @@ REGULAMENTO DA TEMPORADA — CAPS ARENA (copiar p/ Discord)
 • Com 10 jogadores a partida começa sozinha (times montados pelo elo).
 • !fila mostra quem está na sala. !sair tira você da fila.
 • Sem briga por time: o bot monta os times para equilibrar o elo.
+• ⚠️ Quitar no meio da partida gera penalidade da staff: só o Admin aplica !pdl negativo (rage, quit, ofensa grave), além de possível suspensão da fila ou da temporada.
 
 💎 3. LOBBY TIER S (Esmeralda IV ou maior)
 • Só joga no Tier S quem tem elo ou cargo Esmeralda, Diamante, Mestre, Grão-Mestre ou Desafiante.
@@ -123,3 +185,122 @@ JSON DA IMAGEM DE DIVULGAÇÃO (copiar p/ gerador de imagem)
     }
   }
 }
+
+============================================================
+JSON 1/2 — LOGOTIPO CAPS ARENA (gerar primeiro, sozinho)
+Diretriz: design profissional, minimalista e original. NADA de sombras pesadas, brilhos exagerados ou efeitos gamer poluídos.
+============================================================
+{
+  "id": "logo_caps_arena",
+  "uso": "Ícone oficial CAPS ARENA LOL — foto de perfil (Discord/Twitch), posts e sobreposição em lives",
+  "tamanho": { "largura": 1080, "altura": 1080, "formato": "PNG", "fundo": "transparente" },
+  "conceito": "Emblema geométrico original: hexágono de arena com silhueta de elmo espartano formada por 3 traços (negativo), sem copiar o logo antigo — apenas a mesma identidade dourado + escuro",
+  "estilo": "Minimalista flat com micro-profundidade (flat 2.0): formas chapadas, no máximo 1 sombra suave curta (deslocamento pequeno, blur leve, opacidade baixa). Proibido: sombras profundas, glows fortes, metálicos 3D, partículas e texturas",
+  "composicao": {
+    "simbolo": "Hexágono central em dourado chapado com elmo em negativo (cor do fundo) no interior; traço limpo, simétrico, legível em 98x98 px e em recorte circular de perfil",
+    "texto_principal": "CAPS ARENA",
+    "texto_secundario": "LOL",
+    "posicao_texto": "Abaixo do símbolo, centralizado, com respiro (margem mínima de 12% da largura)",
+    "tipografia": "Sans-serif geométrica, negrito, caixa alta, espaçamento amplo entre letras; dourado chapado, sem contorno e sem sombra"
+  },
+  "cores": { "dourado": "#C9A227", "branco": "#FFFFFF", "fundo_escuro": "#0B0B1A" },
+  "teste_de_qualidade": "Reduzir para 98x98 px: símbolo e nome continuam reconhecíveis; em fundo claro e escuro; em círculo (foto de perfil)"
+}
+
+============================================================
+JSON 2/2 — BANNER TWITCH CAPS ARENA (gerar depois, separado)
+Diretriz: mesmo minimalismo do logotipo. Arena sugerida por geometria, não por cenário carregado.
+============================================================
+{
+  "id": "banner_twitch_caps_arena",
+  "uso": "Banner do canal da Twitch (perfil)",
+  "tamanho": { "largura": 1200, "altura": 480, "formato": "PNG", "proporcao": "5:2 (padrao banner de perfil da Twitch)" },
+  "area_segura": "Textos e símbolo concentrados no centro (margens laterais podem ser cortadas em telas menores)",
+  "estilo": "Minimalista profissional: fundo escuro chapado com degradê sutil (quase imperceptível), linhas geométricas finas sugerindo arena; proibido sombras pesadas, neblina densa e excesso de personagens",
+  "cena": {
+    "fundo": "Degradê escuro roxo-azulado quase plano, com 2-3 linhas finas douradas em perspectiva sugerindo a arena",
+    "personagens": "No máximo 2 silhuetas chapadas e discretas nas extremidades (quase ícones, baixa opacidade), nunca cobrindo o centro nem competindo com o texto",
+    "simbolo": "Reaproveitar o hexágono com elmo do JSON 1/2, pequeno, à esquerda do título ou acima dele"
+  },
+  "texto": {
+    "principal": "CAPS ARENA",
+    "estilo_principal": "Sans-serif geométrica, negrito, caixa alta, branco chapado com leve espaçamento; sombra curta e suave apenas para leitura (opacidade baixa)",
+    "secundario": "CUSTOMS • RANKED • TORNEIOS",
+    "estilo_secundario": "Menor, dourado chapado (#C9A227), abaixo do título"
+  },
+  "cores": { "dourado": "#C9A227", "branco": "#FFFFFF", "roxo": "#7B2FF7", "azul": "#00C3FF", "fundo_escuro": "#0B0B1A" }
+}
+
+============================================================
+JSON 3/3 — WALLPAPEL CAPS ARENA (gerar separado)
+Diretriz: épico mas organizado. Simetria total, centro livre para a logo.
+============================================================
+{
+  "id": "wallpaper_caps_arena",
+  "uso": "Plano de fundo / wallpaper (PC e divulgação)",
+  "tamanho": { "largura": 1920, "altura": 1080, "formato": "PNG", "proporcao": "16:9 (Full HD)" },
+  "composicao": {
+    "estrutura": "Simetria espelhada: 5 personagens do lado esquerdo e 5 do lado direito, enfileirados em perspectiva (maiores na frente, menores atrás), todos de frente uns para os outros como pré-luta",
+    "time_azul": "Lado esquerdo banhado em luz azul (#00C3FF): 5 campeões de LoL em poses de batalha, armaduras e magias em tons de azul e branco",
+    "time_vermelho": "Lado direito banhado em luz vermelha (#FF2D2D): 5 campeões de LoL em poses de batalha, armaduras e magias em tons de vermelho e laranja",
+    "centro": "Faixa central LIVRE e escura (sem personagens nem efeitos) com espaço reservado para encaixar a logo do CAPS ARENA; confronto de energias azul x vermelha se chocando no meio, abaixo do espaço da logo",
+    "chao": "Chão de arena escuro com runas brilhantes e reflexo das duas cores; vinheta escura nas bordas"
+  },
+  "estilo": "Arte digital cinematográfica de League of Legends, iluminação dramática azul vs vermelho, sem sombras sujas; personagens nítidos e reconhecíveis, sem deformações",
+  "texto": {
+    "principal": "CAPS ARENA (aplicar depois sobre o espaço central, fora da geração)",
+    "observacao": "Gerar a imagem SEM texto embutido; o nome e a logo serão colocados na edição sobre o centro livre"
+  },
+  "cores": { "azul_time": "#00C3FF", "vermelho_time": "#FF2D2D", "dourado": "#C9A227", "fundo_escuro": "#0B0B1A" }
+}
+
+============================================================
+LINK DE CONVITE DO BOT (copiar p/ navegador)
+============================================================
+
+https://discord.com/oauth2/authorize?client_id=1487258474810183711&permissions=8&scope=bot%20applications.commands
+
+Como usar: cole no navegador → escolha o servidor CAPS Teste → Continuar → marque Administrador → Autorizar.
+O permissions=8 (Administrador) é só para o setup criar cargos e canais; depois pode tirar.
+
+============================================================
+COMUNICADO DISCORD — VOTAÇÃO DE RESULTADO COM BOTÕES (copiar p/ Discord)
+(1 mensagem, dentro do limite de 2000 caracteres do Discord)
+============================================================
+
+📢 **NOVIDADE — VOTAR FICOU FÁCIL** 🗳️
+
+Acabou a partida e ninguém confirma o resultado? Agora é 1 clique:
+
+**Como funciona (bem simples):**
+1) Alguém da partida digita `!votar 1` ou `!votar 2` (ou `/votar`).
+2) O bot abre uma **caixinha no canal da partida** com 2 botões: 🟦 **Time 1** e 🟥 **Time 2**, e **marca os 10 jogadores**.
+3) Você **clica no botão** do time que ganhou. Pronto, votou! (Dá pra votar digitando também.)
+4) O placar atualiza na hora na caixinha.
+5) Chegou em **6 votos (maioria)**? O bot **registra a vitória sozinho**. Sem esperar staff, capitão ou admin. A próxima partida anda rápido! 🚀
+
+**E se eu esquecer?**
+• Com 2 min o bot manda **1 lembrete marcando quem falta**.
+• Com 5 min os botões desligam (aí é só usar `!votar 1` ou `!votar 2`).
+• Digitou `!votar` sem número? O bot mostra a caixinha de novo.
+
+**O que NÃO mudou:**
+• `!vitoria 1 A` da staff continua igual (registro direto).
+• Voto do MVP continua separado, no canal de destaques.
+• Só quem **jogou a partida** pode votar no resultado.
+
+Exemplo: acabou o jogo da sala A → alguém manda `!votar 1` → aparece a caixinha marcando todo mundo → cada um clica → 6º voto fecha sozinho. Bom jogo! 🔥
+
+============================================================
+FLUXO !votar (resumo interno, passo a passo)
+============================================================
+
+1. Fim da partida (sala A, B ou C).
+2. Qualquer participante digita `!votar 1` ou `!votar 2` (vale `/votar` também).
+3. 1ª votação: o bot publica o painel com botões no canal de partidas em andamento e menciona os 9 que ainda não votaram (= o "pop up": cada um recebe notificação).
+4. Cada voto (botão ou texto) atualiza o placar no painel (ex: Time 1: 4/6).
+5. Lembrete automático em 2 min marcando quem falta (1 vez só).
+6. Maioria (6 votos no 5x5) = vitória registrada automaticamente, painel fecha, MVP abre, todo mundo vai pra Sala de Espera.
+7. Expiração em 5 min: botões desativam; `!votar` em texto segue valendo.
+8. `!vitoria 1 A` (staff/capitão) segue registrando direto e fecha o painel se ele existir.
+9. `!votar` sem número reabre/mostra o painel da partida ativa do jogador.

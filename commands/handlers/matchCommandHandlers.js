@@ -68,6 +68,35 @@ async function handleVoteCommandFlow({
 
   const teamVote = args[args.length - 1];
   if (!['1', '2'].includes(teamVote)) {
+    // Sem número: se o jogador está em partida ativa, mostra o painel de votação
+    // (botões Time 1 / Time 2) para votar com 1 clique.
+    try {
+      const votePanel = deps.votePanel;
+      if (votePanel) {
+        const currentMatchData = await loadCurrentMatch();
+        const matchEntry = Object.entries(currentMatchData.matches || {}).find(([, entry]) => {
+          if (!entry.active || !entry.match) return false;
+          const { teamOne = [], teamTwo = [] } = entry.match;
+          return [...teamOne, ...teamTwo].some((player) => player.discordId === message.author.id);
+        });
+        if (matchEntry) {
+          const [matchId, entry] = matchEntry;
+          const teamSize = entry.match.teamOne.length;
+          const threshold = deps.getVoteThreshold ? deps.getVoteThreshold(teamSize) : VOTE_THRESHOLD;
+          await votePanel.postOrUpdate({
+            guild: message.guild,
+            matchId,
+            match: entry.match,
+            votes: entry.votes || {},
+            threshold
+          });
+          await replyToMessage(message, '🗳️ Abri o painel de votação no canal da partida — clique em **Time 1** ou **Time 2** (ou use `!votar 1` / `!votar 2`).');
+          return;
+        }
+      }
+    } catch (err) {
+      console.error('[VOTEPANEL] Falha ao abrir painel via !votar:', err.message);
+    }
     await replyToMessage(message, '❌ Use `!votar 1` ou `!votar 2` para votar no time vencedor.');
     return;
   }
@@ -110,7 +139,7 @@ async function handleVoteCommandFlow({
       deps: createCastVictoryVoteDeps()
     });
 
-    return { status: voteResult.status, voteResult, currentThreshold, matchLetter: matchEntry[1].match.letter };
+    return { status: voteResult.status, voteResult, currentThreshold, matchLetter: matchEntry[1].match.letter, matchId: matchEntry[0], match: matchEntry[1].match, votes: { ...(matchEntry[1].votes || {}) } };
   });
 
   if (voteOutcome.status === 'no_match') {
@@ -130,6 +159,8 @@ async function handleVoteCommandFlow({
       message,
       `🗳️ **${currentThreshold} votos atingidos!** Registrando vitoria do **Time ${voteResult.winnerTeam}** automaticamente...`
     );
+    // Vitória automática pela maioria: não exige staff (bypass de permissão).
+    message._isAutoVote = true;
     // Repassa a letra da partida para mirar a partida certa quando houver A e B ativas
     const victoryArgs = voteOutcome.matchLetter ? [voteResult.winnerTeam, voteOutcome.matchLetter] : [voteResult.winnerTeam];
     await handleVictoryCommand(message, victoryArgs);
@@ -138,6 +169,21 @@ async function handleVoteCommandFlow({
 
   const bar1 = '🟦'.repeat(voteResult.votesT1) + '⬜'.repeat(Math.max(0, currentThreshold - voteResult.votesT1));
   const bar2 = '🟥'.repeat(voteResult.votesT2) + '⬜'.repeat(Math.max(0, currentThreshold - voteResult.votesT2));
+  // Publica/atualiza o painel com botões: menciona quem ainda não votou
+  // (notificação = "popup") para ninguém esquecer e a próxima começar rápido.
+  try {
+    if (deps.votePanel) {
+      await deps.votePanel.postOrUpdate({
+        guild: message.guild,
+        matchId: voteOutcome.matchId,
+        match: voteOutcome.match,
+        votes: voteOutcome.votes,
+        threshold: currentThreshold
+      });
+    }
+  } catch (err) {
+    console.error('[VOTEPANEL] Falha ao publicar painel:', err.message);
+  }
   await replyToMessage(
     message,
     `🗳️ Voto registrado! Placar atual:\n` +

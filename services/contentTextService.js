@@ -20,7 +20,7 @@ const DEFAULT_CONTENT_TEMPLATES = {
     queueTitle: 'PASSO 2 - Entre na fila',
     queueText: 'Entre em um canal de voz de Lobby e use:\n```\n!entrar              -> Classic 5x5\n!entrar aram         -> ARAM 5x5\n!entrar aram 1x1     -> ARAM 1x1\n!entrar aram 2x2     -> ARAM 2x2\n```\nQuando a sala completa, o bot anuncia, cria os times e move a galera automaticamente.',
     voteTitle: 'PASSO 3 - Vote no vencedor',
-    voteText: 'Ao terminar a partida, vote no time que ganhou:\n```\n!votar 1   -> Voto no Time 1\n!votar 2   -> Voto no Time 2\n```\n> 3 votos confirmam o resultado automaticamente.\n> Staff pode registrar com `!vitoria 1` ou `!vitoria 2` a qualquer momento.',
+    voteText: 'Ao terminar a partida, vote no time que ganhou:\n```\n!votar 1   -> Voto no Time 1 (abre o painel com botoes p/ os 10)\n!votar 2   -> Voto no Time 2\n```\n> A maioria confirma sozinha (6 votos no 5x5) — sem depender da staff.\n> Staff pode registrar com `!vitoria 1` ou `!vitoria 2` a qualquer momento.',
     progressTitle: 'Acompanhe sua evolucao',
     progressText: '`!perfil` - Seu card com MMR e historico\n`!placar` - Ranking geral por modo\n`!top10` - Top 10 por MMR\n`!topstreak` - Maiores sequencias de vitoria ativas\n`!temporadas` - Periodos arquivados',
     channelsTitle: 'Canais Importantes',

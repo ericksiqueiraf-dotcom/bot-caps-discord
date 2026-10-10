@@ -74,6 +74,19 @@ async function handleEnterCommandFlow({
     return;
   }
 
+  if (result.status === 'roulette_pending') {
+    const letters = (result.letters || []).join(', ');
+    const secs = Number(result.secondsRemaining || 0);
+    const mm = Math.floor(secs / 60);
+    const ss = String(secs % 60).padStart(2, '0');
+    const when = secs >= 60 ? `${mm}m${ss}s` : `${secs}s`;
+    await replyToMessage(
+      message,
+      `⏳ Aguarde a **!roleta da sala ${letters}** (${when} restantes). O \`!entrar\` libera após o sorteio — staff: use \`!roleta N ${letters.split(', ')[0] || 'A'}\`.`
+    );
+    return;
+  }
+
   if (result.status === 'duplicate_nickname') {
     await replyToMessage(message, 'Ja existe um jogador com esse nick na fila.');
     return;

@@ -7,20 +7,20 @@
 
 ## 🗓️ Última Sessão
 
-- **Data:** 2026-10-05
-- **Foco:** Lobby TIER S (Esmeralda+) + `!top10`/`!placar tiers` + INFERNAL até 08h com prioridade + `!roleta` instantânea + `!roletasair` + `!regras` + `!staff` + abertura da Temporada Oficial #1
-- **Status:** ✅ Concluído
+- **Data:** 2026-10-10
+- **Foco:** `!pdl` (ajuste staff) + painel de votação de resultado com botões + trava pós-vitória p/ `!roleta` (3 min) + migração de IDs p/ servidor novo (`setup-servidor.js`)
+- **Status:** ✅ Concluído (49/49 testes, commit + push)
 
 ---
 
 ## 📍 Ponto de Parada Atual
 
 ### Onde paramos:
-Banco no MongoDB Atlas (185 jogadores). Pós-`!vitoria` move todos para a **Sala de Espera (1490385246775017572)**. **Lobby TIER S** (`1556124976359415919`, gate Esmeralda IV+ por elo/cargo, sem bypass de `!entrar` p/ staff). **Top10/placar tiers** (mesmo PDL, filtro `baseMmr >= 2000`). Cargo **INFERNAL** automático (5+ winstreak, vale até 08h SP mesmo com derrota; prioridade posição 5 na `!espera` + imunidade na roleta). **`!roleta N A`** instantânea (1 comando, anti-duplo por `matchId`, anúncio no canal fila `1489237001013297182`) + **`!roletasair A`** (opt-out). **`!regras`** (jogadores) + **`!staff`** (restrito). Alias `!iniciarseason`. **Temporada Oficial #1 ativa** (`!resetgeral` → `!iniciartemporada` em 2026-10-05). Suite em **40/40**. Bot online no PM2 (`caps-bot`, `CAPS BOT LOL#6241 v1.8.0`, `[DB] Conectado`). Extração do `legacyCommands.js` segue pendente.
+Banco no MongoDB Atlas (185 jogadores). Pós-`!vitoria` move todos para a **Sala de Espera**. **Lobby TIER S** (gate Esmeralda IV+ por elo/cargo, sem bypass de `!entrar` p/ staff). **Top10/placar tiers** (mesmo PDL, filtro `baseMmr >= 2000`). Cargo **INFERNAL** automático (5+ winstreak, vale até 08h SP mesmo com derrota; prioridade posição 5 na `!espera` + imunidade na roleta). **`!roleta N A`** instantânea (1 comando, anti-duplo por `matchId`, anúncio no canal fila) + **`!roletasair A`** (opt-out). **`!regras`** (jogadores) + **`!staff`** (restrito). Alias `!iniciarseason`. **Temporada Oficial #1 ativa** (aberta em 2026-10-05). Suite em **49/49**. **IDs migrados p/ servidor novo** (`config.json` com IDs `1558...`; script `setup-servidor.js` cria a estrutura; Sala de Espera Tier S separada via `postMatchTierSWaitingChannelId`). **`!pdl @jogador ±valor motivo`** (Admin, ±500, Classic, com auditoria). **Painel de voto de resultado** com botões (`votewin:<matchId>:<time>`, maioria 6/10, lembrete 2min, expira 5min). **Trava pós-vitória de 3min** no `!entrar` (mesma mode/format/tier com roleta pendente). Extração do `legacyCommands.js` segue pendente.
 
 ### Próximo passo imediato:
 - **Pendente do admin no Discord:** subir `CAPS BOT LOL` acima do `INFERNAL` (hierarquia) + remover o INFERNAL órfão do maggot 1x
-- Testar em produção: `!entrar` Tier S, `!top10 tiers`, `!roleta 2 A`, `!regras`, `!staff`
+- Testar em produção: `!entrar` Tier S, `!top10 tiers`, `!roleta 2 A`, `!regras`, `!staff`, `!pdl`, painel de voto por botão
 - Continuar extração de lógica de negócio do `legacyCommands.js`
 
 ---
@@ -67,7 +67,7 @@ Banco no MongoDB Atlas (185 jogadores). Pós-`!vitoria` move todos para a **Sala
 - [x] `!cancelarstart <letra>` (2026-09-30: `!cancelarstart A/B/C` cancela a contagem de auto-start do lobby cheio (jogadores ficam na fila); sem letra só resolve com pendente único; sem pendente cai no cancelamento de partida ativa + limpa timer residual; helper `findPendingAutoStartLobby` exportado e testado)
 
 ### Testes automatizados
-- [x] `tests/` com `node:test` nativo (`npm test`): `helpers.js` + `victory-selector` (7) + `register-victory` (3) + `balance` (3) + `rematch` (5) + `cancel-start` (4) + `cleanup-rooms` (6) = 28/28 verdes
+- [x] `tests/` com `node:test` nativo (`npm test`): `helpers.js` + `victory-selector` (7) + `register-victory` (3) + `balance` (3) + `rematch` (5) + `cancel-start` (4) + `cleanup-rooms` (6) + `tiers-roulette` + `rules` + `pdl` (3) + `result-vote-panel` (6) = 49/49 verdes (13 suites)
 - [x] `!limparsalas A/B/C` (2026-09-30: filtra a sala pela letra; move ocupantes pra Sala de Espera antes de apagar; mutação sob lock; recusa com partida ativa; sem letra limpa tudo como antes; helper `resolveCleanupTargets` exportado e testado)
 - [x] `!ajuda` atualizado (2026-09-30: documenta `!rematch [sala]`, `!cancelarstart [sala]`, `!limparsalas [sala]`, votação de MVP e cargo INFERNAL)
 - [x] Mocks em memória com semântica fiel ao banco (load = clone, save = sobrescreve)
@@ -106,6 +106,13 @@ Banco no MongoDB Atlas (185 jogadores). Pós-`!vitoria` move todos para a **Sala
 - [x] `!roleta N A` instantânea (anti-duplo por partida, anúncio no canal fila) + `!roletasair A` (opt-out, inclui winners)
 - [x] `!regras` (jogadores) + `!staff` (restrito) + alias `!iniciarseason`; regulamento e JSON da imagem em `ALTERAÇÕES BOT.txt`
 - [x] Testes 40/40 (`tiers-roulette`, `rules`); Temporada Oficial #1 aberta (`!resetgeral` → `!iniciartemporada`)
+
+### Pós-05/10: !pdl + painel de voto + trava roleta + servidor novo (2026-10-10)
+- [x] `!pdl @jogador ±valor motivo` (Admin, Classic, inteiro ≠0, limite ±500, piso 0, sem tocar W/L; lock `guildId:victory`; `application/use-cases/adjustPdl.js` + `tests/pdl.test.js` com 3 casos)
+- [x] Painel de votação de resultado com botões (`commands/handlers/resultVotePanel.js`): `votewin:<matchId>:<time>`, maioria simples (6/10 5x5), menciona faltantes, lembrete 2min, expira 5min (texto `!votar` segue valendo); `index.js` trata o clique; `tests/result-vote-panel.test.js` com 6 casos
+- [x] Trava pós-vitória no `!entrar` (`ENTER_ROULETTE_BLOCK_MS` = 3min): mesma mode/format/tier com roleta pendente retorna `roulette_pending` (não mistura lobby antes do sorteio; roleta feita libera via `roletaHistory`); espera Tier S separada (`classic:5x5:s`)
+- [x] Migração de servidor: `config.json` com IDs novos (`1558...`, cargos/voz/texto), `postMatchTierSWaitingChannelId` (Sala de Espera Tier S separada, `lobbyUtils.js` move Tier S p/ lá); `setup-servidor.js` cria a estrutura do zero; `IMAGENS/` centraliza os assets (raiz limpa)
+- [x] Suite em 49/49 (13 suites); `!ajuda`/`!staff` documentam `!pdl`; `rules.test.js` exige `!pdl` no guia da staff
 
 ### Backup e recuperação
 - [x] Pasta `backups/` na raiz do projeto
@@ -237,6 +244,13 @@ database/                    ← fallback JSON local
 - **Partidas simultâneas (2026-09-30):** teste com 2 partidas ativas (A e B) provou que `!vitoria 1 A` mira só a A (seletor por letra; sem letra e com 2 ativas não resolve sozinho = seguro). Achado e corrigido: vitórias REALMENTE simultâneas se apagavam (lock era por partida, saves do doc inteiro colidiam) → lock do `registerVictory` virou por guild (`${guildId}:victory`). `!votar` também registra o voto sob o mesmo lock e a vitória automática agora repassa a letra (`[time, letra]`) pra mirar a partida certa. 13/13 testes passaram.
 - **Backup de segurança (2026-09-30):** `backups/codigo-2026-09-30-1215.zip` (código completo para restore) + `backups/mongo-data-2026-09-30-1515.json` (135 jogadores, 1 partida ativa, 3 temporadas). Bot segue online no PM2 (`caps-bot`, `CAPS BOT LOL#6241 v1.8.0`).
 - **Testes + INFERNAL + rematch (2026-09-30):** criados `tests/helpers.js`, `victory-selector.test.js`, `register-victory.test.js`, `balance.test.js`, `rematch.test.js` + script `npm test` (15/15 verdes, `node:test` nativo, sem deps novas). `syncInfernalRolesAfterMatch` retorna recém-premiados; `postInfernalAnnouncement` posta 🔥 no canal do MVP; `!vitoria` chama ambos com try/catch. `!rematch` consertado: `recentVictory` agora salva `teamOne/teamTwo`, rematch cria a sala se não houver, enriquece os 10 com `baseMmr/mmr` do cadastro e roda sob lock da fila. Bot reiniciado e online.
+
+### 2026-10-10 — !pdl + painel de voto + trava roleta + servidor novo
+- **`!pdl`:** `application/use-cases/adjustPdl.js` (lock `victory`, valida inteiro ≠0, teto 500, piso 0, mexe só no `internalRating` Classic); `legacyCommands.js` expõe `!pdl @jogador -50 motivo` (Admin, com auditoria no log); `!ajuda`/`!staff`/`!entrar` (texto) citam a punição p/ rage quit.
+- **Painel de voto:** `commands/handlers/resultVotePanel.js` (payload puro e testável + timers `reminder 2min`/`expire 5min` com `unref`); `index.js` roteia `votewin:*` p/ `handleResultVoteButton` (só participante, lock `victory`, maioria registra sozinho via `onThresholdReached`); `closeResultVotePanel` desativa botões ao registrar/expirar.
+- **Trava roleta:** `enterQueue.js` exporta `ENTER_ROULETTE_BLOCK_MS`/`getPendingRouletteEntries`/`getWaitingListKey`; `queueCommandHandlers.js` responde o bloqueio (`roulette_pending` com letras + segundos restantes).
+- **Servidor novo:** `config.json` inteiro remapeado (voz/texto/cargos `1558...`); Tier S pós-partida vai p/ `postMatchTierSWaitingChannelId`; `setup-servidor.js` automatiza a criação; `IMAGENS/` recebe os assets (deletados da raiz); `config.json.bak-*` locais NÃO commitados.
+- Validação: `npm test` 49/49; commit + push em `main`.
 
 ### 2026-10-05 — TIER S + roleta instantânea + regras/staff + Temporada Oficial #1
 - **Lobby TIER S:** `config.voiceChannels.classicTierSQueueChannelId = 1556124976359415919` + `config.tierS` (min 2000); gate por elo/cargo em `enterQueue.js` (staff organiza mas NÃO joga sem elo); salas `Lobby TIER S X`; `getOpenLobby` filtra por tier.

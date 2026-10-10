@@ -432,7 +432,16 @@ function getRouletteAnnounceChannelId() {
   return config.textChannels?.queueStatusChannelId || null;
 }
 
-function getPostMatchVoiceChannelId(mode) {
+function getPostMatchVoiceChannelId(mode, tierOrLobby = null) {
+  // Tier S tem Sala de Espera propria (nao mistura com o Classic normal)
+  let tier = tierOrLobby;
+  if (tierOrLobby && typeof tierOrLobby === 'object') {
+    tier = tierOrLobby.tier || getLobbyTier(tierOrLobby);
+  }
+  if (mode === QUEUE_MODES.CLASSIC && tier === 'S') {
+    const tierSWaiting = config.voiceChannels.postMatchTierSWaitingChannelId;
+    if (tierSWaiting) return tierSWaiting;
+  }
   const waitingChannelId = config.voiceChannels.postMatchWaitingChannelId;
   if (waitingChannelId) {
     return waitingChannelId;
@@ -820,8 +829,11 @@ async function syncInfernalRolesAfterMatch(guild, winners = [], losers = []) {
     const stored = getStoredPlayerStats(statsData, winner);
     const stillValid = stored.infernalExpiresAt && new Date(stored.infernalExpiresAt).getTime() > Date.now();
     const infernalExpiresAt = stillValid ? stored.infernalExpiresAt : getNextEightAmSaoPauloIso();
+    // Contador da temporada: so incrementa em NOVA conquista (cargo anterior vencido).
+    // Vitorias em sequencia com o cargo ainda valido nao contam de novo.
+    const infernalCount = Number(stored.infernalCount || 0) + (stillValid ? 0 : 1);
     try {
-      upsertPlayerStats(statsData, winner, { infernalExpiresAt });
+      upsertPlayerStats(statsData, winner, { infernalExpiresAt, infernalCount });
       await savePlayerStats(statsData);
     } catch (err) {
       failed.push({ discordId: winner.discordId, action: 'save_db', error: err.message });
@@ -1389,7 +1401,7 @@ const RULES_SECTIONS = [
   },
   {
     name: '🎮 2. Como jogar',
-    value: 'Entre no canal de voz **Lobby Classic**, **Lobby TIER S** ou **Lobby ARAM** e digite `!entrar` (só vale dentro desses canais — na Sala de Espera não funciona, troque de canal primeiro). Com 10 jogadores a partida inicia sozinha. `!fila` mostra quem está na sala, `!sair` tira você dela.'
+    value: 'Entre no canal de voz **Lobby Classic**, **Lobby TIER S** ou **Lobby ARAM** e digite `!entrar` (só vale dentro desses canais — na Sala de Espera não funciona, troque de canal primeiro). Com 10 jogadores a partida inicia sozinha. `!fila` mostra quem está na sala, `!sair` tira você dela.\n⚠️ **Quitar no meio da partida = penalidade da staff**: só Admin aplica `!pdl` negativo (rage, quit, ofensa grave), além de possível suspensão da fila ou da temporada.'
   },
   {
     name: '💎 3. Lobby TIER S (Esmeralda IV ou mais)',
@@ -1405,7 +1417,7 @@ const RULES_SECTIONS = [
   },
   {
     name: '⏳ 6. Espera e 🎯 roleta',
-    value: '`!espera` guarda seu lugar para a próxima (🔥 = prioridade INFERNAL). Após a partida todos vão à **Sala de Espera**: um comando `!roleta N A` sorteia na hora quem sai (N = 1–5, letra da sala; só losers entram, 🔥 INFERNAL é imune). Não quer a próxima? `!roletasair A` (fora do sorteio e da subida). Resultado sai no canal **fila**; vagas restantes vão para a `!espera`.'
+    value: '`!espera` guarda seu lugar para a próxima (🔥 = prioridade INFERNAL). `!esperatiers` = espera do **Lobby TIER S** (só Esmeralda+). Após a partida todos vão à **Sala de Espera**: um comando `!roleta N A` sorteia na hora quem sai (N = 1–5, letra da sala; só losers entram, 🔥 INFERNAL é imune). Não quer a próxima? `!roletasair A` (fora do sorteio e da subida). Resultado sai no canal **fila**; vagas restantes vão para a `!espera` / `!esperatiers`.'
   },
   {
     name: '🗳️ 7. Fim de jogo e MVP',
@@ -1428,7 +1440,7 @@ const STAFF_SECTIONS = [
   },
   {
     name: '🧹 Filas e salas — organizar e limpar',
-    value: '`!remover @jogador` • Tira alguém da fila (🔥 INFERNAL só sai com Admin).\n`!limparsalas A` • Apaga a sala A vazia/travada (sem letra = todas; com partida ativa, recusa).\n`!limpar 10` • Apaga 10 mensagens do canal.\n`!espera` + `!limparespera` • Ver a espera e (staff) zerá-la.\n`!reset` • Emergência: limpa filas e partidas (não mexe em pontos).'
+    value: '`!pdl @jogador -50 motivo` • Punição/ajuste de PDL Classic, só Admin (-500 a +500, com auditoria no log).\n`!remover @jogador` • Tira alguém da fila (🔥 INFERNAL só sai com Admin).\n`!limparsalas A` • Apaga a sala A vazia/travada (sem letra = todas; com partida ativa, recusa).\n`!limpar 10` • Apaga 10 mensagens do canal.\n`!espera` + `!limparespera` • Ver a espera e (staff) zerá-la.\n`!reset` • Emergência: limpa filas e partidas (não mexe em pontos).'
   },
   {
     name: '🎖️ Elos e cargos — manter atualizado',
@@ -1675,6 +1687,7 @@ function resetStatsForNewSeason(statsData) {
       ...player,
       customWins: 0,
       customLosses: 0,
+      infernalCount: 0,
       internalRating: resetModes.classic?.internalRating || calculateSeedRating(modes.classic.baseMmr || 0),
       modes: resetModes
     };
@@ -2304,7 +2317,10 @@ async function sendToMessageChannel(message, payload) {
     return null;
   }
 
-  return channel.send(payload).catch(() => null);
+  return channel.send(payload).catch((error) => {
+    console.error('[DISCORD] Falha ao enviar mensagem:', error?.message || error);
+    return null;
+  });
 }
 
 async function replyToMessage(message, payload) {
@@ -2413,6 +2429,48 @@ function buildTopStreakEmbed(statsData, mode, format = null) {
   splitEmbedFieldChunks(entries).forEach((chunk, index) => {
     embed.addFields({
       name: index === 0 ? `Top Streak ${modeLabel}` : `Top Streak ${modeLabel} (${index + 1})`,
+      value: chunk
+    });
+  });
+
+  return embed;
+}
+
+function buildTopInfernalEmbed(statsData, seasonMeta) {
+  const now = Date.now();
+  const ranked = Object.values(statsData?.players || {})
+    .map((p) => ({
+      discordId: p.discordId,
+      nickname: p.registeredNickname || p.nickname || p.discordId,
+      infernalCount: Number(p.infernalCount || 0),
+      active: Boolean(p.infernalExpiresAt && new Date(p.infernalExpiresAt).getTime() > now)
+    }))
+    .filter((p) => p.discordId && p.infernalCount > 0)
+    .sort((a, b) => b.infernalCount - a.infernalCount || String(a.nickname).localeCompare(String(b.nickname)))
+    .slice(0, 10);
+  const medals = ['🥇', '🥈', '🥉'];
+
+  const embed = new EmbedBuilder()
+    .setColor(THEME.RANK)
+    .setTitle('🔥 Top INFERNAL da Temporada')
+    .setDescription(`Quem mais conquistou o cargo **INFERNAL** (5 wins seguidas) em **${getSeasonDisplayLabel(seasonMeta)}**.`)
+    .setFooter({ text: `${FOOTER_PREFIX} • Top INFERNAL` })
+    .setTimestamp();
+
+  if (ranked.length === 0) {
+    embed.addFields({ name: 'Sem conquistas ainda', value: 'Ninguém conquistou o INFERNAL nesta temporada. Faça 5 wins seguidas! 🔥' });
+    return embed;
+  }
+
+  const entries = ranked.map((player, index) => {
+    const medal = medals[index] || `#${index + 1}`;
+    const active = player.active ? ' 🔥' : '';
+    return `${medal} <@${player.discordId}> | \`${player.nickname}\`${active}\nINFERNAL conquistado: **${player.infernalCount}x**`;
+  });
+
+  splitEmbedFieldChunks(entries).forEach((chunk, index) => {
+    embed.addFields({
+      name: index === 0 ? 'Top INFERNAL' : `Top INFERNAL (${index + 1})`,
       value: chunk
     });
   });
@@ -2696,6 +2754,7 @@ module.exports = {
   decorateWithLeaderIcons,
   buildTopTenEmbed,
   buildTopStreakEmbed,
+  buildTopInfernalEmbed,
   buildRulesEmbed,
   RULES_SECTIONS,
   buildStaffEmbed,

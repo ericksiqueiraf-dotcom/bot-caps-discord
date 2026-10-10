@@ -31,7 +31,9 @@ async function handleVictoryCommandFlow({
     loadPlayerStats,
     postPlayerLogs,
     postMatchSummaryToSeasonLog,
-    postSmurfAlerts
+    postSmurfAlerts,
+    closeResultVotePanel,
+    votePanelSaveDeps
   } = deps;
 
   const teamArgs = args.filter((arg) => ['1', '2'].includes(String(arg)));
@@ -91,6 +93,14 @@ async function handleVictoryCommandFlow({
   match.winners = victoryResult.winners;
   match.losers = victoryResult.losers;
 
+  // Fecha o painel de votação de resultado (desativa os botões Time 1/2).
+  // Nunca quebra o !vitoria.
+  if (typeof closeResultVotePanel === 'function' && votePanelSaveDeps) {
+    await closeResultVotePanel({ guild: message.guild, matchId, deps: votePanelSaveDeps }).catch((err) =>
+      console.error('[VOTEPANEL] Falha ao fechar painel:', err.message)
+    );
+  }
+
   const { winners, losers } = match;
 
   // INFERNAL: cargo automatico para 5+ vitorias seguidas (vale ate as 08h; derrota nao tira na hora)
@@ -109,8 +119,8 @@ async function handleVictoryCommandFlow({
   // Se ninguem votar, o encerramento usa fallback automatico (maior ganho de rating).
   await startMvpVote(message.guild, match, winners, losers);
 
-  // Pos-partida: todos voltam para a Sala de Espera (nao para o lobby da fila)
-  const postMatchChannelId = getPostMatchVoiceChannelId(match.mode);
+  // Pos-partida: todos voltam para a Sala de Espera (Tier S tem sala propria)
+  const postMatchChannelId = getPostMatchVoiceChannelId(match.mode, match);
   await movePlayersToVoiceChannel(message.guild, [...winners, ...losers], postMatchChannelId);
 
   await deleteManagedChannelsForLobby(message.guild, match.mode, match.format, match.letter, [
@@ -141,10 +151,16 @@ async function handleVictoryCommandFlow({
   // Historico curto das ultimas partidas finalizadas (p/ !rematch <letra>).
   // O recentVictory (ultima) e mantido como antes para o anti-duplo do !vitoria.
   const recentVictories = [finishedEntry, ...((systemMeta.recentVictories || []).filter((e) => e && e.matchId !== matchId))].slice(0, 5);
+  // O matchId e o ID do lobby (ex: classic-5x5-a) e se repete a cada jogo da mesma sala.
+  // Sem limpar aqui, a roleta do jogo anterior bloquearia para sempre ("ja foi roletada").
+  // Nova partida finalizada = roleta liberada de novo p/ esse matchId.
+  const roletaHistory = (Array.isArray(systemMeta.roletaHistory) ? systemMeta.roletaHistory : [])
+    .filter((h) => h && h.matchId !== matchId);
   await saveSystemMeta({
     ...systemMeta,
     recentVictory: finishedEntry,
-    recentVictories
+    recentVictories,
+    roletaHistory
   });
 
   await postMatchHistoryLog(message.guild, {

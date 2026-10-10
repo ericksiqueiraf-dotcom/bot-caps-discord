@@ -121,6 +121,10 @@ function buildSlashCommands() {
     new SlashCommandBuilder().setName('staff').setDescription('Guia de comandos da staff.'),
     new SlashCommandBuilder().setName('roletasair').setDescription('Fica fora da próxima partida (sem sorteio nem subida).')
       .addStringOption((option) => option.setName('sala').setDescription('Letra da sala, ex.: A').setRequired(false)),
+    new SlashCommandBuilder().setName('pdl').setDescription('Ajuste de PDL Classic (staff).')
+      .addUserOption((option) => option.setName('jogador').setDescription('Jogador').setRequired(true))
+      .addIntegerOption((option) => option.setName('valor').setDescription('Ex: -50').setRequired(true).setMinValue(-500).setMaxValue(500))
+      .addStringOption((option) => option.setName('motivo').setDescription('Motivo').setRequired(false)),
     new SlashCommandBuilder()
       .setName('entrar')
       .setDescription('Entra na fila CLASSIC ou ARAM.')
@@ -151,6 +155,7 @@ function buildSlashCommands() {
     addModeAndLobbyOptions(new SlashCommandBuilder().setName('lista').setDescription('Mostra a fila atual.')),
     addModeAndLobbyOptions(new SlashCommandBuilder().setName('fila').setDescription('Mostra a fila atual.')),
     addModeAndLobbyOptions(new SlashCommandBuilder().setName('espera').setDescription('Entra na fila de espera.')),
+    new SlashCommandBuilder().setName('esperatiers').setDescription('Entra na fila de espera TIER S (Esmeralda+).'),
     new SlashCommandBuilder().setName('limparespera').setDescription('Limpa todas as filas de espera.'),
     new SlashCommandBuilder().setName('sair').setDescription('Remove voce da fila.'),
     addModeAndLobbyOptions(new SlashCommandBuilder().setName('start').setDescription('Inicia a partida da sala.')),
@@ -288,7 +293,10 @@ function buildSlashCommands() {
             { name: '3x3', value: '3x3' },
             { name: '4x4', value: '4x4' }
           )
-      )
+      ),
+    new SlashCommandBuilder()
+      .setName('toprankinfernal')
+      .setDescription('Quem mais conquistou o INFERNAL na temporada.'),
   ].map((command) => command.toJSON());
 }
 
@@ -463,6 +471,10 @@ async function processCommand(message, rawContent) {
       case 'espera':
         await handlers.handleWaitingListCommand(message, args);
         break;
+      case 'esperatiers':
+      case 'esperatier':
+        await handlers.handleTierSWaitingListCommand(message, args);
+        break;
       case 'limparespera':
         await handlers.handleClearWaitingListsCommand(message);
         break;
@@ -474,6 +486,9 @@ async function processCommand(message, rawContent) {
         break;
       case 'topstreak':
         await handlers.handleTopStreakCommand(message, args);
+        break;
+      case 'toprankinfernal':
+        await handlers.handleTopInfernalCommand(message);
         break;
       case 'ficha':
       case 'perfil':
@@ -544,6 +559,9 @@ async function processCommand(message, rawContent) {
         break;
       case 'roletasair':
         await handlers.handleRoletaSairCommand(message, args);
+        break;
+      case 'pdl':
+        await handlers.handlePdlCommand(message, args);
         break;
       case 'regras':
       case 'regra':
@@ -647,9 +665,15 @@ client.on('interactionCreate', async (interaction) => {
       if (interaction.customId === ONBOARDING_BUTTON_IDS.NON_PLAYER) {
         await interaction.reply({
           content:
-            'Perfeito. Voce ficara somente com acesso aos canais e salas abertas do servidor, sem receber cargo de jogador.',
+          'Perfeito. Voce ficara somente com acesso aos canais e salas abertas do servidor, sem receber cargo de jogador.',
           ephemeral: true
         });
+        return;
+      }
+
+      // Painel de votação de resultado: votewin:<matchId>:<time>
+      if (String(interaction.customId || '').startsWith('votewin:')) {
+        await handlers.handleResultVoteButton(interaction);
         return;
       }
     } catch (error) {
@@ -752,6 +776,9 @@ client.on('interactionCreate', async (interaction) => {
       case 'espera':
         await handlers.handleWaitingListCommand(context, selectorArgs);
         break;
+      case 'esperatiers':
+        await handlers.handleTierSWaitingListCommand(context, selectorArgs);
+        break;
       case 'sair':
         await handlers.handleLeaveCommand(context);
         break;
@@ -773,6 +800,9 @@ client.on('interactionCreate', async (interaction) => {
       case 'topstreak':
         await handlers.handleTopStreakCommand(context, [mode, format].filter(Boolean));
         break;
+      case 'toprankinfernal':
+        await handlers.handleTopInfernalCommand(context);
+        break;
       case 'perfil':
       case 'ficha':
         await handlers.handlePlayerCardCommand(context, targetUser);
@@ -789,6 +819,13 @@ client.on('interactionCreate', async (interaction) => {
       case 'roletasair': {
         const salaSair = interaction.options.getString('sala');
         await handlers.handleRoletaSairCommand(context, salaSair ? [salaSair] : []);
+        break;
+      }
+      case 'pdl': {
+        const pdlUser = interaction.options.getUser('jogador');
+        const pdlValor = interaction.options.getInteger('valor');
+        const pdlMotivo = interaction.options.getString('motivo');
+        await handlers.handlePdlCommand(context, [String(pdlValor), ...(pdlMotivo ? [pdlMotivo] : [])], pdlUser || null);
         break;
       }
       case 'roleta': {

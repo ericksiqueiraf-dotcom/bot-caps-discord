@@ -10,6 +10,7 @@ const { castVictoryVote } = require('../application/use-cases/castVictoryVote');
 const { handleStartCommandFlow, handleVoteCommandFlow } = require('./handlers/matchCommandHandlers');
 const { handleEnterCommandFlow } = require('./handlers/queueCommandHandlers');
 const { handleVictoryCommandFlow } = require('./handlers/victoryCommandHandlers');
+const votePanel = require('./handlers/resultVotePanel');
 
 const { 
   replyToMessage, sendToMessageChannel, getFormatFromArgs, 
@@ -34,7 +35,7 @@ const {
   postMvpAnnouncement, postMatchHistoryLog, buildPlayerCardEmbed,
   buildSeasonHistoryEmbed, formatCustomRecord,
   postPlayerLogs, postMatchSummaryToSeasonLog, postSeasonSummaryToSeasonLog, postSmurfAlerts,
-  getCustomPointsDelta, getCustomDisplayScore
+  getCustomPointsDelta, getCustomDisplayScore, buildTopInfernalEmbed
 } = require('../utils/lobbyUtils');
 
 const { 
@@ -91,7 +92,7 @@ function getVoteThreshold(teamSize) {
   if (size <= 2) return 2;  // 2x2: 2 votos
   if (size <= 3) return 3;  // 3x3: 3 votos
   if (size <= 4) return 3;  // 4x4: 3 votos
-  return 5;                  // 5x5 Classic: 5 votos (maioria)
+  return 6;                  // 5x5 Classic: maioria dos 10
 }
 const RECENT_VICTORY_WINDOW_MS = 2 * 60 * 1000;
 
@@ -109,6 +110,7 @@ function createEnterQueueDeps() {
     loadPlayerStats,
     loadQueue,
     loadCurrentMatch,
+    loadSystemMeta,
     saveQueue,
     savePlayerStats,
     withQueueOperationLock,
@@ -195,6 +197,60 @@ function createCastVictoryVoteDeps() {
   return {
     saveCurrentMatch
   };
+}
+
+// Deps do painel de votação de resultado (botões Time 1 / Time 2).
+// Centraliza aqui para texto (!votar) e botão usarem o mesmo canal/lock.
+function createVotePanelDeps() {
+  const panelDeps = {
+    loadCurrentMatch,
+    saveCurrentMatch,
+    withQueueOperationLock,
+    castVictoryVote,
+    createCastVictoryVoteDeps,
+    getVoteThreshold,
+    resolveChannel: async (guild) => {
+      const channelId = config.textChannels?.matchOngoingChannelId;
+      if (!channelId) return null;
+      const channel = await guild.channels.fetch(channelId).catch(() => null);
+      return channel?.isTextBased() ? channel : null;
+    },
+    postOrUpdate: (args) => votePanel.postOrUpdateResultVotePanel({ ...args, deps: panelDeps }),
+    close: (args) => votePanel.closeResultVotePanel({ ...args, deps: panelDeps }),
+    // Maioria atingida via botão: registra a vitória sem exigir staff.
+    onThresholdReached: async ({ guild, matchId, match, winnerTeam, voterMember }) => {
+      const panelChannelId = config.textChannels?.matchOngoingChannelId;
+      const channel = panelChannelId ? await guild.channels.fetch(panelChannelId).catch(() => null) : null;
+      const shimMessage = {
+        _isAutoVote: true,
+        guild,
+        member: voterMember,
+        author: voterMember?.user || { id: voterMember?.id || 'unknown', tag: 'votacao-botao' },
+        channelId: panelChannelId,
+        channel,
+        client: guild.client,
+        deletable: false
+      };
+      shimMessage.reply = async (payload) => {
+        if (channel?.isTextBased()) return channel.send(payload).catch(() => null);
+        return null;
+      };
+      await handleVictoryCommand(shimMessage, [String(winnerTeam), String(match?.letter || '')].filter(Boolean));
+    }
+  };
+  return panelDeps;
+}
+
+// Clique nos botões do painel de resultado (votewin:<matchId>:<time>).
+async function handleResultVoteButton(interaction) {
+  try {
+    await votePanel.handleResultVoteButton(interaction, createVotePanelDeps());
+  } catch (error) {
+    console.error('[ERRO] voto por botao:', error);
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({ content: '❌ Não consegui registrar seu voto agora.', ephemeral: true }).catch(() => null);
+    }
+  }
 }
 
 function getRecentVictoryForGuild(systemMeta, guildId) {
@@ -500,7 +556,8 @@ async function handleVoteCommand(message, args) {
         castVictoryVote,
         createCastVictoryVoteDeps,
         replyToMessage,
-        handleVictoryCommand
+        handleVictoryCommand,
+        votePanel: createVotePanelDeps()
       }
     });
   } catch (error) {
@@ -543,15 +600,16 @@ async function handleListCommand(message, args = []) {
   }
 }
 
-async function handleWaitingListCommand(message, args = []) {
+async function handleWaitingListCommand(message, args = [], options = {}) {
   try {
     const action = String(args[0] || '').toLowerCase();
     const isViewOnly = ['ver', 'listar', 'lista'].includes(action);
     const isLeaving = ['sair', 'remover'].includes(action);
     const queueArgs = isViewOnly || isLeaving ? args.slice(1) : args;
-    const { mode, format } = parseModeAndFormatArgs(queueArgs);
-    const listKey = `${mode}:${format || '5x5'}`;
-    const modeLabel = mode === QUEUE_MODES.ARAM ? `ARAM ${format || '5x5'}` : 'CLASSIC 5x5';
+    const { mode, format, tierSOnly: parsedTierS } = parseModeAndFormatArgs(queueArgs);
+    const tierSOnly = Boolean(options.forceTierS || parsedTierS);
+    const listKey = tierSOnly && mode === QUEUE_MODES.CLASSIC ? 'classic:5x5:s' : `${mode}:${format || '5x5'}`;
+    const modeLabel = mode === QUEUE_MODES.ARAM ? `ARAM ${format || '5x5'}` : (tierSOnly ? 'CLASSIC TIER S' : 'CLASSIC 5x5');
     let players = [];
     let response = null;
 
@@ -567,27 +625,43 @@ async function handleWaitingListCommand(message, args = []) {
       );
 
       if (isLeaving) {
-        if (playerIndex === -1) {
-          response = 'Voce nao esta na fila de espera.';
+        // !espera sair / !esperatiers sair: sai da lista atual ou de qualquer outra onde esteja
+        if (playerIndex !== -1) {
+          currentList.splice(playerIndex, 1);
+          if (currentList.length === 0) {
+            delete queueData.waitingLists[listKey];
+          } else {
+            queueData.waitingLists[listKey] = currentList;
+          }
+          await saveQueue(queueData);
+          response = 'Voce saiu da fila de espera.';
           players = currentList;
           return;
         }
-
-        currentList.splice(playerIndex, 1);
-        if (currentList.length === 0) {
-          delete queueData.waitingLists[listKey];
-        } else {
-          queueData.waitingLists[listKey] = currentList;
+        if (otherWaitingList) {
+          const [otherKey, otherPlayers] = otherWaitingList;
+          const idx = otherPlayers.findIndex((player) => player.discordId === message.author.id);
+          if (idx !== -1) {
+            otherPlayers.splice(idx, 1);
+            if (otherPlayers.length === 0) {
+              delete queueData.waitingLists[otherKey];
+            } else {
+              queueData.waitingLists[otherKey] = otherPlayers;
+            }
+            await saveQueue(queueData);
+            response = 'Voce saiu da fila de espera.';
+            players = [];
+            return;
+          }
         }
-        await saveQueue(queueData);
-        response = 'Voce saiu da fila de espera.';
+        response = 'Voce nao esta na fila de espera.';
         players = currentList;
         return;
       }
 
       if (!isViewOnly && playerIndex === -1) {
         if (otherWaitingList) {
-          response = 'Voce ja esta aguardando em outra fila. Use `!fila sair` antes de entrar em uma fila diferente.';
+          response = 'Voce ja esta aguardando em outra fila. Use `!espera sair` ou `!esperatiers sair` antes de entrar em uma fila diferente.';
           players = currentList;
           return;
         }
@@ -601,6 +675,16 @@ async function handleWaitingListCommand(message, args = []) {
           response = 'Voce precisa se cadastrar com `!cadastrar Nick#TAG` antes de entrar na fila de espera.';
           players = currentList;
           return;
+        }
+
+        // Gate TIER S na espera: so Esmeralda IV+ (elo ou cargo)
+        if (tierSOnly) {
+          const { isTierSEligibleMember } = require('../utils/lobbyUtils');
+          if (!isTierSEligibleMember(message.member, registeredPlayer)) {
+            response = '⛔ `!esperatiers` exige elo **Esmeralda IV ou superior** (ou cargo Esmeralda+). Use o `!espera` normal.';
+            players = currentList;
+            return;
+          }
         }
 
         const isInfernal = await hasInfernalPriority(message.guild, message.author.id, playerStats).catch(() => false);
@@ -666,6 +750,10 @@ async function handleWaitingListCommand(message, args = []) {
   } finally {
     if (message.deletable) await message.delete().catch(() => null);
   }
+}
+
+async function handleTierSWaitingListCommand(message, args = []) {
+  return handleWaitingListCommand(message, args, { forceTierS: true });
 }
 
 function hasCaptainRole(member) {
@@ -735,6 +823,13 @@ async function handleTopStreakCommand(message, args = []) {
   await sendToMessageChannel(message, { embeds: [embed] });
 }
 
+async function handleTopInfernalCommand(message) {
+  const statsData = await loadPlayerStats();
+  const seasonMeta = await loadSeasonMeta();
+  const embed = buildTopInfernalEmbed(statsData, seasonMeta);
+  await sendToMessageChannel(message, { embeds: [embed] });
+}
+
 async function handlePlayerCardCommand(message, targetUser = null) {
   const selectedUser = targetUser || message.mentions.users.first() || message.author;
   const statsData = await loadPlayerStats();
@@ -744,20 +839,29 @@ async function handlePlayerCardCommand(message, targetUser = null) {
 }
 
 async function handleHelpCommand(message) {
-  const embed = new EmbedBuilder()
+  try {
+    const embed = new EmbedBuilder()
     .setColor(THEME.INFO)
     .setTitle('📚 Guia Completo de Comandos')
     .setDescription('Aqui estao os comandos para gerenciar a CAPS Arena.')
     .addFields(
       { name: '🕹️ Cadastro (1x)', value: '`!cadastrar Nick#TAG` • Vincula sua conta Riot\n`!nick Nick#TAG` • Atualiza seu nick' },
-      { name: '🎮 Jogador', value: '`!regras` • Regulamento completo\n`!entrar` • Fila Classic (no canal Lobby Classic ou Lobby TIER S)\n`!entrar aram` • Fila ARAM\n`!entrar aram 2x2` • ARAM formato\n`!fila` • Mostra jogadores em sala\n`!espera` • Entra na espera (🔥 INFERNAL entra na posição 5)\n`!espera ver` • Mostra a ordem\n`!espera sair` • Sai da espera\n`!sair` • Sai da sala\n`!votar 1/2` • Vota no vencedor\n`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking geral (CLASSIC = pontos custom)\n`!placar tiers` • Só Esmeralda+\n`!top10` • Top 10 CLASSIC por pontos custom, desempate por winrate\n`!top10 tiers` • Top 10 só Esmeralda+\n`!topstreak` • Ranking Streak 🔥\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
-      { name: '🛠️ Staff', value: '`!staff` • Guia completo da staff\n`!remover @u`, `!limpar [qnt]`, `!limparsalas [sala]` • Limpa sala A/B/C (sem letra = todas)\n`!sincronizarelo @u`, `!sincronizartodos` (ou `!sync todos`), `!sync`, `!onboarding`' },
+      { name: '🎮 Jogador (1/2) — Fila e voto', value: '`!regras` • Regulamento completo\n`!entrar` • Fila Classic (no canal Lobby Classic ou Lobby TIER S)\n`!entrar aram` • Fila ARAM\n`!entrar aram 2x2` • ARAM formato\n`!fila` • Mostra jogadores em sala\n`!espera` • Entra na espera (🔥 INFERNAL entra na posição 5)\n`!esperatiers` • Espera do Lobby TIER S (só Esmeralda+)\n`!espera ver` • Mostra a ordem\n`!espera sair` • Sai da espera\n`!sair` • Sai da sala\n`!votar 1/2` • Vota no vencedor (abre painel com botões p/ os 10 votarem)\n`!votar` • Reabre o painel de votação' },
+      { name: '🎮 Jogador (2/2) — Ranking', value: '`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking geral (CLASSIC = pontos custom)\n`!placar tiers` • Só Esmeralda+\n`!top10` • Top 10 CLASSIC por pontos custom, desempate por winrate\n`!top10 tiers` • Top 10 só Esmeralda+\n`!topstreak` • Ranking Streak 🔥\n`!toprankinfernal` • Quem mais pegou INFERNAL na temporada 🔥\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
+      { name: '🛠️ Staff', value: '`!staff` • Guia completo da staff\n`!pdl @u -50 motivo` • Ajuste/punição de PDL Classic (só Admin)\n`!remover @u`, `!limpar [qnt]`, `!limparsalas [sala]` • Limpa sala A/B/C (sem letra = todas)\n`!sincronizarelo @u`, `!sincronizartodos` (ou `!sync todos`), `!sync`, `!onboarding`' },
       { name: '⚙️ Partida (Staff)', value: '`!start [sala]`, `!vitoria [1|2] [sala]`, `!cancelarstart [sala]`\n`!rematch [sala]` • Volta os 10 pra fila, rebalanceia e inicia na hora' },
       { name: '📊 Temporada', value: '`!temporadas`, `!resetgeral` (Admin)' }
     )
     .setFooter({ text: `${FOOTER_PREFIX} • Ajuda Atualizada` })
     .setTimestamp();
-  await sendToMessageChannel(message, { embeds: [embed] });
+  const sent = await sendToMessageChannel(message, { embeds: [embed] });
+    if (!sent) {
+      await replyToMessage(message, '📚 Comandos: `!cadastrar Nick#TAG` • `!entrar` • `!entrar aram` • `!fila` • `!espera` • `!sair` • `!votar 1/2` • `!perfil` • `!placar` • `!top10` • `!topstreak` • `!staff` • `!start` • `!vitoria` • `!temporadas`');
+    }
+  } catch (error) {
+    console.error('[ERRO] !ajuda:', error);
+    await replyToMessage(message, '❌ Erro ao mostrar ajuda. Tente de novo ou use `/ajuda`.').catch(() => null);
+  }
 }
 
 async function handleLeaveCommand(message) {
@@ -790,7 +894,7 @@ async function handleLeaveCommand(message) {
       const [removedPlayer] = lobby.players.splice(playerIndex, 1);
 
       if (message.member.voice?.channelId === lobby.waitingChannelId) {
-        const baseQueueChannelId = getBaseQueueChannelIdByMode(lobby.mode);
+        const baseQueueChannelId = getBaseQueueChannelIdByMode(lobby.mode, require('../utils/lobbyUtils').getLobbyTier(lobby));
         await movePlayersToVoiceChannel(message.guild, [removedPlayer], baseQueueChannelId);
       }
 
@@ -844,7 +948,7 @@ async function handleRemoveCommand(message, targetUserOverride = null) {
 
       const targetMember = await message.guild.members.fetch(targetUser.id).catch(() => null);
       if (targetMember?.voice?.channelId === lobby.waitingChannelId) {
-        const baseQueueChannelId = getBaseQueueChannelIdByMode(lobby.mode);
+        const baseQueueChannelId = getBaseQueueChannelIdByMode(lobby.mode, require('../utils/lobbyUtils').getLobbyTier(lobby));
         await movePlayersToVoiceChannel(message.guild, [removedPlayer], baseQueueChannelId);
       }
 
@@ -953,10 +1057,10 @@ async function handleCleanupRoomsCommand(message, args = [], options = {}) {
           pendingAutoStarts.delete(lobby.id);
         }
 
-        // Move os ocupantes para a Sala de Espera antes de apagar os canais
+        // Move os ocupantes para a Sala de Espera (Tier S tem sala propria) antes de apagar os canais
         const occupants = lobby.players || [];
         if (occupants.length > 0) {
-          await movePlayersToVoiceChannel(message.guild, occupants, getPostMatchVoiceChannelId(lobby.mode));
+          await movePlayersToVoiceChannel(message.guild, occupants, getPostMatchVoiceChannelId(lobby.mode, lobby));
         }
 
         removedChannels += await deleteManagedChannelsForLobby(
@@ -1152,7 +1256,9 @@ async function handleVictoryCommand(message, args) {
         loadPlayerStats,
         postPlayerLogs,
         postMatchSummaryToSeasonLog,
-        postSmurfAlerts
+        postSmurfAlerts,
+        closeResultVotePanel: votePanel.closeResultVotePanel,
+        votePanelSaveDeps: { loadCurrentMatch, saveCurrentMatch }
       }
     });
   } catch (error) {
@@ -1354,7 +1460,7 @@ async function handleOnboardingCommand(message) {
         value:
           'Ao terminar a partida, vote no time que ganhou:\n' +
           '```\n!votar 1   → Voto no Time 1\n!votar 2   → Voto no Time 2\n```\n' +
-          '> **3 votos** confirmam o resultado automaticamente.\n' +
+          '> **6 votos (maioria no 5x5)** confirmam o resultado automaticamente.\n' +
           '> Staff pode registrar com `!vitoria 1` ou `!vitoria 2` a qualquer momento.'
       },
       {
@@ -1400,6 +1506,72 @@ async function handleClearCommand(message, args) {
   }
   const amount = parseInt(args[0]) || 10;
   await (message.channel || message).bulkDelete(Math.min(amount + 1, 100), true);
+}
+
+async function handlePdlCommand(message, args = [], targetUserOverride = null) {
+  try {
+    const adminOnly = message.member?.permissions?.has('Administrator');
+    if (!adminOnly) {
+      return await replyToMessage(message, '❌ Apenas administradores podem ajustar PDL.');
+    }
+
+    const targetUser = targetUserOverride || message.mentions?.users?.first?.() || null;
+    if (!targetUser) {
+      return await replyToMessage(message, 'Uso: `!pdl @jogador -50 motivo` (valor de -500 a +500, Classic).');
+    }
+    const numeric = args.map((a) => Number(a)).find((n) => Number.isInteger(n) && n !== 0 && Math.abs(n) <= 500);
+    if (numeric == null) {
+      return await replyToMessage(message, 'Informe o valor. Ex: `!pdl @jogador -50 rage quit`.');
+    }
+    const reason = args
+      .filter((a) => !/^<@!?\d+>$/.test(String(a)) && Number(a) !== numeric)
+      .join(' ')
+      .trim() || 'Decisão da staff';
+
+    const { adjustPdl } = require('../application/use-cases/adjustPdl');
+    const { calculateSeedRating } = require('../services/balanceService');
+    const result = await adjustPdl({
+      guildId: message.guild.id,
+      discordId: targetUser.id,
+      delta: numeric,
+      deps: {
+        withQueueOperationLock,
+        loadPlayerStats,
+        savePlayerStats,
+        getStoredPlayerStats,
+        getModeStats,
+        normalizePlayerModes,
+        getStatsBucketKey,
+        upsertPlayerStats,
+        calculateSeedRating
+      }
+    });
+
+    const sign = result.applied >= 0 ? '+' : '';
+    const embed = new EmbedBuilder()
+      .setColor(result.applied >= 0 ? THEME.SUCCESS : THEME.ERROR)
+      .setTitle(`⚖️ Ajuste de PDL — ${result.nickname || 'jogador'}`)
+      .setDescription(`<@${result.discordId}>: \`${result.before}\` → \`${result.after}\` (**${sign}${result.applied}** PDL Classic)`)
+      .addFields(
+        { name: 'Motivo', value: reason.slice(0, 1024) },
+        { name: 'Aplicado por', value: `<@${message.author.id}>` }
+      )
+      .setFooter({ text: `${FOOTER_PREFIX} • Punição/ajuste` })
+      .setTimestamp();
+    await sendToMessageChannel(message, { embeds: [embed] });
+
+    // Auditoria no log da temporada
+    const seasonLogId = config.textChannels?.seasonLogChannelId;
+    const seasonLog = seasonLogId ? await message.guild.channels.fetch(seasonLogId).catch(() => null) : null;
+    if (seasonLog?.isTextBased()) {
+      await seasonLog.send({ embeds: [embed] }).catch(() => null);
+    }
+  } catch (error) {
+    console.error('[ERRO] !pdl:', error);
+    await replyToMessage(message, `❌ ${error.message}`);
+  } finally {
+    if (message.deletable) await message.delete().catch(() => null);
+  }
 }
 
 async function handleStatsCommand(message) {
@@ -1655,13 +1827,14 @@ async function handleRouletteCommand(message, args = [], targetUserOverride = nu
 }
 
 module.exports = {
-  handleEnterCommand, handleListCommand, handleWaitingListCommand, handleClearWaitingListsCommand, handleStatsCommand, handlePingCommand, handleLeaderboardCommand, handleTopTenCommand,
+  handleEnterCommand, handleListCommand, handleWaitingListCommand, handleTierSWaitingListCommand, handleClearWaitingListsCommand, handleStatsCommand, handlePingCommand, handleLeaderboardCommand, handleTopTenCommand, handleTopInfernalCommand,
   handleTopStreakCommand, handleSeasonHistoryCommand, handlePlayerCardCommand, handleHelpCommand, handleLeaveCommand, handleRemoveCommand,
   handleResetCommand, handleCleanupRoomsCommand, handleSeasonResetCommand, handleOfficialSeasonStartCommand,
   handleUndoSeasonResetCommand, handleRestoreArchivedPeriodCommand, handleCancelStartCommand, handleStartCommand,
   handleSyncAllRolesCommand, handleSyncAllPlayersEloCommand, handleVictoryCommand, handleOnboardingCommand, handleClearCommand,
   handleRegisterCommand, handleNickUpdateCommand, handleSyncPlayerRankCommand, handleVoteCommand, pendingAutoStarts, triggerAutoStart,
-  handleRematchCommand, handleRouletteCommand, handleRoletaSairCommand, handleRulesCommand, handleStaffCommand,
+  handleRematchCommand, handleRouletteCommand, handleRoletaSairCommand, handleRulesCommand, handleStaffCommand, handlePdlCommand,
+  handleResultVoteButton,
   findRecentVictoryByLetter,
   findPendingAutoStartLobby,
   resolveCleanupTargets

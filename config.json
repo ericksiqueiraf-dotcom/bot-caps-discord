@@ -2,34 +2,41 @@
   "prefix": "!",
   "region": "br1",
   "roles": {
-    "registeredPlayerRoleId": "1487820221694742651",
+    "registeredPlayerRoleId": "1558224995451277402",
     "infernalRoleName": "INFERNAL",
     "mvpPlayerRoleName": "MVP player",
-    "captainRoleId": "1487819172783325255"
+    "captainRoleId": "1558224992821575792"
   },
   "voiceChannels": {
-    "classicQueueChannelId": "1489240283051856023",
-    "classicTierSQueueChannelId": "1556124976359415919",
-    "aramQueueChannelId": "1489240459875455169",
-    "postMatchWaitingChannelId": "1490385246775017572"
+    "classicQueueChannelId": "1558225042893181028",
+    "classicTierSQueueChannelId": "1558225044327370942",
+    "aramQueueChannelId": "1558225045531402411",
+    "postMatchWaitingChannelId": "1558225051353092289",
+    "postMatchTierSWaitingChannelId": "1558225053747773491"
   },
   "tierS": {
     "minBaseMmr": 2000,
-    "tiers": ["EMERALD", "DIAMOND", "MASTER", "GRANDMASTER", "CHALLENGER"]
+    "tiers": [
+      "EMERALD",
+      "DIAMOND",
+      "MASTER",
+      "GRANDMASTER",
+      "CHALLENGER"
+    ]
   },
   "roulette": {
     "timeoutSeconds": 300,
     "warnSeconds": 240
   },
   "textChannels": {
-    "rankUpdatesChannelId": "1489247981155651645",
-    "matchHistoryChannelId": "1489248090526449684",
-    "mvpAnnouncementsChannelId": "1489238507313696838",
-    "queueStatusChannelId": "1489237001013297182",
-    "matchOngoingChannelId": "1489236955479937114",
-    "welcomeChannelId": "1489303816557035700",
-    "playerLogChannelId": "1489810297832210654",
-    "seasonLogChannelId": "1489810341809487966",
+    "rankUpdatesChannelId": "1558225032084328570",
+    "matchHistoryChannelId": "1558225025495076904",
+    "mvpAnnouncementsChannelId": "1558225027047100558",
+    "queueStatusChannelId": "1558225019430244352",
+    "matchOngoingChannelId": "1558225022382776400",
+    "welcomeChannelId": "1558225015063978044",
+    "playerLogChannelId": "1558225028758118570",
+    "seasonLogChannelId": "1558225030486294558",
     "smurfAlertChannelId": ""
   },
   "automation": {

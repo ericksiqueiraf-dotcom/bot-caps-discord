@@ -88,9 +88,22 @@ async function buildLobbyPlayer(deps, stored, mode, format) {
   };
 }
 
-function alreadyDrawn(systemMeta, matchId) {
+function alreadyDrawn(systemMeta, matchIdOrOrigin) {
   const history = Array.isArray(systemMeta?.roletaHistory) ? systemMeta.roletaHistory : [];
-  return history.some((entry) => entry && entry.matchId === matchId);
+  // O matchId e o ID do lobby (ex: classic-5x5-a) e se repete a cada jogo da sala.
+  // Quando recebe a partida de origem, o sorteio so vale se foi feito DEPOIS dela terminar;
+  // registro mais antigo que o fim da partida e de um jogo anterior e e ignorado.
+  const origin = matchIdOrOrigin && typeof matchIdOrOrigin === 'object' ? matchIdOrOrigin : null;
+  const matchId = origin ? origin.matchId : matchIdOrOrigin;
+  const finishedMs = origin && origin.finishedAt ? new Date(origin.finishedAt).getTime() : NaN;
+  return history.some((entry) => {
+    if (!entry || entry.matchId !== matchId) return false;
+    if (origin && !Number.isNaN(finishedMs) && entry.at) {
+      const drawnMs = new Date(entry.at).getTime();
+      if (!Number.isNaN(drawnMs) && drawnMs < finishedMs) return false;
+    }
+    return true;
+  });
 }
 
 // Opt-outs: jogador que não quer a próxima (fora do sorteio e da subida ao lobby).
@@ -157,7 +170,7 @@ async function executeRouletteDraw({ guild, origin, pool, count, winners, deps }
   return withQueueOperationLock(`${guild.id}:global:queue`, async () => {
     // Guarda anti-duplo DENTRO do lock (2 comandos juntos não sorteiam 2x)
     const freshMeta = await deps.loadSystemMeta();
-    if (alreadyDrawn(freshMeta, origin.matchId)) {
+    if (alreadyDrawn(freshMeta, origin)) {
       throw new Error(`A sala **${origin.letter || '?'}** já foi roletada.`);
     }
 
@@ -263,7 +276,7 @@ async function handleRouletteCommandFlow({ message, args, deps }) {
     return;
   }
 
-  if (alreadyDrawn(systemMeta, origin.matchId)) {
+  if (alreadyDrawn(systemMeta, origin)) {
     await replyToMessage(message, `A sala **${origin.letter || targetLetter}** já foi roletada. Vagas restantes: \`!espera\`.`);
     return;
   }
@@ -325,7 +338,7 @@ async function handleRouletteOptOutFlow({ message, args, deps }) {
     return;
   }
 
-  if (alreadyDrawn(systemMeta, origin.matchId)) {
+  if (alreadyDrawn(systemMeta, origin)) {
     await replyToMessage(message, `A sala **${origin.letter}** já foi roletada. Para sair da próxima, use \`!sair\`.`);
     return;
   }

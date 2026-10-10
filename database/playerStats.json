@@ -9655,6 +9655,80 @@
       "leaguePoints": 91,
       "summonerId": null,
       "isFallbackUnranked": false
+    },
+    "DOokFHmGzJRfezL8q9ermmQf1DTE0yv8V6JBTfTQIkx_2KfqTQZDd8dHWtwp1EqFAT-3DTPhZpOwCg": {
+      "discordId": "842674712760942623",
+      "nickname": "RolaECrita#Vayne",
+      "puuid": "DOokFHmGzJRfezL8q9ermmQf1DTE0yv8V6JBTfTQIkx_2KfqTQZDd8dHWtwp1EqFAT-3DTPhZpOwCg",
+      "customWins": 0,
+      "customLosses": 0,
+      "baseMmr": 1537,
+      "internalRating": 2537,
+      "modes": {
+        "classic": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 1537,
+          "internalRating": 2537,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 1537,
+          "internalRating": 2537,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram1x1": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 1537,
+          "internalRating": 2537,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram2x2": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 1537,
+          "internalRating": 2537,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram3x3": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 1537,
+          "internalRating": 2537,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram4x4": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 1537,
+          "internalRating": 2537,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram5x5": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 1537,
+          "internalRating": 2537,
+          "winStreak": 0,
+          "ratingVersion": 2
+        }
+      },
+      "registeredNickname": "RolaECrita#Vayne",
+      "registeredAt": "2026-10-01T15:47:26.258Z",
+      "tier": "GOLD",
+      "rank": "I",
+      "leaguePoints": 37,
+      "summonerId": null,
+      "isFallbackUnranked": false
     }
   }
 }
