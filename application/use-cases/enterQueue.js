@@ -1,3 +1,56 @@
+const ENTER_ROULETTE_BLOCK_MS = 3 * 60 * 1000; // pos-vitoria: segura o !entrar p/ sair a !roleta primeiro
+
+function normalizeRouletteTier(originTier) {
+  return originTier === 'S' ? 'S' : 'normal';
+}
+
+function getPendingRouletteEntries(systemMeta, guildId, mode, format, tier) {
+  if (!systemMeta) return [];
+  const seen = new Set();
+  const entries = [];
+  const push = (e) => {
+    if (!e || !e.matchId || seen.has(e.matchId)) return;
+    seen.add(e.matchId);
+    entries.push(e);
+  };
+  if (Array.isArray(systemMeta.recentVictories)) {
+    for (const e of systemMeta.recentVictories) push(e);
+  }
+  if (systemMeta.recentVictory && !Array.isArray(systemMeta.recentVictory)) push(systemMeta.recentVictory);
+
+  const drawn = new Set(
+    (Array.isArray(systemMeta.roletaHistory) ? systemMeta.roletaHistory : [])
+      .map((h) => h && h.matchId)
+      .filter(Boolean)
+  );
+
+  const now = Date.now();
+  const wantFormat = format || '5x5';
+  const wantTier = tier === 'S' ? 'S' : 'normal';
+  const pending = [];
+  for (const e of entries) {
+    if (!e || e.guildId !== guildId || !e.finishedAt) continue;
+    // Bloqueio por fila: so trava a mesma mode/format/tier (A nao trava B de outro modo,
+    // mas A trava entrante classic-normal que cairia no mesmo lobby).
+    if ((e.mode || 'classic') !== mode) continue;
+    if ((e.format || '5x5') !== wantFormat) continue;
+    if (mode === 'classic' && normalizeRouletteTier(e.tier) !== wantTier) continue;
+    const ms = new Date(e.finishedAt).getTime();
+    if (Number.isNaN(ms)) continue;
+    const elapsed = now - ms;
+    if (elapsed < 0 || elapsed > ENTER_ROULETTE_BLOCK_MS) continue;
+    if (drawn.has(e.matchId)) continue; // ja roletada => libera
+    pending.push({ entry: e, remainingMs: ENTER_ROULETTE_BLOCK_MS - elapsed });
+  }
+  return pending;
+}
+
+function getWaitingListKey(mode, format, tier = null) {
+  // Tier S tem espera propria: classic:5x5:s (normal segue classic:5x5)
+  if (mode === 'classic' && tier === 'S') return `classic:${format || '5x5'}:s`;
+  return `${mode}:${format || '5x5'}`;
+}
+
 async function enterQueue({
   guild,
   guildId,
@@ -14,6 +67,7 @@ async function enterQueue({
     loadPlayerStats,
     loadQueue,
     loadCurrentMatch,
+    loadSystemMeta,
     saveQueue,
     savePlayerStats,
     withQueueOperationLock,
@@ -72,7 +126,27 @@ async function enterQueue({
       return { status: 'already_in_queue', lobby: alreadyInQueue };
     }
 
-    const waitingListKey = `${selectedMode}:${selectedFormat || '5x5'}`;
+    // Trava pos-vitoria por fila (3 min): mesma mode/format/tier com roleta pendente
+    // segura o !entrar p/ nao misturar lobby antes do sorteio. ARAM nao trava Classic,
+    // Tier S nao trava normal (e vice-versa). Apos a roleta (roletaHistory) libera.
+    if (typeof loadSystemMeta === 'function') {
+      try {
+        const systemMeta = await loadSystemMeta();
+        const pending = getPendingRouletteEntries(systemMeta, guildId, selectedMode, selectedFormat, selectedTier);
+        if (pending.length > 0) {
+          const letters = [...new Set(pending.map((p) => String(p.entry.letter || '?').toUpperCase()))];
+          const secondsRemaining = Math.max(
+            1,
+            Math.ceil(Math.min(...pending.map((p) => p.remainingMs)) / 1000)
+          );
+          return { status: 'roulette_pending', letters, secondsRemaining };
+        }
+      } catch {
+        // sem meta => sem trava
+      }
+    }
+
+    const waitingListKey = getWaitingListKey(selectedMode, selectedFormat, selectedTier);
     const waitingList = Array.isArray(queueData.waitingLists?.[waitingListKey])
       ? queueData.waitingLists[waitingListKey]
       : [];
@@ -229,5 +303,8 @@ async function enterQueue({
 }
 
 module.exports = {
-  enterQueue
+  enterQueue,
+  ENTER_ROULETTE_BLOCK_MS,
+  getPendingRouletteEntries,
+  getWaitingListKey
 };

@@ -1,5 +1,7 @@
 node_modules/
 .env
+.env.bak*
+*.bak*
 npm-debug.log*
 bot.stdout.log
 bot.stderr.log

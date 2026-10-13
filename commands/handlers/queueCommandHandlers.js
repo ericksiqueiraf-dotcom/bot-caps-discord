@@ -13,6 +13,8 @@ async function handleEnterCommandFlow({
     createEnterQueueDeps,
     replyToMessage,
     updateQueueDashboard,
+    buildQueueFeedText,
+    postQueueFeedMessage,
     triggerAutoStart,
     pendingAutoStarts
   } = deps;
@@ -74,6 +76,19 @@ async function handleEnterCommandFlow({
     return;
   }
 
+  if (result.status === 'roulette_pending') {
+    const letters = (result.letters || []).join(', ');
+    const secs = Number(result.secondsRemaining || 0);
+    const mm = Math.floor(secs / 60);
+    const ss = String(secs % 60).padStart(2, '0');
+    const when = secs >= 60 ? `${mm}m${ss}s` : `${secs}s`;
+    await replyToMessage(
+      message,
+      `⏳ Aguarde a **!roleta da sala ${letters}** (${when} restantes). O \`!entrar\` libera após o sorteio — staff: use \`!roleta N ${letters.split(', ')[0] || 'A'}\`.`
+    );
+    return;
+  }
+
   if (result.status === 'duplicate_nickname') {
     await replyToMessage(message, 'Ja existe um jogador com esse nick na fila.');
     return;
@@ -86,6 +101,22 @@ async function handleEnterCommandFlow({
   }
 
   await updateQueueDashboard(message.guild);
+
+  // Feed automatico no canal #fila a cada !entrar (com destaque nos marcos)
+  if (typeof buildQueueFeedText === 'function' && typeof postQueueFeedMessage === 'function') {
+    const modeLabel = selectedMode === QUEUE_MODES.ARAM
+      ? `ARAM ${selectedFormat || '5x5'}`
+      : (selectedTier === 'S' ? 'TIER S' : 'Classic');
+    const feedText = buildQueueFeedText({
+      kind: 'entrar-join',
+      discordId: message.author.id,
+      letter: lobby.letter,
+      modeLabel,
+      playersCount: lobby.players.length,
+      requiredPlayers: lobby.requiredPlayers
+    });
+    if (feedText) await postQueueFeedMessage(message.guild, feedText);
+  }
 
   // Notifica quando falta 1 jogador para completar a sala
   const playersCount = lobby.players.length;

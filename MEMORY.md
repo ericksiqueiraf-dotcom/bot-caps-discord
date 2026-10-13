@@ -7,20 +7,22 @@
 
 ## 🗓️ Última Sessão
 
-- **Data:** 2026-10-05
-- **Foco:** Lobby TIER S (Esmeralda+) + `!top10`/`!placar tiers` + INFERNAL até 08h com prioridade + `!roleta` instantânea + `!roletasair` + `!regras` + `!staff` + abertura da Temporada Oficial #1
-- **Status:** ✅ Concluído
+- **Data:** 2026-10-10
+- **Foco:** Painel de votação `!votar` com botões + trava 3min pós-`!vitoria` + espera/sala Tier S separadas + `!pdl` + `!toprankinfernal` + fix `setup-servidor.js` + setup multi-servidor teste
+- **Status:** ✅ Concluído (49/49 testes)
 
 ---
 
 ## 📍 Ponto de Parada Atual
 
 ### Onde paramos:
-Banco no MongoDB Atlas (185 jogadores). Pós-`!vitoria` move todos para a **Sala de Espera (1490385246775017572)**. **Lobby TIER S** (`1556124976359415919`, gate Esmeralda IV+ por elo/cargo, sem bypass de `!entrar` p/ staff). **Top10/placar tiers** (mesmo PDL, filtro `baseMmr >= 2000`). Cargo **INFERNAL** automático (5+ winstreak, vale até 08h SP mesmo com derrota; prioridade posição 5 na `!espera` + imunidade na roleta). **`!roleta N A`** instantânea (1 comando, anti-duplo por `matchId`, anúncio no canal fila `1489237001013297182`) + **`!roletasair A`** (opt-out). **`!regras`** (jogadores) + **`!staff`** (restrito). Alias `!iniciarseason`. **Temporada Oficial #1 ativa** (`!resetgeral` → `!iniciartemporada` em 2026-10-05). Suite em **40/40**. Bot online no PM2 (`caps-bot`, `CAPS BOT LOL#6241 v1.8.0`, `[DB] Conectado`). Extração do `legacyCommands.js` segue pendente.
+Banco no MongoDB Atlas. Pós-`!vitoria` move todos para a Sala de Espera (normal ou Tier S separada). **Painel `!votar` com botões** ativo (`commands/handlers/resultVotePanel.js`: maioria 6/10, lembrete 2min, expira 5min, auto-registro sem staff). **Trava 3min no `!entrar`** pós-vitória por fila até sair a `!roleta` (`enterQueue.js: getPendingRouletteEntries`). **Espera Tier S própria** (`!esperatiers`, chave `classic:5x5:s`) + **Sala de Espera Tier S** (`getPostMatchVoiceChannelId(mode,tier)`). **`!pdl @jogador ±valor`** (Admin, ±500, `application/use-cases/adjustPdl.js`, sem tocar W/L) + slash `/pdl`. **`!toprankinfernal`** (ranking por `infernalCount`, zerado por temporada). **Setup multi-servidor:** `setup-servidor.js` fix `msg.pins()` → `msg.pin()` + `fetchPinned()` → `fetchPins()`; rodado em `CAPS TESTE (1558218740875796560)` e `CAPS BOT TESTRE (1558217291123138561)`; `config.json` atual aponta p/ TESTRE (backups `config.json.bak-*`). **Limite 5x5 corrigido:** `getVoteThreshold` 5 → 6 (maioria real dos 10). Suite em **49/49**. Bot `CAPS BOT LOL#6241` (`1487258474810183711`), invite com `permissions=8`. Extração do `legacyCommands.js` segue pendente.
 
 ### Próximo passo imediato:
-- **Pendente do admin no Discord:** subir `CAPS BOT LOL` acima do `INFERNAL` (hierarquia) + remover o INFERNAL órfão do maggot 1x
-- Testar em produção: `!entrar` Tier S, `!top10 tiers`, `!roleta 2 A`, `!regras`, `!staff`
+- **Modelo salvo:** layout oficial do CAPS ARENA em `docs/SERVER_LAYOUT_CAPS_ARENA.md` (6 categorias, 13 TXT + 9 VOZ mapeados p/ `config.json`, hierarquia de cargos) — pronto p/ replicar no TESTRE
+- **Deploy teste × prod (2026-10-10):** TESTRE = pasta `CAPS BOT TESTRE` → guild `CAPS BOT TESTE (1558217291123138561)` → banco `caps-bot-teste` (`MONGODB_DB`) → PM2 `caps-bot-teste` (online, cwd correto); PROD = pasta `BOT CAPS DISCORD` → guild `CAPS ARENA (1273653944169660427)` → banco `caps-bot` (default) → PM2 `caps-bot` (online); tokens diferentes (hashes distintos); `dataService.js` usa `process.env.MONGODB_DB || 'caps-bot'` nas duas pastas; `.gitignore` prod com `.env.bak*` + `*.bak*`; NUNCA dois processos com o mesmo token
+- **Roteiro de teste:** `!cadastrar` → `!entrar` → `!votar` (botões) → MVP → `!roleta` → `!placar`; conferir `🎮・fila`, `⚔️・partidas`, `📋┃resultados`, `🔥┃destaques`
+- Testar em TESTRE: `!cadastrar Nick#TAG` → `!entrar` → `!votar 1` (botões) → `!roleta N A` → `!esperatiers` → `!pdl`
 - Continuar extração de lógica de negócio do `legacyCommands.js`
 
 ---
@@ -67,7 +69,9 @@ Banco no MongoDB Atlas (185 jogadores). Pós-`!vitoria` move todos para a **Sala
 - [x] `!cancelarstart <letra>` (2026-09-30: `!cancelarstart A/B/C` cancela a contagem de auto-start do lobby cheio (jogadores ficam na fila); sem letra só resolve com pendente único; sem pendente cai no cancelamento de partida ativa + limpa timer residual; helper `findPendingAutoStartLobby` exportado e testado)
 
 ### Testes automatizados
-- [x] `tests/` com `node:test` nativo (`npm test`): `helpers.js` + `victory-selector` (7) + `register-victory` (3) + `balance` (3) + `rematch` (5) + `cancel-start` (4) + `cleanup-rooms` (6) = 28/28 verdes
+- [x] `tests/` com `node:test` nativo (`npm test`): 49/49 verdes (suite 2026-10-10: `result-vote-panel` 6 + `pdl` 3 + anteriores)
+- [x] `tests/result-vote-panel.test.js` — painel `!votar`: maioria 6/10, parse `votewin:<matchId>:<time>`, faltantes, payload dentro de 1024 chars, contagem
+- [x] `tests/pdl.test.js` — `!pdl`: aplica ± sem tocar W/L, piso zero, teto 500, jogador inexistente falha
 - [x] `!limparsalas A/B/C` (2026-09-30: filtra a sala pela letra; move ocupantes pra Sala de Espera antes de apagar; mutação sob lock; recusa com partida ativa; sem letra limpa tudo como antes; helper `resolveCleanupTargets` exportado e testado)
 - [x] `!ajuda` atualizado (2026-09-30: documenta `!rematch [sala]`, `!cancelarstart [sala]`, `!limparsalas [sala]`, votação de MVP e cargo INFERNAL)
 - [x] Mocks em memória com semântica fiel ao banco (load = clone, save = sobrescreve)
@@ -106,6 +110,16 @@ Banco no MongoDB Atlas (185 jogadores). Pós-`!vitoria` move todos para a **Sala
 - [x] `!roleta N A` instantânea (anti-duplo por partida, anúncio no canal fila) + `!roletasair A` (opt-out, inclui winners)
 - [x] `!regras` (jogadores) + `!staff` (restrito) + alias `!iniciarseason`; regulamento e JSON da imagem em `ALTERAÇÕES BOT.txt`
 - [x] Testes 40/40 (`tiers-roulette`, `rules`); Temporada Oficial #1 aberta (`!resetgeral` → `!iniciartemporada`)
+
+### Votação com botões + trava + Tier S separado + PDL + setup (2026-10-09/10)
+- [x] `commands/handlers/resultVotePanel.js` (novo): `!votar 1/2` publica painel com botões Time 1 / Time 2 no matchOngoing, menciona quem falta; placar atualiza por voto; lembrete 2min; expira 5min; maioria (6 no 5x5) registra sozinha via `onThresholdReached`; `!votar` sem número reabre; só participantes votam
+- [x] `index.js` + `legacyCommands.js`: handler `votewin:<matchId>:<time>`; `createVotePanelDeps()`; `getVoteThreshold` 5x5 corrigido 5 → 6
+- [x] Trava 3min no `!entrar` (`enterQueue.js`): mesma mode/format/tier com `recentVictories` sem `roletaHistory` retorna `roulette_pending`
+- [x] `!esperatiers` (+ slash): espera Tier S (`classic:5x5:s`); sair sai de qualquer lista; Sala de Espera Tier S separada (`getPostMatchVoiceChannelId(mode,tier)`)
+- [x] `!pdl @jogador ±valor` + `/pdl` (Admin, ±500, `adjustPdl.js`): sem tocar W/L, auditoria no log; documentado em `!regras`/`!staff`
+- [x] `!toprankinfernal`: top 10 por `infernalCount` (só nova conquista conta; reset por temporada zera)
+- [x] Comunicado votação com botões + fluxo `!votar` em `ALTERAÇÕES BOT.txt`
+- [x] `setup-servidor.js` (novo, idempotente): 8 cargos + 6 categorias + 14 textos + 6 vozes; fix `msg.pin()`/`fetchPins()`; aplicado em CAPS TESTE e CAPS BOT TESTRE; `config.json` atual = TESTRE
 
 ### Backup e recuperação
 - [x] Pasta `backups/` na raiz do projeto
@@ -247,6 +261,15 @@ database/                    ← fallback JSON local
 - **Docs:** `!regras` (+`/regras`, aliases) e `!staff` (restrito) via `buildRulesEmbed`/`buildStaffEmbed`; regulamento + JSON da imagem de divulgação em `ALTERAÇÕES BOT.txt`.
 - Validação: `npm test` 40/40 (`tiers-roulette` + `rules` novos); bot reiniciado ~13x no PM2 e online.
 - `!rematch` mantido como rebalance (decisão do dono).
+
+### 2026-10-10 — !votar com botões + trava 3min + Tier S separado + !pdl + setup teste
+- **!votar com botões:** `resultVotePanel.js` novo; `!votar 1/2` abre painel em `partidas-em-andamento` marcando os 10; clique ou texto vota; placar ao vivo; lembrete 2min; expira 5min; 6 votos registram sozinho; `!votar` sem número reabre; threshold 5x5 corrigido 5 → 6
+- **Trava 3min:** `enterQueue.js` bloqueia `!entrar` na mesma fila até sair a `!roleta` (`roulette_pending` com letras + segundos); por fila (Classic/ARAM/Tier S independentes)
+- **Tier S separado:** `!esperatiers` + Sala de Espera Tier S própria; `getPostMatchVoiceChannelId(mode,tier)`; `!sair`/`!remover` devolvem ao lobby certo
+- **!pdl + toprankinfernal:** `adjustPdl.js` (Admin, ±500, sem W/L); `infernalCount` só em nova conquista; `!toprankinfernal`
+- **Setup teste:** fix `msg.pin()`/`fetchPins()` em `setup-servidor.js`; setup rodado em CAPS TESTE e CAPS BOT TESTRE; `config.json` = TESTRE (backups `.bak-*`); bot precisa de restart + hierarquia acima dos cargos
+- **Layout ARENA replicado no TESTRE (2026-10-10):** modelo em `docs/SERVER_LAYOUT_CAPS_ARENA.md`; `setup-servidor.js` com planta ARENA (6 cats, 19 TXT, 11 VOZ, 11 cargos); aplicado em `CAPS BOT TESTE (1558217291123138561)`; `config.json` remapeado (fila/partidas/resultados/destaques/logs/ranking/cadastro + 3 lobbies com limite 10/10/30)
+- Validação: `npm test` 49/49, 13 suites
 
 ### 2026-10-01 — Reativação + ranking CLASSIC puro + !ajuda
 - Bot estava fora do PM2 (`caps-bot doesn't exist`); religado com `pm2 start index.js --name caps-bot` + `pm2 save`. Docker `caps-mongo` subiu depois do bot e o `dataService` travou em modo local (`storageMode = 'local'` não tenta de novo); `pm2 restart caps-bot` resolveu → `[DB] Conectado ao MongoDB Atlas` + `Bot conectado como CAPS BOT LOL#6241 | v1.8.0`.

@@ -4,7 +4,7 @@ const { MongoClient } = require('mongodb');
 const { QUEUE_MODES } = require('../domain/constants/queueModes');
 
 const MONGODB_URI = process.env.MONGODB_URI;
-const DB_NAME = 'caps-bot';
+const DB_NAME = process.env.MONGODB_DB || 'caps-bot';
 const DATA_DIR = path.join(__dirname, '..', 'database');
 
 const LOCAL_FILES = {

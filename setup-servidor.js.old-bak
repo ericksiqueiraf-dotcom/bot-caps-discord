@@ -1,0 +1,284 @@
+// Setup automático do servidor Discord da CAPS Arena.
+// Cria cargos, categorias, canais e permissões e grava os IDs no config.json.
+//
+// USO:
+//   node setup-servidor.js <GUILD_ID>            -> executa (com backup do config.json)
+//   node setup-servidor.js <GUILD_ID> --dry-run  -> só mostra o plano, não cria nada
+//   node setup-servidor.js <GUILD_ID> --skip-config -> não altera o config.json
+//   node setup-servidor.js <GUILD_ID> --config-out config.teste.json -> grava IDs em outro arquivo
+//   node setup-servidor.js <GUILD_ID> --extra jokers -> inclui cargos de lane + canais estilo Joker's (bate-papo/nicks-lol/bem-vindos)
+//   Combine: --dry-run com --extra jokers para prévia sem tocar em nada.
+//   ATENÇÃO: sem --config-out, o config.json DE PRODUÇÃO é sobrescrito. Para o servidor
+//   de testes (CAPS BOT TESTE), use sempre --config-out config.teste.json.
+//
+// PRÉ-REQUISITO: o bot já convidado no servidor COM permissão de Administrador.
+// Pode rodar de novo sem medo: tudo é "procurar-ou-criar" (idempotente).
+require('dotenv').config();
+const fs = require('fs');
+const path = require('path');
+const {
+  Client,
+  GatewayIntentBits,
+  ChannelType,
+  PermissionFlagsBits
+} = require('discord.js');
+
+const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
+if (!DISCORD_TOKEN) {
+  console.error('❌ DISCORD_TOKEN não configurado no .env');
+  process.exit(1);
+}
+
+const [, , GUILD_ID, ...flags] = process.argv;
+if (!GUILD_ID) {
+  console.error('Uso: node setup-servidor.js <GUILD_ID> [--dry-run] [--skip-config]');
+  process.exit(1);
+}
+const DRY_RUN = flags.includes('--dry-run');
+const SKIP_CONFIG = flags.includes('--skip-config');
+const EXTRA_JOKERS = flags.includes('--extra');
+const CONFIG_OUT = (() => {
+  const i = flags.indexOf('--config-out');
+  return i >= 0 && flags[i + 1] ? flags[i + 1] : null;
+})();
+
+// ─── Planta do servidor (modelo CAPS ARENA — ver docs/SERVER_LAYOUT_CAPS_ARENA.md) ──
+const ROLES = [
+  { name: '👑 Admin', color: '#E74C3C', reason: 'Equipe do servidor' },
+  { name: '🛠️ Moderador', color: '#E67E22', reason: 'Equipe do servidor' },
+  { name: '👑 Capitão de Customs', color: '#F1C40F', reason: 'Pode !start / !vitoria' },
+  { name: 'Jogador Ativo', color: '#3498DB', reason: 'Recebe no !cadastrar' },
+  { name: 'INFERNAL', color: '#FF6B00', reason: 'Bot dá/remove sozinho (5 wins)' },
+  { name: '⭐ MVP', color: '#9B59B6', reason: 'Bot dá/remove sozinho (MVP)' },
+  { name: 'Esmeralda', color: '#2ECC71', reason: 'Elo / gate Tier S' },
+  { name: '💎Diamante', color: '#00C3FF', reason: 'Elo' },
+  { name: 'Mestre', color: '#A855F7', reason: 'Elo' },
+  { name: 'Grão Mestre', color: '#FF2D78', reason: 'Elo' },
+  { name: 'Desafiante', color: '#FFD700', reason: 'Elo' }
+];
+
+const CATEGORIES = ['📢・INFORMAÇÕES', '💬・COMUNIDADE', '🏆・COMPETITIVO', '🤖・BOT', '🎮・JOGO', '🔊・VOZ'];
+
+const TEXT_CHANNELS = [
+  { name: '👊┃cadastro', category: '📢・INFORMAÇÕES', configKey: 'welcomeChannelId' },
+  { name: '👑┃parceiros', category: '📢・INFORMAÇÕES', configKey: null },
+  { name: '📘┃como-jogar', category: '📢・INFORMAÇÕES', configKey: null },
+  { name: '📜┃regras', category: '📢・INFORMAÇÕES', configKey: null },
+  { name: '📢┃comunicados', category: '📢・INFORMAÇÕES', configKey: null },
+  { name: '💡┃infos-lol', category: '📢・INFORMAÇÕES', configKey: null },
+  { name: '💬・geral-leagueoflegends', category: '💬・COMUNIDADE', configKey: null },
+  { name: '📋-sugestões', category: '💬・COMUNIDADE', configKey: null },
+  { name: '🎵・música', category: '💬・COMUNIDADE', configKey: null },
+  { name: '📳・grupo-whatsapp-caps', category: '💬・COMUNIDADE', configKey: null },
+  { name: '🥇┃ranking', category: '🏆・COMPETITIVO', configKey: 'rankUpdatesChannelId' },
+  { name: '📋┃resultados', category: '🏆・COMPETITIVO', configKey: 'matchHistoryChannelId' },
+  { name: '🔥┃destaques', category: '🏆・COMPETITIVO', configKey: 'mvpAnnouncementsChannelId' },
+  { name: '🧍┃logs-jogadores', category: '🏆・COMPETITIVO', configKey: 'playerLogChannelId' },
+  { name: '⚔️┃logs-temporada', category: '🏆・COMPETITIVO', configKey: 'seasonLogChannelId' },
+  { name: '🤖・comandos', category: '🤖・BOT', configKey: null },
+  { name: '📘・guia-de-comandos', category: '🤖・BOT', configKey: 'guideChannelId', staffOnly: true, guidePosts: true },
+  { name: '🧪・testes-bot', category: '🤖・BOT', configKey: null },
+  { name: '⚔️・partidas', category: '🎮・JOGO', configKey: 'matchOngoingChannelId' },
+  { name: '🎮・fila', category: '🎮・JOGO', configKey: 'queueStatusChannelId' }
+];
+
+const VOICE_CHANNELS = [
+  { name: 'Conversa', category: '💬・COMUNIDADE', configKey: null },
+  { name: '⚒️ FLEX', category: '💬・COMUNIDADE', configKey: null },
+  { name: '☠️ SoloQ', category: '💬・COMUNIDADE', configKey: null },
+  { name: '😶‍🌫️ Sala Classic', category: '🎮・JOGO', configKey: 'postMatchWaitingChannelId' },
+  { name: '😶‍🌫️ Sala de espera - tier S', category: '🎮・JOGO', configKey: 'postMatchTierSWaitingChannelId' },
+  { name: '🤼 Outros jogos', category: '🎮・JOGO', configKey: null },
+  { name: '☠️ TFT', category: '🎮・JOGO', configKey: null },
+  { name: 'OFK', category: '🎮・JOGO', configKey: null },
+  { name: '🎮・lobby-classic', category: '🔊・VOZ', configKey: 'classicQueueChannelId', userLimit: 10 },
+  { name: '🎮・lobby-tier S', category: '🔊・VOZ', configKey: 'classicTierSQueueChannelId', userLimit: 10 },
+  { name: '🎮・lobby-aram', category: '🔊・VOZ', configKey: 'aramQueueChannelId', userLimit: 30 }
+];
+
+const PIN_NOTICES = {
+  '📘┃como-jogar': '🎮 **Bem-vindo à CAPS Arena!**\n1️⃣ Digite `!cadastrar SeuNick#TAG` aqui ou no #comandos\n2️⃣ Entre num canal 🎮 Lobby e digite `!entrar`\n3️⃣ Jogou? Vote com `!votar 1` ou `!votar 2`\nDúvidas: `!ajuda`',
+  '🤖・comandos': '⌨️ **Canal de comandos** — use aqui: `!entrar` • `!fila` • `!votar 1/2` • `!perfil` • `!placar` • `!ajuda`',
+  '🎮・fila': '📊 **Status das filas e resultado da roleta aparecem aqui.** Este canal é só leitura.',
+  '⚔️・partidas': '⚔️ **Início das partidas e votação de resultado (botões Time 1 / Time 2) aqui.** Este canal é só leitura — vote clicando ou use o #comandos.'
+};
+
+// ─── Extra estilo Joker's House (só com --extra jokers; cargos de lane são cosméticos) ──
+const JOKERS_ROLES = [
+  { name: 'Top', color: '#E74C3C', reason: 'Lane (cosmético, onboarding)' },
+  { name: 'Mid', color: '#3498DB', reason: 'Lane (cosmético, onboarding)' },
+  { name: 'Adc', color: '#E67E22', reason: 'Lane (cosmético, onboarding)' },
+  { name: 'Suporte', color: '#2ECC71', reason: 'Lane (cosmético, onboarding)' },
+  { name: 'Jungle', color: '#9B59B6', reason: 'Lane (cosmético, onboarding)' },
+  { name: 'Autofill', color: '#95A5A6', reason: 'Lane (cosmético, onboarding)' }
+];
+
+const JOKERS_TEXT_CHANNELS = [
+  { name: '👋・bem-vindos', category: '📢・INFORMAÇÕES', configKey: null },
+  { name: '💬・bate-papo', category: '💬・COMUNIDADE', configKey: null },
+  { name: '📝・nicks-lol', category: '💬・COMUNIDADE', configKey: null }
+];
+
+const JOKERS_PIN_NOTICES = {
+  '👋・bem-vindos': '👋 **Bem-vindo(a)!** Complete as perguntas de entrada do servidor para liberar os canais (é o questionário "O que você deseja?" ao entrar). Depois registre seu nick com `!cadastrar Nick#TAG`.',
+  '📝・nicks-lol': '📝 **Registre seu nick do LoL aqui** (ex: `Faker#BR1`). A staff confirma e o bot vincula com `!cadastrar`. Depois é só dar `!entrar` no Lobby.'
+};
+
+if (EXTRA_JOKERS) {
+  ROLES.push(...JOKERS_ROLES);
+  TEXT_CHANNELS.push(...JOKERS_TEXT_CHANNELS);
+  Object.assign(PIN_NOTICES, JOKERS_PIN_NOTICES);
+}
+
+async function findOrCreateRole(guild, { name, color, reason }) {
+  const existing = guild.roles.cache.find((r) => r.name === name);
+  if (existing) {
+    console.log(`   ✔ cargo "${name}" já existe (${existing.id})`);
+    return existing;
+  }
+  if (DRY_RUN) {
+    console.log(`   + criaria cargo "${name}"`);
+    return { id: `(novo)`, name };
+  }
+  const role = await guild.roles.create({ name, color, reason: `Setup CAPS Arena: ${reason}` });
+  console.log(`   + cargo "${name}" criado (${role.id})`);
+  return role;
+}
+
+async function findOrCreateCategory(guild, name) {
+  const existing = guild.channels.cache.find((c) => c.type === ChannelType.GuildCategory && c.name === name);
+  if (existing) return existing;
+  if (DRY_RUN) {
+    console.log(`   + criaria categoria "${name}"`);
+    return { id: '(nova)', name };
+  }
+  return guild.channels.create({ name, type: ChannelType.GuildCategory });
+}
+
+async function findChannel(guild, name, categoryId) {
+  return guild.channels.cache.find((c) => c.name === name && c.parentId === categoryId && c.type !== ChannelType.GuildCategory) || null;
+}
+
+async function main() {
+  const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+  await client.login(DISCORD_TOKEN);
+  const guild = await client.guilds.fetch(GUILD_ID).catch(() => null);
+  if (!guild) {
+    console.error('❌ Servidor não encontrado. Confira o GUILD_ID e se o bot está no servidor com permissão de Administrador.');
+    process.exit(1);
+  }
+  await guild.channels.fetch();
+  await guild.roles.fetch();
+  console.log(`🏟️ Servidor: ${guild.name} (${guild.id})${DRY_RUN ? ' — DRY RUN (nada será criado)' : ''}`);
+
+  // 1. Cargos
+  console.log('🎭 Cargos:');
+  const roles = {};
+  for (const spec of ROLES) roles[spec.name] = await findOrCreateRole(guild, spec);
+
+  const everyone = guild.roles.everyone;
+  const get = (name) => roles[name];
+
+  // 2. Categorias
+  console.log('📁 Categorias:');
+  const cats = {};
+  for (const name of CATEGORIES) {
+    cats[name] = await findOrCreateCategory(guild, name);
+    console.log(`   ✔ categoria "${name}"`);
+  }
+
+  // 3. Canais de texto
+  console.log('💬 Canais de texto:');
+  const textIds = {};
+  for (const spec of TEXT_CHANNELS) {
+    const parent = cats[spec.category];
+    let channel = await findChannel(guild, spec.name, parent.id);
+    if (!channel) {
+      if (DRY_RUN) {
+        console.log(`   + criaria #${spec.name} em ${spec.category}${spec.staffOnly ? ' (só staff escreve)' : ''}${spec.guidePosts ? ' + fixaria o guia (!regras/!staff)' : ''}`);
+        continue;
+      }
+      // Modelo ARENA: cria sem mexer em permissões (mantém padrão do servidor),
+      // exceto canais staffOnly (guia): @everyone lê, só staff escreve.
+      const createOpts = { name: spec.name, type: ChannelType.GuildText, parent: parent.id };
+      if (spec.staffOnly) {
+        const staffRoles = ['👑 Admin', '🛠️ Moderador', '👑 Capitão de Customs']
+          .map((name) => roles[name])
+          .filter((r) => r && r.id && !String(r.id).startsWith('('));
+        createOpts.permissionOverwrites = [
+          { id: everyone.id, deny: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.SendMessagesInThreads] },
+          ...staffRoles.map((r) => ({ id: r.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.SendMessagesInThreads] }))
+        ];
+      }
+      channel = await guild.channels.create(createOpts);
+      console.log(`   + #${spec.name} criado (${channel.id})${spec.staffOnly ? ' [só staff escreve]' : ''}`);
+    } else {
+      console.log(`   ✔ #${spec.name} já existe (${channel.id})`);
+    }
+    if (spec.configKey) textIds[spec.configKey] = channel.id;
+    if (PIN_NOTICES[spec.name] && !DRY_RUN && channel?.send) {
+      const pins = await channel.messages.fetchPins().catch(() => null);
+      if (!pins || pins.size === 0) {
+        const msg = await channel.send(PIN_NOTICES[spec.name]).catch(() => null);
+        if (msg) await msg.pin().catch(() => null);
+      }
+    }
+    if (spec.guidePosts && !DRY_RUN && channel?.send) {
+      const pins = await channel.messages.fetchPins().catch(() => null);
+      if (!pins || pins.size === 0) {
+        const { buildRulesEmbed, buildStaffEmbed } = require('./utils/lobbyUtils');
+        for (const embed of [buildRulesEmbed(), buildStaffEmbed()]) {
+          const msg = await channel.send({ embeds: [embed] }).catch(() => null);
+          if (msg) await msg.pin().catch(() => null);
+        }
+        console.log(`   📌 guia fixado em #${spec.name} (!regras + !staff)`);
+      }
+    }
+  }
+
+  // 4. Canais de voz
+  console.log('🔊 Canais de voz:');
+  const voiceIds = {};
+  for (const spec of VOICE_CHANNELS) {
+    const parent = cats[spec.category];
+    let channel = await findChannel(guild, spec.name, parent.id);
+    if (!channel) {
+      if (DRY_RUN) {
+        console.log(`   + criaria "${spec.name}" em ${spec.category}`);
+        continue;
+      }
+      channel = await guild.channels.create({ name: spec.name, type: ChannelType.GuildVoice, parent: parent.id, userLimit: spec.userLimit || 0 });
+      console.log(`   + "${spec.name}" criado (${channel.id})`);
+    } else {
+      console.log(`   ✔ "${spec.name}" já existe (${channel.id})`);
+    }
+    if (spec.configKey) voiceIds[spec.configKey] = channel.id;
+  }
+
+  // 5. Grava no config.json (com backup) — ou em arquivo separado com --config-out
+  if (!DRY_RUN && !SKIP_CONFIG) {
+    const configPath = path.join(__dirname, CONFIG_OUT || 'config.json');
+    const config = CONFIG_OUT && fs.existsSync(configPath)
+      ? JSON.parse(fs.readFileSync(configPath, 'utf8'))
+      : JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
+    const backupPath = `${configPath}.bak-${Date.now()}`;
+    if (fs.existsSync(configPath)) fs.copyFileSync(configPath, backupPath);
+    console.log(`💾 Backup do config atual: ${path.basename(backupPath)}`);
+    config.roles = { ...config.roles, registeredPlayerRoleId: roles['Jogador Ativo'].id, captainRoleId: roles['👑 Capitão de Customs'].id };
+    config.voiceChannels = { ...config.voiceChannels, ...voiceIds };
+    config.textChannels = { ...config.textChannels, ...textIds };
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+    console.log(`✔ ${path.basename(configPath)} atualizado com os IDs novos`);
+  }
+
+  console.log('\n✅ Setup concluído! Próximos passos:');
+  console.log('   1. Confira os cargos: dê "Staff" e "Capitão" para quem é da equipe.');
+  console.log('   2. Reinicie o bot (pm2 restart caps-bot --update-env).');
+  console.log('   3. Teste: !cadastrar Nick#TAG → !entrar (no Lobby) → !votar 1.');
+  await client.destroy();
+}
+
+main().catch((err) => {
+  console.error('❌ Falha no setup:', err.message);
+  process.exit(1);
+});

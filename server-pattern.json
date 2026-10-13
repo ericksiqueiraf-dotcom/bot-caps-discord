@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "description": "Padrao oficial de salas do CAPS BOT (estilo VOZ). O setup-servidor.js aplica este arquivo de forma idempotente: reusa/move/renomeia o que existe, cria o que falta e so apaga duplicada vazia.",
+  "categories": ["📥・ENTRADA", "FILA", "📊・ARENA", "💎・CLUBE VIP", "💬・COMUNIDADE", "📢・INFORMAÇÕES"],
+  "categoryMerges": {
+    "FILA": ["voz", "filas"]
+  },
+  "roles": [
+    { "name": "Staff", "color": "#E74C3C", "reason": "Equipe do servidor" },
+    { "name": "Capitão", "color": "#F1C40F", "reason": "Pode !start / !vitoria" },
+    { "name": "Jogador", "color": "#3498DB", "reason": "Recebe apos validar Nick#TAG + aceitar regras" },
+    { "name": "Visitante", "color": "#95A5A6", "reason": "Nao joga LoL, so canais abertos" },
+    { "name": "INFERNAL", "color": "#FF6B00", "reason": "Bot dá/remove sozinho (5 wins)" },
+    { "name": "MVP player", "color": "#9B59B6", "reason": "Bot dá/remove sozinho (MVP)" },
+    { "name": "💜 Apoiador", "color": "#A855F7", "reason": "Tier 1 do clube VIP" },
+    { "name": "⭐ VIP", "color": "#FFD700", "reason": "Tier 2 do clube VIP" },
+    { "name": "👑 Lendário", "color": "#FF2D78", "reason": "Tier 3 do clube VIP" }
+  ],
+  "vipRoleNames": ["💜 Apoiador", "⭐ VIP", "👑 Lendário"],
+  "textChannels": [
+    { "name": "👋-boas-vindas", "category": "📥・ENTRADA", "configKey": "welcomeChannelId", "open": true, "aliases": ["boas-vindas"] },
+    { "name": "🧩como-jogar", "category": "📥・ENTRADA", "configKey": null, "open": true, "infoEmbed": "onboarding", "aliases": ["como-jogar"] },
+    { "name": "🎮・fila", "category": "📊・ARENA", "configKey": "queueStatusChannelId", "aliases": ["fila"] },
+    { "name": "⚔️・partidas", "category": "📊・ARENA", "configKey": "matchOngoingChannelId", "aliases": ["partidas-em-andamento"] },
+    { "name": "📋┃historico-partidas", "category": "📊・ARENA", "configKey": "matchHistoryChannelId", "aliases": ["historico-partidas", "📋┃resultados"] },
+    { "name": "🔥┃destaques-mvp", "category": "📊・ARENA", "configKey": "mvpAnnouncementsChannelId", "aliases": ["destaques-mvp", "🔥┃destaques"] },
+    { "name": "🧍┃meu-elo", "category": "📊・ARENA", "configKey": "playerLogChannelId", "aliases": ["meu-elo", "🧍┃logs-jogadores"] },
+    { "name": "⚔️┃logs-temporada", "category": "📊・ARENA", "configKey": "seasonLogChannelId", "aliases": ["temporada"] },
+    { "name": "🥇┃ranking", "category": "📊・ARENA", "configKey": "rankUpdatesChannelId", "aliases": ["ranking"] },
+    { "name": "🤖・comandos", "category": "📊・ARENA", "configKey": null, "talk": true, "aliases": ["comandos"] },
+    { "name": "🔰clube-vip", "category": "💎・CLUBE VIP", "configKey": null, "vip": true, "talk": true, "aliases": ["clube-vip"] },
+    { "name": "💬・geral-leagueoflegends", "category": "💬・COMUNIDADE", "configKey": null, "aliases": ["geral"] },
+    { "name": "🎬-clipes", "category": "💬・COMUNIDADE", "configKey": null, "aliases": ["clips"] },
+    { "name": "📋-sugestões", "category": "💬・COMUNIDADE", "configKey": null, "aliases": ["sugestoes"] },
+    { "name": "🎵・música", "category": "💬・COMUNIDADE", "configKey": null },
+    { "name": "📳・grupo-whatsapp-caps", "category": "💬・COMUNIDADE", "configKey": null },
+    { "name": "📜┃regras", "category": "📢・INFORMAÇÕES", "configKey": null, "open": true, "infoEmbed": "rules" },
+    { "name": "👊┃cadastro", "category": "📢・INFORMAÇÕES", "configKey": null, "open": true, "talk": true },
+    { "name": "👑┃parceiros", "category": "📢・INFORMAÇÕES", "configKey": null },
+    { "name": "💡┃infos-lol", "category": "📢・INFORMAÇÕES", "configKey": null },
+    { "name": "📢┃comunicados", "category": "📢・INFORMAÇÕES", "configKey": null },
+    { "name": "📘┃como-jogar", "category": "📢・INFORMAÇÕES", "configKey": null }
+  ],
+  "voiceChannels": [
+    { "name": "🎮・lobby-classic", "category": "FILA", "configKey": "classicQueueChannelId", "hidden": true, "aliases": ["🔊 Lobby Classic", "Lobby Classic"] },
+    { "name": "🎮・lobby-tier S", "category": "FILA", "configKey": "classicTierSQueueChannelId", "hidden": true, "aliases": ["💎 Lobby TIER S", "💎 Lobby Tier S", "Lobby TIER S"] },
+    { "name": "🎮・lobby-aram", "category": "FILA", "configKey": "aramQueueChannelId", "hidden": true, "aliases": ["🔊 Lobby ARAM", "Lobby ARAM"] },
+    { "name": "⏳・sala-de-espera", "category": "FILA", "configKey": "postMatchWaitingChannelId", "hidden": true, "aliases": ["⏳ Sala de Espera", "Sala de Espera"] },
+    { "name": "⏳・sala-de-espera-tier-s", "category": "FILA", "configKey": "postMatchTierSWaitingChannelId", "hidden": true, "aliases": ["⏳ Sala de Espera Tier S", "Sala de Espera Tier S"] },
+    { "name": "⚒️ FLEX", "category": "💬・COMUNIDADE", "configKey": null, "hidden": true },
+    { "name": "☠️ SoloQ", "category": "💬・COMUNIDADE", "configKey": null, "hidden": true },
+    { "name": "HUB", "category": "FILA", "tempVoiceKey": "hubChannelId", "aliases": ["➕ Criar sala", "Criar sala"] },
+    { "name": "🔥・lobby-clandestino LCL", "category": "FILA", "configKey": null, "userLimit": 5, "preserve": true },
+    { "name": "👑 Lounge VIP", "category": "💎・CLUBE VIP", "configKey": null, "vip": true }
+  ],
+  "pinNotices": {
+    "🧩como-jogar": "🎮 **Bem-vindo à CAPS Arena!**\n1️⃣ Digite `!cadastrar SeuNick#TAG` aqui ou no #comandos\n2️⃣ Entre num canal 🎮・lobby (classic, tier S ou aram) e digite `!entrar`\n3️⃣ Jogou? Vote com `!votar 1` ou `!votar 2`\nDúvidas: `!ajuda`",
+    "🤖・comandos": "⌨️ **Canal de comandos** — use aqui: `!entrar` • `!fila` • `!votar 1/2` • `!perfil` • `!placar` • `!ajuda`",
+    "🎮・fila": "📊 **Status das filas e resultado da roleta aparecem aqui.** Este canal é só leitura.",
+    "⚔️・partidas": "⚔️ **Início das partidas e votação de resultado (botões Time 1 / Time 2) aqui.** Este canal é só leitura — vote clicando ou use o #comandos."
+  }
+}

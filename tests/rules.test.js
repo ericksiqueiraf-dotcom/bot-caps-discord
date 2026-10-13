@@ -24,7 +24,7 @@ describe('!regras', () => {
       assert.ok(field.value.length <= 1024, `field excede 1024: ${field.name}`);
     }
     const text = embed.data.fields.map((f) => `${f.name} ${f.value}`).join('\n').toLowerCase();
-    for (const keyword of ['!start', '!vitoria', '!rematch', '!roleta', '!remover', '!limparsalas', '!sincronizarelo', '!resetgeral', '!iniciartemporada']) {
+    for (const keyword of ['!start', '!vitoria', '!rematch', '!roleta', '!pdl', '!remover', '!limparsalas', '!sincronizarelo', '!resetgeral', '!iniciartemporada']) {
       assert.ok(text.includes(keyword), `guia sem o comando: ${keyword}`);
     }
   });
