@@ -139,8 +139,8 @@ function isRankRole(role) {
   return Boolean(getRankTierFromRoleName(role.name));
 }
 
-const MVP_ROLE_NAMES = [config.roles?.mvpPlayerRoleName || 'MVP player', '⭐ MVP'];
-const INFERNAL_ROLE_NAME = config.roles?.infernalRoleName || 'INFERNAL';
+const MVP_ROLE_NAMES = [config.roles?.mvpPlayerRoleName || '⭐ MVP', '⭐ MVP', 'MVP player'];
+const INFERNAL_ROLE_NAME = config.roles?.infernalRoleName || '🔥 INFERNAL';
 const INFERNAL_STREAK = 5;
 const MVP_VOTE_DURATION_MS = 2 * 60 * 1000;
 const pendingMvpVotes = new Map();
@@ -494,7 +494,7 @@ function findMvpRole(guild) {
 }
 
 async function ensureMvpRole(guild) {
-  return findMvpRole(guild) || ensureNamedRole(guild, config.roles?.mvpPlayerRoleName || 'MVP player');
+  return findMvpRole(guild) || ensureNamedRole(guild, config.roles?.mvpPlayerRoleName || '⭐ MVP');
 }
 
 function findInfernalRole(guild) {
@@ -964,6 +964,34 @@ async function postRouletteAnnouncement(guild, { letter, leaving = [], staying =
 
 function getQueueFeedChannelId() {
   return config.textChannels?.queueStatusChannelId || null;
+}
+
+const QUEUE_JOIN_BUTTON_IDS = {
+  CLASSIC: 'queue:classic:join',
+  ARAM: 'queue:aram:join'
+};
+
+function parseQueueJoinButtonId(customId) {
+  if (customId === QUEUE_JOIN_BUTTON_IDS.CLASSIC) {
+    return { mode: QUEUE_MODES.CLASSIC, args: [] };
+  }
+  if (customId === QUEUE_JOIN_BUTTON_IDS.ARAM) {
+    return { mode: QUEUE_MODES.ARAM, args: [QUEUE_MODES.ARAM] };
+  }
+  return null;
+}
+
+function buildQueueJoinActionRow() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(QUEUE_JOIN_BUTTON_IDS.CLASSIC)
+      .setLabel('Entrar Queue CAPS')
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId(QUEUE_JOIN_BUTTON_IDS.ARAM)
+      .setLabel('Entrar Queue ARAM')
+      .setStyle(ButtonStyle.Primary)
+  );
 }
 
 // Texto puro do feed da fila (testavel): novidades de !entrar / !espera no canal #fila.
@@ -1987,27 +2015,84 @@ async function updateQueueDashboard(guild) {
 
   const queueData = await loadQueue();
   const systemMeta = await loadSystemMeta();
-  const embed = buildQueueEmbed(null, Object.values(queueData.lobbies || {}));
-  const components = [
-    new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId('queue:classic:join')
-        .setLabel('Entrar Queue Classic')
-        .setStyle(ButtonStyle.Success)
-    )
-  ];
+  const components = [buildQueueJoinActionRow()];
+  const waitingLobbies = Object.values(queueData.lobbies || {})
+    .filter((lobby) => lobby && lobby.status === 'waiting')
+    .sort((a, b) => String(a.letter || '').localeCompare(String(b.letter || '')));
+  const dashboardIds = systemMeta.queueDashboardMessageIds && typeof systemMeta.queueDashboardMessageIds === 'object'
+    ? { ...systemMeta.queueDashboardMessageIds }
+    : {};
+  const nextDashboardIds = {};
 
-  try {
-    if (systemMeta.lastQueueMessageId) {
-      const lastMessage = await channel.messages.fetch(systemMeta.lastQueueMessageId).catch(() => null);
-      if (lastMessage) {
-        await lastMessage.edit({ embeds: [embed], components });
-        return;
+  async function editOrSendPanel(panelKey, embed, preferredMessageId = null) {
+    const messageId = dashboardIds[panelKey] || preferredMessageId || null;
+    if (messageId) {
+      const message = await channel.messages.fetch(messageId).catch(() => null);
+      if (message) {
+        await message.edit({ content: '', embeds: [embed], components });
+        return message.id;
       }
     }
 
-    const newMessage = await channel.send({ embeds: [embed], components });
-    systemMeta.lastQueueMessageId = newMessage.id;
+    const message = await channel.send({ content: '', embeds: [embed], components });
+    return message.id;
+  }
+
+  async function deletePanel(messageId) {
+    if (!messageId) return;
+    const message = await channel.messages.fetch(messageId).catch(() => null);
+    if (message) await message.delete().catch(() => null);
+  }
+
+  async function clearLegacyQueueButtons(activeMessageIds) {
+    const botId = guild.client?.user?.id;
+    if (!botId) return;
+
+    const messages = await channel.messages.fetch({ limit: 100 }).catch(() => null);
+    if (!messages) return;
+
+    for (const message of messages.values()) {
+      if (activeMessageIds.has(message.id)) continue;
+      if (message.author?.id !== botId) continue;
+
+      const hasQueueButton = message.components?.some((row) =>
+        row.components?.some((component) => String(component.customId || '').startsWith('queue:'))
+      );
+
+      if (hasQueueButton) {
+        await message.edit({ components: [] }).catch(() => null);
+      }
+    }
+  }
+
+  try {
+    if (waitingLobbies.length === 0) {
+      const idleKey = 'idle';
+      const idleEmbed = buildQueueEmbed(null, []);
+      nextDashboardIds[idleKey] = await editOrSendPanel(idleKey, idleEmbed, systemMeta.lastQueueMessageId);
+      systemMeta.lastQueueMessageId = nextDashboardIds[idleKey];
+    } else {
+      for (let index = 0; index < waitingLobbies.length; index += 1) {
+        const lobby = waitingLobbies[index];
+        const panelKey = lobby.id || `${lobby.mode || 'queue'}:${lobby.format || '5x5'}:${lobby.letter || index}`;
+        nextDashboardIds[panelKey] = await editOrSendPanel(panelKey, buildQueueEmbed(lobby));
+      }
+      systemMeta.lastQueueMessageId = nextDashboardIds[Object.keys(nextDashboardIds)[0]] || null;
+    }
+
+    const activeMessageIds = new Set(Object.values(nextDashboardIds));
+    for (const [panelKey, messageId] of Object.entries(dashboardIds)) {
+      if (!activeMessageIds.has(messageId)) {
+        await deletePanel(messageId);
+      }
+    }
+
+    if (systemMeta.lastQueueMessageId && !activeMessageIds.has(systemMeta.lastQueueMessageId)) {
+      await deletePanel(systemMeta.lastQueueMessageId);
+    }
+
+    systemMeta.queueDashboardMessageIds = nextDashboardIds;
+    await clearLegacyQueueButtons(activeMessageIds);
     await saveSystemMeta(systemMeta);
   } catch (err) {
     console.error('[DASHBOARD] Erro ao atualizar painel de fila:', err.message);
@@ -2795,6 +2880,9 @@ module.exports = {
   postInfernalAnnouncement,
   postRouletteAnnouncement,
   getQueueFeedChannelId,
+  QUEUE_JOIN_BUTTON_IDS,
+  parseQueueJoinButtonId,
+  buildQueueJoinActionRow,
   buildQueueFeedText,
   postQueueFeedMessage,
   expireInfernalRolesIfDue,

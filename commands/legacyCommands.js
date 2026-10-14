@@ -35,7 +35,8 @@ const {
   postMvpAnnouncement, postMatchHistoryLog, buildPlayerCardEmbed,
   buildSeasonHistoryEmbed, formatCustomRecord,
   postPlayerLogs, postMatchSummaryToSeasonLog, postSeasonSummaryToSeasonLog, postSmurfAlerts,
-  getCustomPointsDelta, getCustomDisplayScore, buildTopInfernalEmbed, buildQueueFeedText, postQueueFeedMessage
+  getCustomPointsDelta, getCustomDisplayScore, buildTopInfernalEmbed, buildQueueFeedText, postQueueFeedMessage,
+  buildQueueJoinActionRow
 } = require('../utils/lobbyUtils');
 
 const { 
@@ -576,21 +577,17 @@ async function handleListCommand(message, args = []) {
     const currentVoiceChannelId = message.member?.voice?.channelId || null;
     const lobbies = Object.values(queueData?.lobbies || {});
     
-    if (lobbies.length === 0) {
-      return await replyToMessage(message, 'Nao ha nenhuma fila ativa no momento.');
-    }
-
     // Tentar encontrar um lobby específico pelo seletor ou pelo canal atual
     const lobby = findLobbyBySelector(queueData, args) || (currentVoiceChannelId ? findLobbyByChannelId(queueData, currentVoiceChannelId) : null);
 
     if (lobby) {
       // Se encontrou um lobby específico, mostra o detalhe dele
       const embed = buildQueueEmbed(lobby);
-      await sendToMessageChannel(message, { embeds: [embed] });
+      await sendToMessageChannel(message, { embeds: [embed], components: [buildQueueJoinActionRow()] });
     } else {
       // Se não especificou e não está em um canal de lobby, mostra um resumo de todos
       const embed = buildQueueEmbed(null, lobbies);
-      await sendToMessageChannel(message, { embeds: [embed] });
+      await sendToMessageChannel(message, { embeds: [embed], components: [buildQueueJoinActionRow()] });
     }
 
     await updateQueueDashboard(message.guild);

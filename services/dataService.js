@@ -22,7 +22,7 @@ const LOCAL_FILES = {
     }
   },
   seasonHistory: { file: 'seasonHistory.json', fallback: { seasons: [] } },
-  systemMeta: { file: 'systemMeta.json', fallback: { lastQueueMessageId: null } },
+  systemMeta: { file: 'systemMeta.json', fallback: { lastQueueMessageId: null, queueDashboardMessageIds: {} } },
   contentTemplates: { file: 'contentTemplates.json', fallback: { onboarding: {}, welcome: {} } }
 };
 
@@ -114,7 +114,7 @@ async function ensureDataFiles() {
       }
     },
     { _id: 'seasonHistory', data: { seasons: [] } },
-    { _id: 'systemMeta', data: { lastQueueMessageId: null } },
+    { _id: 'systemMeta', data: { lastQueueMessageId: null, queueDashboardMessageIds: {} } },
     { _id: 'contentTemplates', data: { onboarding: {}, welcome: {} } }
   ];
 
@@ -234,8 +234,15 @@ async function saveSeasonHistory(data) {
 }
 
 async function loadSystemMeta() {
-  const parsed = await readDoc('systemMeta', { lastQueueMessageId: null });
-  return { lastQueueMessageId: null, ...parsed };
+  const parsed = await readDoc('systemMeta', { lastQueueMessageId: null, queueDashboardMessageIds: {} });
+  return {
+    lastQueueMessageId: null,
+    queueDashboardMessageIds: {},
+    ...parsed,
+    queueDashboardMessageIds: parsed?.queueDashboardMessageIds && typeof parsed.queueDashboardMessageIds === 'object'
+      ? parsed.queueDashboardMessageIds
+      : {}
+  };
 }
 
 async function saveSystemMeta(data) {

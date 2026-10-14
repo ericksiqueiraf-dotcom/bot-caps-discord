@@ -2,12 +2,14 @@
 // Cria cargos, categorias, canais e permissões e grava os IDs no config.json.
 //
 // USO:
-//   node setup-servidor.js <GUILD_ID>            -> executa (com backup do config.json)
-//   node setup-servidor.js <GUILD_ID> --dry-run  -> só mostra o plano, não cria nada
-//   node setup-servidor.js <GUILD_ID> --skip-config -> não altera o config.json
+//   node setup-servidor.js <GUILD_ID> [--dry-run] [--skip-config] [--keep-perms]
 //
 // PRÉ-REQUISITO: o bot já convidado no servidor COM permissão de Administrador.
 // Pode rodar de novo sem medo: tudo é "procurar-ou-criar" (idempotente).
+//
+// --keep-perms: NÃO reescreve permissões de canais existentes (mantém o modelo
+//   de cargos local). Uso em servidor oficial já organizado com cargos próprios:
+//   aplica nomes/estrutura/embeds sem tocar em quem acessa o quê.
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
@@ -33,6 +35,7 @@ if (!GUILD_ID && require.main === module) {
 }
 const DRY_RUN = flags.includes('--dry-run');
 const SKIP_CONFIG = flags.includes('--skip-config');
+const KEEP_PERMS = flags.includes('--keep-perms');
 
 // ─── Planta do servidor (fonte da verdade: server-pattern.json) ─────────────
 // "HUB" no JSON resolve para o HUB_CHANNEL_NAME do tempVoiceService (lookup por nome).
@@ -231,6 +234,13 @@ async function main() {
   // Reaquece o cache: cargos recem-criados precisam estar resolviveis para os overwrites.
   await guild.roles.fetch().catch(() => null);
 
+  // Nomes anteriores ao padrão com emoticons: o setup nao apaga cargos sozinho,
+  // entao avisa para remocao manual e evita duplicidade funcional.
+  for (const legacy of ['Jogador Ativo', 'Capitão', 'MVP player', 'INFERNAL']) {
+    const found = guild.roles.cache.find((r) => r.name === legacy);
+    if (found) console.log(`   ! cargo legado "${legacy}" ainda existe (${found.id}) — remova manualmente após migrar os membros`);
+  }
+
   const everyone = guild.roles.everyone;
   const get = (name) => roles[name];
 
@@ -326,7 +336,12 @@ async function main() {
 
     if (channel && !DRY_RUN) {
       if (preserve) console.log(`     = permissoes preservadas (canal de outro bot)`);
+      else if (KEEP_PERMS) console.log(`     = permissoes mantidas (--keep-perms: modelo de cargos local preservado)`);
       else await channel.permissionOverwrites.set(keepResolvable(overwrites)).catch((e) => console.log(`     ⚠ permissões: ${e.message}`));
+      // Limite de voz vale mesmo com preserve/keep-perms (só permissão é preservada).
+      if (userLimit && kind === ChannelType.GuildVoice && channel.userLimit !== userLimit) {
+        await channel.edit({ userLimit }).catch(() => null);
+      }
     }
 
     // Sobras fora do pai (ex.: #comandos no topo + #comandos na ARENA): apaga so se vazia.
@@ -346,12 +361,12 @@ async function main() {
     return channel;
   }
 
-  // Embed informativo fixo por sala (ex.: #regras <- !regras, #como-jogar <- guia).
-  // Procura mensagem anterior do proprio bot pelo titulo; edita ou posta+fixa.
+  // Embed informativo fixo por sala (ex.: #regras <- !regras).
+  // builders ausentes (ex. onboarding removido do lobbyUtils) são pulados sem quebrar o setup.
   async function ensureInfoEmbed(channel, type) {
     const builders = {
       rules: () => buildRulesEmbed(),
-      onboarding: () => buildOnboardingGuideEmbed(channel.guild)
+      onboarding: () => (typeof buildOnboardingGuideEmbed === 'function' ? buildOnboardingGuideEmbed(channel.guild) : null)
     };
     const build = builders[type];
     if (!build) {
@@ -359,6 +374,10 @@ async function main() {
       return;
     }
     const embed = build();
+    if (!embed) {
+      console.log(`     ⚠ embed "${type}" indisponível (função ausente no lobbyUtils) — pulando`);
+      return;
+    }
     const title = embed?.data?.title || type;
     const isOurs = (m) => m?.author?.id === client.user.id && (m.embeds || []).some((e) => e.title === title);
     const pinned = await channel.messages.fetchPinned().catch(() => null);
@@ -410,7 +429,7 @@ async function main() {
       : [
           { id: everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
           { id: get('Jogador').id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.AddReactions], deny: spec.talk ? [] : [PermissionFlagsBits.SendMessages] },
-          { id: get('Capitão').id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.AddReactions] },
+          { id: get('👑 Capitão de Customs').id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.AddReactions] },
           { id: get('Staff').id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.AddReactions] }
         ];
     const channel = await ensureChannel({
@@ -443,11 +462,11 @@ async function main() {
       : spec.vip
       ? buildVipVoiceOverwrites({ everyoneId: everyone.id, memberIds: paidVipIds, managerIds: vipManagerIds })
       : spec.hidden
-      ? buildHiddenVoiceOverwrites({ everyoneId: everyone.id, jogId: get('Jogador')?.id, capId: get('Capitão')?.id, staffId: get('Staff')?.id })
+      ? buildHiddenVoiceOverwrites({ everyoneId: everyone.id, jogId: get('Jogador')?.id, capId: get('👑 Capitão de Customs')?.id, staffId: get('Staff')?.id })
       : [
       { id: everyone.id, allow: [PermissionFlagsBits.ViewChannel], deny: [PermissionFlagsBits.Connect] },
       { id: get('Jogador').id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak] },
-      { id: get('Capitão').id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak, PermissionFlagsBits.MoveMembers] },
+      { id: get('👑 Capitão de Customs').id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak, PermissionFlagsBits.MoveMembers] },
       { id: get('Staff').id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak, PermissionFlagsBits.MoveMembers, PermissionFlagsBits.MuteMembers] }
     ];
     const channel = await ensureChannel({
@@ -477,14 +496,14 @@ async function main() {
     const backupPath = path.join(__dirname, `config.json.bak-${Date.now()}`);
     fs.copyFileSync(configPath, backupPath);
     console.log(`💾 Backup do config atual: ${path.basename(backupPath)}`);
-    config.roles = { ...config.roles, registeredPlayerRoleId: roles.Jogador.id, visitanteRoleId: roles.Visitante?.id || config.roles?.visitanteRoleId || '', captainRoleId: roles['Capitão'].id };
+    config.roles = { ...config.roles, registeredPlayerRoleId: roles.Jogador.id, visitanteRoleId: roles.Visitante?.id || config.roles?.visitanteRoleId || '', captainRoleId: roles['👑 Capitão de Customs'].id };
     config.voiceChannels = { ...config.voiceChannels, ...voiceIds };
     config.textChannels = { ...config.textChannels, ...textIds };
-    const creatorIds = [roles['Capitão']?.id, roles.Staff?.id, roles['⭐ VIP']?.id, roles['👑 Lendário']?.id].filter(Boolean);
+    const creatorIds = [roles['👑 Capitão de Customs']?.id, roles.Staff?.id, roles['⭐ VIP']?.id, roles['👑 Lendário']?.id].filter(Boolean);
     config.tempVoice = {
       userLimit: Number(config.tempVoice?.userLimit || 10),
       deleteDelaySeconds: Number(config.tempVoice?.deleteDelaySeconds || 60),
-      allowedRoleNames: config.tempVoice?.allowedRoleNames?.length ? config.tempVoice.allowedRoleNames : ['Capitão', 'Staff', '⭐ VIP', '👑 Lendário'],
+      allowedRoleNames: config.tempVoice?.allowedRoleNames?.length ? config.tempVoice.allowedRoleNames : ['👑 Capitão de Customs', 'Staff', '⭐ VIP', '👑 Lendário'],
       allowedRoleIds: [...new Set([...(config.tempVoice?.allowedRoleIds || []), ...creatorIds])],
       hubChannelId: tempVoiceIds.hubChannelId || config.tempVoice?.hubChannelId || ''
     };
@@ -493,7 +512,7 @@ async function main() {
   }
 
   console.log('\n✅ Setup concluído! Próximos passos:');
-  console.log('   1. Confira os cargos: dê "Staff" e "Capitão" para quem é da equipe.');
+  console.log('   1. Confira os cargos: dê "Staff" e "👑 Capitão de Customs" para quem é da equipe.');
   console.log('   2. Confira o padrão: categoria FILA com 🎮・lobby-* + ⏳・sala-de-espera-* + ➕・criar-sala; textos na ARENA.');
   console.log('   3. Reinicie o bot (pm2 restart caps-bot-teste --update-env).');
   console.log('   4. Teste: !cadastrar Nick#TAG → !aceito (ou botao) → !entrar (no lobby) → !votar 1.');

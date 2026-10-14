@@ -3,13 +3,13 @@
   "region": "br1",
   "roles": {
     "registeredPlayerRoleId": "1559621161342599240",
-    "infernalRoleName": "INFERNAL",
-    "mvpPlayerRoleName": "MVP player",
-    "captainRoleId": "1559621160478445609",
+    "infernalRoleName": "🔥 INFERNAL",
+    "mvpPlayerRoleName": "⭐ MVP",
+    "captainRoleId": "1559671649400258630",
     "rankRoleIds": {
       "Prata": "1552537451388608602"
     },
-    "visitanteRoleId": "1559622666237779978"
+    "visitanteRoleId": "1559671650864205924"
   },
   "voiceChannels": {
     "classicQueueChannelId": "1489240283051856023",
@@ -49,8 +49,20 @@
     "dailyRankUpdatesMinute": 0
   },
   "tempVoice": {
-    "hubChannelId": "1559622714736779316",
     "userLimit": 10,
-    "deleteDelaySeconds": 60
+    "deleteDelaySeconds": 60,
+    "allowedRoleNames": [
+      "👑 Capitão de Customs",
+      "Staff",
+      "⭐ VIP",
+      "👑 Lendário"
+    ],
+    "allowedRoleIds": [
+      "1559671649400258630",
+      "1559671647865409577",
+      "1559622673661821018",
+      "1559622674936758443"
+    ],
+    "hubChannelId": "1559622714736779316"
   }
 }

@@ -20,7 +20,7 @@ const files = {
   currentMatch:  { file: 'currentMatch.json',  fallback: { matches: {} } },
   seasonMeta:    { file: 'seasonMeta.json',     fallback: { currentSeason: 1 } },
   seasonHistory: { file: 'seasonHistory.json', fallback: { seasons: [] } },
-  systemMeta:    { file: 'systemMeta.json',     fallback: { lastQueueMessageId: null } },
+  systemMeta:    { file: 'systemMeta.json',     fallback: { lastQueueMessageId: null, queueDashboardMessageIds: {} } },
 };
 
 async function migrate() {

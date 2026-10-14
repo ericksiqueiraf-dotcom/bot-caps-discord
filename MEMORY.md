@@ -7,21 +7,21 @@
 
 ## 🗓️ Última Sessão
 
-- **Data:** 2026-10-10
-- **Foco:** Painel de votação `!votar` com botões + trava 3min pós-`!vitoria` + espera/sala Tier S separadas + `!pdl` + `!toprankinfernal` + fix `setup-servidor.js` + setup multi-servidor teste
-- **Status:** ✅ Concluído (49/49 testes)
+- **Data:** 2026-10-14
+- **Foco:** Instalador unificado (`instalar.js`) + auditoria e padronização dos cargos com emoticons + fixes no setup
+- **Status:** ✅ Concluído (CAPS 63/63, LCL 108/108, dry-run validado na CAPS ARENA, 3 bots reiniciados e online)
 
 ---
 
 ## 📍 Ponto de Parada Atual
 
 ### Onde paramos:
-Banco no MongoDB Atlas. Pós-`!vitoria` move todos para a Sala de Espera (normal ou Tier S separada). **Painel `!votar` com botões** ativo (`commands/handlers/resultVotePanel.js`: maioria 6/10, lembrete 2min, expira 5min, auto-registro sem staff). **Trava 3min no `!entrar`** pós-vitória por fila até sair a `!roleta` (`enterQueue.js: getPendingRouletteEntries`). **Espera Tier S própria** (`!esperatiers`, chave `classic:5x5:s`) + **Sala de Espera Tier S** (`getPostMatchVoiceChannelId(mode,tier)`). **`!pdl @jogador ±valor`** (Admin, ±500, `application/use-cases/adjustPdl.js`, sem tocar W/L) + slash `/pdl`. **`!toprankinfernal`** (ranking por `infernalCount`, zerado por temporada). **Setup multi-servidor:** `setup-servidor.js` fix `msg.pins()` → `msg.pin()` + `fetchPinned()` → `fetchPins()`; rodado em `CAPS TESTE (1558218740875796560)` e `CAPS BOT TESTRE (1558217291123138561)`; `config.json` atual aponta p/ TESTRE (backups `config.json.bak-*`). **Limite 5x5 corrigido:** `getVoteThreshold` 5 → 6 (maioria real dos 10). Suite em **49/49**. Bot `CAPS BOT LOL#6241` (`1487258474810183711`), invite com `permissions=8`. Extração do `legacyCommands.js` segue pendente.
+Banco no MongoDB Atlas. Pós-`!vitoria` move todos para a Sala de Espera (normal ou Tier S separada). **Painel `!votar` com botões** ativo (`commands/handlers/resultVotePanel.js`: maioria 6/10, lembrete 2min, expira 5min, auto-registro sem staff). **Botões de queue do CAPS BOT no canal `fila`** ativos em painel fixo por sala, não no feed: `updateQueueDashboard()` cria/edita um embed para Sala A e só cria outro quando existir Sala B/C/D; IDs ficam em `systemMeta.queueDashboardMessageIds`; mensagens de feed (`postQueueFeedMessage`) voltaram a ser texto puro. Botões: **Entrar Queue CAPS** (`queue:classic:join` → `!entrar`) e **Entrar Queue ARAM** (`queue:aram:join` → `!entrar aram`); Tier S continua decidido pela call/gate existente. `index.js` atualiza o painel fixo no boot via `updateQueueDashboard()`, então após restart/deploy o botão volta sozinho. **Trava 3min no `!entrar`** pós-vitória por fila até sair a `!roleta` (`enterQueue.js: getPendingRouletteEntries`). **Espera Tier S própria** (`!esperatiers`, chave `classic:5x5:s`) + **Sala de Espera Tier S** (`getPostMatchVoiceChannelId(mode,tier)`). **`!pdl @jogador ±valor`** (Admin, ±500, `application/use-cases/adjustPdl.js`, sem tocar W/L) + slash `/pdl`. **`!toprankinfernal`** (ranking por `infernalCount`, zerado por temporada). **Setup multi-servidor:** `setup-servidor.js` fix `msg.pins()` → `msg.pin()` + `fetchPinned()` → `fetchPins()`; rodado em `CAPS TESTE (1558218740875796560)` e `CAPS BOT TESTRE (1558217291123138561)`; `config.json` atual aponta p/ TESTRE (backups `config.json.bak-*`). **Limite 5x5 corrigido:** `getVoteThreshold` 5 → 6 (maioria real dos 10). Suite em **63/63**. Commit salvo: `3687829 feat: add vote panel, pdl and server setup`. Bot `CAPS BOT LOL#6241` (`1487258474810183711`), invite com `permissions=8`. Extração do `legacyCommands.js` segue pendente.
 
 ### Próximo passo imediato:
 - **Modelo salvo:** layout oficial do CAPS ARENA em `docs/SERVER_LAYOUT_CAPS_ARENA.md` (6 categorias, 13 TXT + 9 VOZ mapeados p/ `config.json`, hierarquia de cargos) — pronto p/ replicar no TESTRE
 - **Deploy teste × prod (2026-10-10):** TESTRE = pasta `CAPS BOT TESTRE` → guild `CAPS BOT TESTE (1558217291123138561)` → banco `caps-bot-teste` (`MONGODB_DB`) → PM2 `caps-bot-teste` (online, cwd correto); PROD = pasta `BOT CAPS DISCORD` → guild `CAPS ARENA (1273653944169660427)` → banco `caps-bot` (default) → PM2 `caps-bot` (online); tokens diferentes (hashes distintos); `dataService.js` usa `process.env.MONGODB_DB || 'caps-bot'` nas duas pastas; `.gitignore` prod com `.env.bak*` + `*.bak*`; NUNCA dois processos com o mesmo token
-- **Roteiro de teste:** `!cadastrar` → `!entrar` → `!votar` (botões) → MVP → `!roleta` → `!placar`; conferir `🎮・fila`, `⚔️・partidas`, `📋┃resultados`, `🔥┃destaques`
+- **Roteiro de teste:** `!cadastrar` → botão **Entrar Queue CAPS** ou `!entrar` → `!votar` (botões) → MVP → `!roleta` → `!placar`; conferir `🎮・fila`, `⚔️・partidas`, `📋┃resultados`, `🔥┃destaques`
 - Testar em TESTRE: `!cadastrar Nick#TAG` → `!entrar` → `!votar 1` (botões) → `!roleta N A` → `!esperatiers` → `!pdl`
 - Continuar extração de lógica de negócio do `legacyCommands.js`
 
@@ -69,7 +69,7 @@ Banco no MongoDB Atlas. Pós-`!vitoria` move todos para a Sala de Espera (normal
 - [x] `!cancelarstart <letra>` (2026-09-30: `!cancelarstart A/B/C` cancela a contagem de auto-start do lobby cheio (jogadores ficam na fila); sem letra só resolve com pendente único; sem pendente cai no cancelamento de partida ativa + limpa timer residual; helper `findPendingAutoStartLobby` exportado e testado)
 
 ### Testes automatizados
-- [x] `tests/` com `node:test` nativo (`npm test`): 49/49 verdes (suite 2026-10-10: `result-vote-panel` 6 + `pdl` 3 + anteriores)
+- [x] `tests/` com `node:test` nativo (`npm test`): 63/63 verdes (suite 2026-10-13: botões de queue + `result-vote-panel` + `pdl` + anteriores)
 - [x] `tests/result-vote-panel.test.js` — painel `!votar`: maioria 6/10, parse `votewin:<matchId>:<time>`, faltantes, payload dentro de 1024 chars, contagem
 - [x] `tests/pdl.test.js` — `!pdl`: aplica ± sem tocar W/L, piso zero, teto 500, jogador inexistente falha
 - [x] `!limparsalas A/B/C` (2026-09-30: filtra a sala pela letra; move ocupantes pra Sala de Espera antes de apagar; mutação sob lock; recusa com partida ativa; sem letra limpa tudo como antes; helper `resolveCleanupTargets` exportado e testado)
@@ -270,6 +270,21 @@ database/                    ← fallback JSON local
 - **Setup teste:** fix `msg.pin()`/`fetchPins()` em `setup-servidor.js`; setup rodado em CAPS TESTE e CAPS BOT TESTRE; `config.json` = TESTRE (backups `.bak-*`); bot precisa de restart + hierarquia acima dos cargos
 - **Layout ARENA replicado no TESTRE (2026-10-10):** modelo em `docs/SERVER_LAYOUT_CAPS_ARENA.md`; `setup-servidor.js` com planta ARENA (6 cats, 19 TXT, 11 VOZ, 11 cargos); aplicado em `CAPS BOT TESTE (1558217291123138561)`; `config.json` remapeado (fila/partidas/resultados/destaques/logs/ranking/cadastro + 3 lobbies com limite 10/10/30)
 - Validação: `npm test` 49/49, 13 suites
+
+### 2026-10-14 — Instalador unificado + cargos padronizados com emoticons
+- **`instalar.js` (novo):** `node instalar.js` interativo (pede GUILD_ID + `caps|lcl|ambos`) ou direto `node instalar.js <GUILD_ID> <bot> [--dry-run]`; `ambos` roda `organize-official-discord.js` e é o recomendado p/ servidor compartilhado (evita drift de `captainRoleId`/`visitanteRoleId` entre os 2 configs).
+- **Padrão = servidor real:** `Capitão` → `👑 Capitão de Customs`, `INFERNAL` → `🔥 INFERNAL`, `MVP player` → `⭐ MVP` (nomes confirmados via API na CAPS ARENA, 37 cargos); `Staff`/`Jogador`/VIPs já coincidiam e foram mantidos. `Visitante` removido do pattern CAPS (nem CAPS nem LCL criam mais; o existente é preservado).
+- **Código acompanhando:** refs `roles['👑 Capitão de Customs']` nos 3 setups; `allowedRoleNames` nos 2 configs + default do `tempVoiceService` LCL; `INFERNAL_ROLE_NAME`/`MVP_ROLE_NAMES` + fallbacks nos 2 `lobbyUtils`; `infernalRoleName`/`mvpPlayerRoleName` nos 2 configs; aviso de legados mira os nomes simples antigos (`Capitão`, `MVP player`, `INFERNAL`, `Jogador Ativo` — este com 2 membros na ARENA, migração manual pendente).
+- **Bug real achado no dry-run:** `buildOnboardingGuideEmbed is not a function` quebrava o `setup-servidor.js` no meio (import sem export no `lobbyUtils`); agora pula com aviso. Dry-run na CAPS ARENA: 8/8 cargos "já existe", 0 duplicação, canais/vozes resolvidos.
+- **LCL:** textos `🔥・LCL` com `talk: false` explícito (leitura p/ Jogador, operação p/ Capitão/Staff — por botão/voz); setup LCL não cria mais `Visitante`.
+- Validação: CAPS 63/63, LCL 108/108; restart `caps-bot` + `lcl-bot` + `caps-bot-teste` (`--update-env`), os 3 com `Bot conectado como` no log.
+
+### 2026-10-13 — Commit geral + botões de queue no canal fila- Commit criado: `3687829 feat: add vote panel, pdl and server setup` (pacote grande com votação por botões, PDL, setup de servidor, docs e imagens organizadas em `IMAGENS/`).
+- **Botões de queue:** `utils/lobbyUtils.js` ganhou `QUEUE_JOIN_BUTTON_IDS`, `parseQueueJoinButtonId()` e `buildQueueJoinActionRow()`; `updateQueueDashboard()` envia botões **Entrar Queue CAPS** e **Entrar Queue ARAM** em painéis fixos por sala; `postQueueFeedMessage()` voltou a enviar só texto para não poluir o canal.
+- **Roteamento dos botões:** `index.js` usa `parseQueueJoinButtonId()` no `interactionCreate`; `queue:classic:join` chama `handleEnterCommand(..., [])`; `queue:aram:join` chama `handleEnterCommand(..., ['aram'])`; respostas seguem ephemeral via `createInteractionContext()`.
+- **Regra preservada:** o botão não burla voz/gate; `handleEnterCommandFlow()` ainda exige o canal correto (`Lobby Classic`, `Lobby TIER S` ou `Lobby ARAM`) e o gate de Tier S.
+- **Testes:** `tests/queue-feed.test.js` cobre mapeamento dos botões e serialização da action row; validação `npm test` = 63/63, 15 suites.
+- **+ Criar sala:** corrigido em 2026-10-13; faltava `services/tempVoiceService.js` e o listener `voiceStateUpdate` no `index.js`. Agora entrar no hub `➕・criar-sala` cria sala temporária `➕・Nome`, move o usuário, limita por `config.tempVoice.userLimit`, apaga após ficar vazia (`deleteDelaySeconds`) e respeita `allowedRoleIds/allowedRoleNames` (Capitão, Staff, VIP, Lendário/Admin). Bot reiniciado no PM2 e testes 63/63.
 
 ### 2026-10-01 — Reativação + ranking CLASSIC puro + !ajuda
 - Bot estava fora do PM2 (`caps-bot doesn't exist`); religado com `pm2 start index.js --name caps-bot` + `pm2 save`. Docker `caps-mongo` subiu depois do bot e o `dataService` travou em modo local (`storageMode = 'local'` não tenta de novo); `pm2 restart caps-bot` resolveu → `[DB] Conectado ao MongoDB Atlas` + `Bot conectado como CAPS BOT LOL#6241 | v1.8.0`.

@@ -7,11 +7,10 @@
   },
   "roles": [
     { "name": "Staff", "color": "#E74C3C", "reason": "Equipe do servidor" },
-    { "name": "Capitão", "color": "#F1C40F", "reason": "Pode !start / !vitoria" },
+    { "name": "👑 Capitão de Customs", "color": "#F1C40F", "reason": "Pode !start / !vitoria" },
     { "name": "Jogador", "color": "#3498DB", "reason": "Recebe apos validar Nick#TAG + aceitar regras" },
-    { "name": "Visitante", "color": "#95A5A6", "reason": "Nao joga LoL, so canais abertos" },
-    { "name": "INFERNAL", "color": "#FF6B00", "reason": "Bot dá/remove sozinho (5 wins)" },
-    { "name": "MVP player", "color": "#9B59B6", "reason": "Bot dá/remove sozinho (MVP)" },
+    { "name": "🔥 INFERNAL", "color": "#FF6B00", "reason": "Bot dá/remove sozinho (5 wins)" },
+    { "name": "⭐ MVP", "color": "#9B59B6", "reason": "Bot dá/remove sozinho (MVP)" },
     { "name": "💜 Apoiador", "color": "#A855F7", "reason": "Tier 1 do clube VIP" },
     { "name": "⭐ VIP", "color": "#FFD700", "reason": "Tier 2 do clube VIP" },
     { "name": "👑 Lendário", "color": "#FF2D78", "reason": "Tier 3 do clube VIP" }

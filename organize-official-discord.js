@@ -355,6 +355,12 @@ async function main() {
   for (const spec of roleSpecs) roles[spec.name] = await ensureRole(guild, spec);
   await guild.roles.fetch().catch(() => null);
 
+  // Nomes anteriores ao padrão com emoticons: nunca apagados automaticamente.
+  for (const legacy of ['Jogador Ativo', 'Capitão', 'MVP player', 'INFERNAL']) {
+    const found = guild.roles.cache.find((r) => r.name === legacy);
+    if (found) console.log(`! cargo legado "${legacy}" ainda existe (${found.id}) — remova manualmente após migrar os membros`);
+  }
+
   const categories = {};
   for (const categoryName of desiredCategories) {
     categories[categoryName] = await reconcileCategory(guild, categoryName);

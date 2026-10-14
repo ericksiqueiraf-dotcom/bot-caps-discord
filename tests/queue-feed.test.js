@@ -1,6 +1,11 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { buildQueueFeedText } = require('../utils/lobbyUtils');
+const {
+  QUEUE_JOIN_BUTTON_IDS,
+  buildQueueFeedText,
+  buildQueueJoinActionRow,
+  parseQueueJoinButtonId
+} = require('../utils/lobbyUtils');
 
 describe('feed automatico do canal #fila', () => {
   it('!entrar gera linha com sala, modo e contagem', () => {
@@ -85,5 +90,27 @@ describe('feed automatico do canal #fila', () => {
   it('evento desconhecido retorna nulo', () => {
     assert.equal(buildQueueFeedText({ kind: 'x' }), null);
     assert.equal(buildQueueFeedText(), null);
+  });
+
+  it('botoes de queue mapeiam para os argumentos do !entrar', () => {
+    assert.deepEqual(parseQueueJoinButtonId(QUEUE_JOIN_BUTTON_IDS.CLASSIC), {
+      mode: 'classic',
+      args: []
+    });
+    assert.deepEqual(parseQueueJoinButtonId(QUEUE_JOIN_BUTTON_IDS.ARAM), {
+      mode: 'aram',
+      args: ['aram']
+    });
+    assert.equal(parseQueueJoinButtonId('queue:x:join'), null);
+  });
+
+  it('linha de botoes da fila tem Queue CAPS e ARAM', () => {
+    const row = buildQueueJoinActionRow();
+    const json = row.toJSON();
+    assert.equal(json.components.length, 2);
+    assert.equal(json.components[0].custom_id, QUEUE_JOIN_BUTTON_IDS.CLASSIC);
+    assert.equal(json.components[0].label, 'Entrar Queue CAPS');
+    assert.equal(json.components[1].custom_id, QUEUE_JOIN_BUTTON_IDS.ARAM);
+    assert.equal(json.components[1].label, 'Entrar Queue ARAM');
   });
 });

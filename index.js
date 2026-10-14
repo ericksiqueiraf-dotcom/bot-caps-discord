@@ -19,6 +19,7 @@ const {
 
 const config = require('./config.json');
 const { createRiotService } = require('./services/riotService');
+const { handleTempVoiceStateUpdate } = require('./services/tempVoiceService');
 const {
   createBalancedTeams,
   calculateHybridMmr,
@@ -352,6 +353,7 @@ const {
   getStoredPlayerStats,
   upsertPlayerStats,
   buildQueueEmbed,
+  updateQueueDashboard,
   splitEmbedFieldChunks,
   buildTeamsEmbed,
   buildLeaderboardEmbed,
@@ -372,6 +374,7 @@ const {
   handleMvpVoteInteraction,
   resumePendingMvpVotes,
   expireInfernalRolesIfDue,
+  parseQueueJoinButtonId,
   startDailyRankScheduler,
   movePlayersToTeamChannels,
   movePlayersToVoiceChannel,
@@ -421,6 +424,15 @@ client.once('ready', async () => {
     console.error('[RESTART] Erro ao expirar cargos INFERNAL:', err);
   }
 
+  // Garante que o painel fixo do canal #fila volte com os botoes apos restart/deploy.
+  try {
+    for (const guild of client.guilds.cache.values()) {
+      await updateQueueDashboard(guild);
+    }
+  } catch (err) {
+    console.error('[RESTART] Erro ao atualizar painel de fila:', err);
+  }
+
   // Item 3: Recuperar auto-starts pendentes (se a sala estiver cheia no BD e reiniciou)
   try {
     const queueData = await loadQueue();
@@ -441,6 +453,12 @@ client.on('guildCreate', async (guild) => {
   const commands = buildSlashCommands();
   await guild.commands.set(commands).catch((error) => {
     console.error(`[SLASH] Nao foi possivel registrar os comandos na nova guild ${guild.id}:`, error);
+  });
+});
+
+client.on('voiceStateUpdate', async (oldState, newState) => {
+  await handleTempVoiceStateUpdate(oldState, newState).catch((error) => {
+    console.error('[TEMP VOICE] Erro no evento de voz:', error.message);
   });
 });
 
@@ -671,10 +689,13 @@ client.on('interactionCreate', async (interaction) => {
         return;
       }
 
-      if (interaction.customId === 'queue:classic:join') {
+      const queueJoin = parseQueueJoinButtonId(interaction.customId);
+      if (queueJoin) {
         await interaction.deferReply({ ephemeral: true }).catch(() => null);
-        const context = createInteractionContext(interaction, { content: '!entrar' });
-        await handlers.handleEnterCommand(context, []);
+        const context = createInteractionContext(interaction, {
+          content: ['!entrar', ...queueJoin.args].join(' ')
+        });
+        await handlers.handleEnterCommand(context, queueJoin.args);
         return;
       }
 
