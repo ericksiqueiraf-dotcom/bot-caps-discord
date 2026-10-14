@@ -46,7 +46,7 @@ const {
   savePlayerStats, loadCurrentMatch, saveCurrentMatch, 
   loadSeasonMeta, saveSeasonMeta, loadSeasonHistory, 
   saveSeasonHistory, loadSystemMeta, saveSystemMeta,
-  loadContentTemplates,
+  loadContentTemplates, loadVipSubscriptions,
   withQueueOperationLock 
 } = require('../services/dataService');
 const { getResolvedContentTemplates } = require('../services/contentTextService');
@@ -900,17 +900,27 @@ async function handleLiveCommand(message, args = []) {
   return await replyToMessage(message, '🔴 Live divulgada!');
 }
 
-async function handleClubeCommand(message) {  const paymentsEnabled = Boolean(process.env.MP_ACCESS_TOKEN);
+async function handleClubeCommand(message) {
+  const paymentsEnabled = Boolean(process.env.MP_ACCESS_TOKEN);
   const components = [];
   if (paymentsEnabled) {
-    const { TIER_KEYS, TIER_ROLE_NAMES } = require('../services/clubePaymentsService');
+    const { TIER_KEYS, TIER_ROLE_NAMES, findRenewableSub } = require('../services/clubePaymentsService');
+    let subscriptions = [];
+    try {
+      ({ subscriptions } = await loadVipSubscriptions());
+    } catch { /* sem store, só Assinar */ }
+    const guildId = message.guild?.id;
+    const discordId = message.author?.id;
     const row = new ActionRowBuilder().addComponents(
-      TIER_KEYS.map((tierKey) =>
-        new ButtonBuilder()
-          .setCustomId(`clube:buy:${tierKey}`)
-          .setLabel(`Assinar ${TIER_ROLE_NAMES[tierKey]}`)
-          .setStyle(ButtonStyle.Primary)
-      )
+      TIER_KEYS.map((tierKey) => {
+        const renewable = subscriptions.length && guildId && discordId
+          ? findRenewableSub(subscriptions, guildId, discordId, tierKey)
+          : null;
+        return new ButtonBuilder()
+          .setCustomId(renewable ? `clube:buy:${tierKey}:renew` : `clube:buy:${tierKey}`)
+          .setLabel(renewable ? `Renovar ${TIER_ROLE_NAMES[tierKey]} -10%` : `Assinar ${TIER_ROLE_NAMES[tierKey]}`)
+          .setStyle(renewable ? ButtonStyle.Success : ButtonStyle.Primary);
+      })
     );
     components.push(row);
   }
@@ -930,6 +940,7 @@ async function handleHelpCommand(message) {
       { name: '🕹️ Cadastro (1x)', value: '`!cadastrar Nick#TAG` • Vincula sua conta Riot\n`!nick Nick#TAG` • Atualiza seu nick' },
       { name: '🎮 Jogador (1/2) — Fila e voto', value: '`!regras` • Regulamento completo\n`!entrar` • Fila Classic (no canal Lobby Classic ou Lobby TIER S)\n`!entrar aram` • Fila ARAM\n`!entrar aram 2x2` • ARAM formato\n`!fila` • Mostra jogadores em sala\n`!espera` • Entra na espera (🔥 INFERNAL entra na posição 5)\n`!esperatiers` • Espera do Lobby TIER S (só Esmeralda+)\n`!espera ver` • Mostra a ordem\n`!espera sair` • Sai da espera\n`!sair` • Sai da sala\n`!votar 1/2` • Vota no vencedor (abre painel com botões p/ os 10 votarem)\n`!votar` • Reabre o painel de votação' },
       { name: '🎮 Jogador (2/2) — Ranking', value: '`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking geral (CLASSIC = pontos custom)\n`!placar tiers` • Só Esmeralda+\n`!top10` • Top 10 CLASSIC por pontos custom, desempate por winrate\n`!top10 tiers` • Top 10 só Esmeralda+\n`!topstreak` • Ranking Streak 🔥\n`!toprankinfernal` • Quem mais pegou INFERNAL na temporada 🔥\n`!clube` • Clube VIP: tiers, benefícios e membros 💎\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
+      { name: '💎 Clube VIP', value: '`!clube` • Tiers, assinatura PIX e renovação -10%\n`!querolive` • Entrar/sair do ping 🔴 Ao Vivo\n`!live <link>` • Divulgar live Twitch/YouTube/Kick (só 👑 Lendário, 1x a cada 6h)' },
       { name: '🛠️ Staff', value: '`!staff` • Guia completo da staff\n`!pdl @u -50 motivo` • Ajuste/punição de PDL Classic (só Admin)\n`!remover @u`, `!limpar [qnt]`, `!limparsalas [sala]` • Limpa sala A/B/C (sem letra = todas)\n`!sincronizarelo @u`, `!sincronizartodos` (ou `!sync todos`), `!sync`, `!onboarding`' },
       { name: '⚙️ Partida (Staff)', value: '`!start [sala]`, `!vitoria [1|2] [sala]`, `!cancelarstart [sala]`\n`!rematch [sala]` • Volta os 10 pra fila, rebalanceia e inicia na hora' },
       { name: '📊 Temporada', value: '`!temporadas`, `!resetgeral` (Admin)' }
@@ -938,7 +949,7 @@ async function handleHelpCommand(message) {
     .setTimestamp();
   const sent = await sendToMessageChannel(message, { embeds: [embed] });
     if (!sent) {
-      await replyToMessage(message, '📚 Comandos: `!cadastrar Nick#TAG` • `!entrar` • `!entrar aram` • `!fila` • `!espera` • `!sair` • `!votar 1/2` • `!perfil` • `!placar` • `!top10` • `!topstreak` • `!staff` • `!start` • `!vitoria` • `!temporadas`');
+      await replyToMessage(message, '📚 Comandos: `!cadastrar Nick#TAG` • `!entrar` • `!entrar aram` • `!fila` • `!espera` • `!sair` • `!votar 1/2` • `!perfil` • `!placar` • `!top10` • `!topstreak` • `!clube` • `!querolive` • `!live` • `!staff` • `!start` • `!vitoria` • `!temporadas`');
     }
   } catch (error) {
     console.error('[ERRO] !ajuda:', error);

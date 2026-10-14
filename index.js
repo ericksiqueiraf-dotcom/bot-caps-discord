@@ -717,7 +717,9 @@ client.on('interactionCreate', async (interaction) => {
       }
 
       if (String(interaction.customId || '').startsWith(CLUBE_BUY_PREFIX)) {
-        const tierKey = String(interaction.customId).slice(CLUBE_BUY_PREFIX.length);
+        const buyParts = String(interaction.customId).split(':');
+        const tierKey = buyParts[2] || '';
+        const isRenewal = buyParts[3] === 'renew';
         const tier = getClubeTierConfig(config, tierKey);
         if (!tier) {
           await interaction.reply({ content: 'Tier inválido.', ephemeral: true }).catch(() => null);
@@ -727,9 +729,11 @@ client.on('interactionCreate', async (interaction) => {
           await interaction.reply({ content: '💳 Assinaturas PIX em configuração — fale com a Staff.', ephemeral: true }).catch(() => null);
           return;
         }
+        const { getRenewalPrice } = require('./services/clubePaymentsService');
+        const amount = isRenewal ? getRenewalPrice(tier.preco) : tier.preco;
         const modal = new ModalBuilder()
-          .setCustomId(`${CLUBE_EMAIL_MODAL_PREFIX}${tierKey}`)
-          .setTitle(`Assinar ${tier.roleName} — R$ ${tier.preco.toFixed(2).replace('.', ',')}`);
+          .setCustomId(`${CLUBE_EMAIL_MODAL_PREFIX}${tierKey}${isRenewal ? ':renew' : ''}`)
+          .setTitle(`${isRenewal ? 'Renovar' : 'Assinar'} ${tier.roleName} — R$ ${amount.toFixed(2).replace('.', ',')}`);
         const emailInput = new TextInputBuilder()
           .setCustomId(CLUBE_EMAIL_FIELD_ID)
           .setLabel('Seu e-mail (para o PIX)')
@@ -769,12 +773,15 @@ client.on('interactionCreate', async (interaction) => {
     try {
       if (String(interaction.customId || '').startsWith(CLUBE_EMAIL_MODAL_PREFIX)) {
         await interaction.deferReply({ ephemeral: true }).catch(() => null);
-        const tierKey = String(interaction.customId).slice(CLUBE_EMAIL_MODAL_PREFIX.length);
+        const emailParts = String(interaction.customId).slice(CLUBE_EMAIL_MODAL_PREFIX.length).split(':');
+        const tierKey = emailParts[0] || '';
+        const isRenewal = emailParts[1] === 'renew';
         const email = interaction.fields.getTextInputValue(CLUBE_EMAIL_FIELD_ID)?.trim();
         try {
           const payment = await createVipPixPayment({
             tierKey,
             email,
+            isRenewal,
             discordId: interaction.user.id,
             guildId: interaction.guildId,
             config
@@ -787,7 +794,7 @@ client.on('interactionCreate', async (interaction) => {
             });
           }
           const embed = new EmbedBuilder()
-            .setTitle(`💎 ${payment.tier.roleName} — R$ ${payment.tier.preco.toFixed(2).replace('.', ',')}`)
+            .setTitle(`💎 ${payment.tier.roleName} — R$ ${payment.amount.toFixed(2).replace('.', ',')}${payment.isRenewal ? ' (renovação -10%)' : ''}`)
             .setDescription(`Pague no app do seu banco (vale por ${30} min). Assim que o PIX for confirmado, o cargo entra **sozinho**.\n${payment.ticketUrl ? `[Abrir no Mercado Pago](${payment.ticketUrl})` : ''}`)
             .setColor('#00C851');
           if (payment.qrCodeBase64) embed.setImage('attachment://pix-qrcode.png');

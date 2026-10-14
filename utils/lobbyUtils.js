@@ -14,7 +14,7 @@ const {
 const { 
   loadQueue, saveQueue, loadSystemMeta, saveSystemMeta, 
   loadPlayerStats, savePlayerStats, loadSeasonMeta, 
-  loadSeasonHistory, saveSeasonHistory 
+  loadSeasonHistory, saveSeasonHistory, loadVipSubscriptions, saveVipSubscriptions
 } = require('../services/dataService');
 const { calculateSeedRating, calculateHybridMmr, calculateEloDelta, RATING_VERSION, DEFAULT_CUSTOM_POINTS } = require('../services/balanceService');
 
@@ -1056,6 +1056,26 @@ async function syncInfernalRolesAfterMatch(guild, winners = [], losers = []) {
         failed.push({ discordId: winner.discordId, action: 'add_role', error: err.message });
       }
     }
+
+    // Degustação do clube: nova conquista INFERNAL ganha 💜 Apoiador até o
+    // INFERNAL vencer — exceto quem já tem qualquer tier (pago ou degustação).
+    if (!stillValid) {
+      try {
+        const memberRoles = [...member.roles.cache.values()].map((r) => String(r?.name || ''));
+        const hasVipTier = VIP_TIERS.some((tier) => memberRoles.includes(tier.name));
+        if (!hasVipTier) {
+          const apoiadorRole = guild.roles.cache.find((r) => String(r?.name || '') === '💜 Apoiador');
+          if (apoiadorRole) {
+            await member.roles.add(apoiadorRole, 'Degustação INFERNAL: Apoiador').catch(() => null);
+            const entry = newlyAwarded.find((a) => String(a.discordId) === String(winner.discordId));
+            if (entry) entry.trialVip = true;
+            const trialStats = await loadPlayerStats();
+            upsertPlayerStats(trialStats, winner, { trialVip: true });
+            await savePlayerStats(trialStats);
+          }
+        }
+      } catch { /* degustação é opcional, nunca quebra o fluxo */ }
+    }
   }
 
   if (failed.length > 0) {
@@ -1065,20 +1085,26 @@ async function syncInfernalRolesAfterMatch(guild, winners = [], losers = []) {
 }
 
 async function reconcileInfernalRoles(guild) {
-  // Limpa órfãos: membro com role no Discord mas sem infernalExpiresAt válida no banco
-  if (!guild) return { removedOrphans: 0, failed: [] };
+  // Duas vias: remove órfãos (tem cargo sem validade no banco) E concede
+  // faltantes (banco válido mas sem cargo — ex. falha de hierarquia anterior).
+  if (!guild) return { removedOrphans: 0, grantedMissing: [], failed: [] };
   const infernalRole = findInfernalRole(guild);
-  if (!infernalRole) return { removedOrphans: 0, failed: [] };
+  if (!infernalRole) return { removedOrphans: 0, grantedMissing: [], failed: [] };
   // role.members depende de cache: busca geral p/ enxergar todos (servidor pequeno, 1 chamada)
   await guild.members.fetch().catch(() => null);
   const statsData = await loadPlayerStats();
+  const now = Date.now();
+  const failed = [];
+  const grantedMissing = [];
   let removedOrphans = 0;
+  const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
+  const hierarchyOk = !botMember || infernalRole.position < botMember.roles.highest.position;
+
   for (const [, member] of infernalRole.members) {
     const stored = Object.values(statsData.players || {}).find((entry) => entry.discordId === member.id) || null;
-    const valid = stored?.infernalExpiresAt && new Date(stored.infernalExpiresAt).getTime() > Date.now();
+    const valid = stored?.infernalExpiresAt && new Date(stored.infernalExpiresAt).getTime() > now;
     if (!valid) {
-      const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
-      if (botMember && infernalRole.position >= botMember.roles.highest.position) {
+      if (!hierarchyOk) {
         failed.push({ discordId: member.id, action: 'remove_orphan', error: 'hierarchy_bot_below_infernal' });
         continue;
       }
@@ -1086,10 +1112,27 @@ async function reconcileInfernalRoles(guild) {
       removedOrphans += 1;
     }
   }
+
+  for (const player of Object.values(statsData.players || {})) {
+    const valid = player?.infernalExpiresAt && new Date(player.infernalExpiresAt).getTime() > now;
+    if (!valid || !player.discordId) continue;
+    const member = guild.members.cache.get(String(player.discordId));
+    if (!member || member.roles.cache.has(infernalRole.id)) continue;
+    if (!hierarchyOk) {
+      failed.push({ discordId: player.discordId, action: 'grant_missing', error: 'hierarchy_bot_below_infernal' });
+      continue;
+    }
+    const done = await member.roles.add(infernalRole, 'Reconciliação INFERNAL').then(() => true).catch((err) => {
+      failed.push({ discordId: player.discordId, action: 'grant_missing', error: err.message });
+      return false;
+    });
+    if (done) grantedMissing.push({ discordId: player.discordId, nickname: player.registeredNickname || player.nickname });
+  }
+
   if (failed.length > 0) {
     console.warn('[INFERNAL] Reconciliacao com falhas (verifique a hierarquia: cargo do bot precisa ficar ACIMA do INFERNAL):', failed.map((f) => `${f.discordId}:${f.error}`).join(' | '));
   }
-  return { removedOrphans, failed };
+  return { removedOrphans, grantedMissing, failed };
 }
 
 async function postInfernalAnnouncement(guild, awarded = []) {
@@ -1104,7 +1147,7 @@ async function postInfernalAnnouncement(guild, awarded = []) {
 
   const mentions = awarded.map((p) => `<@${p.discordId}>`).join(' ');
   const lines = awarded
-    .map((p) => `• **${p.nickname || p.discordId}** — \`${p.winStreak}\` vitorias seguidas (vale ate ${formatDateTimeForHistory(p.infernalExpiresAt)})`)
+    .map((p) => `• **${p.nickname || p.discordId}** — \`${p.winStreak}\` vitorias seguidas (vale ate ${formatDateTimeForHistory(p.infernalExpiresAt)})${p.trialVip ? '\n  💜 Degustação **Apoiador** até o INFERNAL vencer!' : ''}`)
     .join('\n');
 
   const embed = new EmbedBuilder()
@@ -1238,6 +1281,24 @@ async function expireInfernalRolesIfDue(guild) {
     const member = await guild.members.fetch(player.discordId).catch(() => null);
     if (member?.roles.cache.has(infernalRole.id)) {
       await member.roles.remove(infernalRole).catch(() => null);
+    }
+
+    // Fim da degustação: tira o Apoiador de teste, exceto de quem pagou.
+    if (player.trialVip) {
+      try {
+        const { subscriptions } = await loadVipSubscriptions();
+        const hasPaid = subscriptions.some((s) => s?.status === 'active'
+          && String(s?.discordId) === String(player.discordId)
+          && String(s?.guildId) === String(guild.id));
+        if (!hasPaid) {
+          const apoiadorRole = guild.roles.cache.find((r) => String(r?.name || '') === '💜 Apoiador');
+          if (apoiadorRole && member?.roles.cache.has(apoiadorRole.id)) {
+            await member.roles.remove(apoiadorRole, 'Fim da degustação INFERNAL').catch(() => null);
+          }
+        }
+        upsertPlayerStats(statsData, player, { trialVip: false });
+        changed = true;
+      } catch { /* segue */ }
     }
   }
 
@@ -2418,9 +2479,11 @@ function startDailyRankScheduler() {  setInterval(async () => {
         await expireInfernalRolesIfDue(guild);
         await reconcileInfernalRoles(guild).catch(() => null);
         try {
-          const { expireVipSubscriptionsForGuild } = require('../services/clubePaymentsService');
+          const { expireVipSubscriptionsForGuild, sendVipExpiryReminders } = require('../services/clubePaymentsService');
           const expired = await expireVipSubscriptionsForGuild(guild);
           if (expired.length) console.log(`[CLUBE] ${expired.length} assinatura(s) expirada(s) em ${guild.id}.`);
+          const reminded = await sendVipExpiryReminders(guild);
+          if (reminded.length) console.log(`[CLUBE] ${reminded.length} lembrete(s) de vencimento em ${guild.id}.`);
         } catch (err) {
           console.error('[CLUBE] Erro ao expirar assinaturas:', err.message);
         }

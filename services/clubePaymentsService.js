@@ -52,8 +52,31 @@ function pixExpiryIso(nowMs = Date.now()) {
   return new Date(nowMs + PIX_EXPIRY_MINUTES * 60 * 1000).toISOString();
 }
 
+const RENEWAL_DISCOUNT = 0.10;
+const RENEWAL_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
+
+function getRenewalPrice(preco) {
+  return Math.round(Number(preco) * (1 - RENEWAL_DISCOUNT) * 100) / 100;
+}
+
+// Assinatura renovável: ativa, ou vencida há até 7 dias (carência).
+function findRenewableSub(subscriptions, guildId, discordId, tierKey, nowMs = Date.now()) {
+  const list = (Array.isArray(subscriptions) ? subscriptions : []).filter((s) =>
+    String(s?.guildId || '') === String(guildId || '')
+    && String(s?.discordId || '') === String(discordId || '')
+    && String(s?.tierKey || '') === String(tierKey || ''));
+  const active = list.find((s) => s?.status === 'active');
+  if (active) return active;
+  const expired = list
+    .filter((s) => s?.status === 'expired' && s?.expiresAt)
+    .sort((a, b) => new Date(b.expiresAt).getTime() - new Date(a.expiresAt).getTime())[0];
+  if (expired && nowMs - new Date(expired.expiresAt).getTime() <= RENEWAL_GRACE_MS) return expired;
+  return null;
+}
+
 async function createVipPixPayment({
   tierKey, email, discordId, guildId, config,
+  isRenewal = false,
   accessToken = process.env.MP_ACCESS_TOKEN,
   publicBaseUrl = process.env.PUBLIC_BASE_URL,
   mpFetch = fetch,
@@ -67,11 +90,12 @@ async function createVipPixPayment({
     throw new Error('MP_ACCESS_TOKEN não configurado.');
   }
 
+  const amount = isRenewal ? getRenewalPrice(tier.preco) : tier.preco;
   const externalReference = buildExternalReference(guildId, discordId, tierKey);
   const body = {
-    transaction_amount: tier.preco,
+    transaction_amount: amount,
     payment_method_id: 'pix',
-    description: `CAPS Arena - ${tier.roleName} (${tier.dias} dias)`,
+    description: `CAPS Arena - ${tier.roleName} (${tier.dias} dias)${isRenewal ? ' - renovação -10%' : ''}`,
     payer: { email: cleanEmail },
     external_reference: externalReference,
     date_of_expiration: pixExpiryIso(nowMs)
@@ -95,7 +119,8 @@ async function createVipPixPayment({
   return {
     paymentId: String(data?.id || ''),
     status: String(data?.status || ''),
-    amount: tier.preco,
+    amount,
+    isRenewal: Boolean(isRenewal),
     tier,
     qrCode: tx.qr_code || '',
     qrCodeBase64: tx.qr_code_base64 || '',
@@ -223,7 +248,10 @@ async function finalizeApprovedVipPayment(
   await discordRest.addMemberRole(ref.guildId, ref.discordId, roleId);
 
   const startedAt = new Date(nowMs).toISOString();
-  const expiresAt = new Date(nowMs + tier.dias * 24 * 60 * 60 * 1000).toISOString();
+  // Renovação soma os dias no vencimento atual (renovar cedo não pune).
+  const prior = findRenewableSub(subscriptions, ref.guildId, ref.discordId, ref.tierKey, nowMs);
+  const baseMs = prior?.expiresAt ? Math.max(nowMs, new Date(prior.expiresAt).getTime()) : nowMs;
+  const expiresAt = new Date((Number.isFinite(baseMs) ? baseMs : nowMs) + tier.dias * 24 * 60 * 60 * 1000).toISOString();
   const kept = subscriptions.filter((s) => {
     if (String(s?.paymentId || '') === String(payment.id)) return false;
     if (String(s?.discordId) === ref.discordId && String(s?.guildId) === ref.guildId && s?.status === 'active') return false;
@@ -357,6 +385,37 @@ function startVipPaymentPoller({ intervalMs = 3 * 60 * 1000, config = null } = {
   return timer;
 }
 
+// Lembretes de vencimento via DM (3 dias e 1 dia antes). 1 DM por marco.
+async function sendVipExpiryReminders(guild, { store = null, nowMs = Date.now() } = {}) {
+  const storeApi = store || require('./dataService');
+  const { subscriptions } = await storeApi.loadVipSubscriptions();
+  const notified = [];
+  let changed = false;
+  for (const sub of subscriptions) {
+    if (sub?.status !== 'active') continue;
+    if (String(sub?.guildId || '') !== String(guild?.id || '')) continue;
+    const expiresMs = new Date(sub.expiresAt).getTime();
+    if (!Number.isFinite(expiresMs) || expiresMs <= nowMs) continue;
+    const daysLeft = Math.ceil((expiresMs - nowMs) / (24 * 60 * 60 * 1000));
+    const tier = getClubeTierConfig(null, sub.tierKey) || { roleName: TIER_ROLE_NAMES[sub.tierKey] };
+    const member = await guild.members.fetch(String(sub.discordId)).catch(() => null);
+    if (!member) continue;
+    if (daysLeft === 3 && !sub.reminded3d) {
+      await member.send(`💎 Sua assinatura **${tier?.roleName || sub.tierKey}** na CAPS Arena vence em **3 dias**. Renove antes com **-10%** usando \`!clube\`!`).catch(() => null);
+      sub.reminded3d = true;
+      changed = true;
+      notified.push({ discordId: sub.discordId, milestone: '3d' });
+    } else if (daysLeft <= 1 && !sub.reminded1d) {
+      await member.send(`⏰ Último aviso: sua assinatura **${tier?.roleName || sub.tierKey}** vence **amanhã**! Renove agora com **-10%** usando \`!clube\`.`).catch(() => null);
+      sub.reminded1d = true;
+      changed = true;
+      notified.push({ discordId: sub.discordId, milestone: '1d' });
+    }
+  }
+  if (changed) await storeApi.saveVipSubscriptions({ subscriptions });
+  return notified;
+}
+
 // Expira assinaturas vencidas (roda no bot, com objetos discord.js).
 async function expireVipSubscriptionsForGuild(guild, { store = null, nowMs = Date.now() } = {}) {
   const storeApi = store || require('./dataService');
@@ -405,5 +464,10 @@ module.exports = {
   pollPendingVipPayments,
   createGatewayDiscordRest,
   startVipPaymentPoller,
+  RENEWAL_DISCOUNT,
+  RENEWAL_GRACE_MS,
+  getRenewalPrice,
+  findRenewableSub,
+  sendVipExpiryReminders,
   expireVipSubscriptionsForGuild
 };

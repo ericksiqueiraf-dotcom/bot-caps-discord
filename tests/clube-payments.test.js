@@ -189,3 +189,77 @@ describe('poller de pagamentos (sem URL pública)', () => {
     assert.equal(result.checked, 0);
   });
 });
+
+describe('renovação -10% e lembretes', () => {
+  it('getRenewalPrice e findRenewableSub', () => {
+    assert.equal(payments.getRenewalPrice(9.99), 8.99);
+    assert.equal(payments.getRenewalPrice(19.99), 17.99);
+    assert.equal(payments.getRenewalPrice(29.99), 26.99);
+    const now = Date.now();
+    const subs = [
+      { discordId: 'u1', guildId: 'g1', tierKey: 'vip', status: 'active', expiresAt: new Date(now + 86400000).toISOString() },
+      { discordId: 'u2', guildId: 'g1', tierKey: 'vip', status: 'expired', expiresAt: new Date(now - 3 * 86400000).toISOString() },
+      { discordId: 'u3', guildId: 'g1', tierKey: 'vip', status: 'expired', expiresAt: new Date(now - 30 * 86400000).toISOString() }
+    ];
+    assert.ok(payments.findRenewableSub(subs, 'g1', 'u1', 'vip', now));
+    assert.ok(payments.findRenewableSub(subs, 'g1', 'u2', 'vip', now));
+    assert.equal(payments.findRenewableSub(subs, 'g1', 'u3', 'vip', now), null);
+    assert.equal(payments.findRenewableSub(subs, 'g1', 'u1', 'lendario', now), null);
+  });
+
+  it('renovação soma dias no vencimento atual', async () => {
+    const now = Date.now();
+    const currentExpiry = new Date(now + 5 * 86400000).toISOString();
+    const mpFetch = async () => ({
+      ok: true, status: 200,
+      json: async () => ({ id: 'pay-r', status: 'approved', external_reference: 'caps-vip:g1:u1:vip' })
+    });
+    const store = mockStore([
+      { discordId: 'u1', guildId: 'g1', tierKey: 'vip', paymentId: 'pay-old', status: 'active', startedAt: '', expiresAt: currentExpiry }
+    ]);
+    const evolving = {
+      loadVipSubscriptions: async () => ({ subscriptions: (await store.loadVipSubscriptions()).subscriptions }),
+      saveVipSubscriptions: async (data) => store.saveVipSubscriptions(data)
+    };
+    const result = await payments.handleMpWebhook(
+      { query: { 'data.id': 'pay-r', topic: 'payment' }, body: {}, headers: {} },
+      { config: CONFIG, mpFetch, accessToken: 'test-token', discordRest: mockDiscordRest(), store: evolving, nowMs: now }
+    );
+    assert.equal(result.granted, true);
+    const saved = store.saved();
+    const active = saved.subscriptions.find((s) => s.status === 'active');
+    const expected = new Date(currentExpiry).getTime() + 30 * 86400000;
+    assert.ok(Math.abs(new Date(active.expiresAt).getTime() - expected) < 5000);
+  });
+
+  it('lembretes 3d/1d uma vez cada', async () => {
+    const now = Date.now();
+    const sent = [];
+    const member = { send: async (msg) => { sent.push(msg); } };
+    const guild = { id: 'g1', members: { fetch: async () => member } };
+    const mk = (days, flags = {}) => ({
+      discordId: 'u1', guildId: 'g1', tierKey: 'vip', status: 'active',
+      expiresAt: new Date(now + days * 86400000).toISOString(), ...flags
+    });
+    // 3 dias -> avisa e marca
+    let saved = null;
+    const store3 = {
+      loadVipSubscriptions: async () => ({ subscriptions: [mk(3)] }),
+      saveVipSubscriptions: async (data) => { saved = data; }
+    };
+    const r1 = await payments.sendVipExpiryReminders(guild, { store: store3, nowMs: now });
+    assert.equal(r1.length, 1);
+    assert.equal(r1[0].milestone, '3d');
+    assert.ok(saved.subscriptions[0].reminded3d);
+    // mesma chamada de novo -> não repete
+    const store3b = {
+      loadVipSubscriptions: async () => saved,
+      saveVipSubscriptions: async (data) => { saved = data; }
+    };
+    const r2 = await payments.sendVipExpiryReminders(guild, { store: store3b, nowMs: now });
+    assert.equal(r2.length, 0);
+    // 10 dias -> nada; vencido -> nada
+    const store10 = { loadVipSubscriptions: async () => ({ subscriptions: [mk(10)] }), saveVipSubscriptions: async () => {} };
+    assert.equal((await payments.sendVipExpiryReminders(guild, { store: store10, nowMs: now })).length, 0);
+  });
+});
