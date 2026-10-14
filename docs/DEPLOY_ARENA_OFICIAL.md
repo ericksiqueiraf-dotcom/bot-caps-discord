@@ -3,6 +3,26 @@
 > Guild: CAPS ARENA (`1273653944169660427`) · Processos prod: `caps-bot` + `caps-admin`
 > Pré-requisito: fluxo validado na TESTE em 2026-10-14 (pagamento real R$ 9,99 → cargo automático).
 
+## Como funciona (para manutenção)
+
+```
+!clube → botões → modal e-mail → POST /v1/payments (pix)
+  → QR + copia-e-cola (30 min) + pendência gravada
+  → APROVAÇÃO por 2 vias (a que chegar primeiro vale; anti-duplo por paymentId):
+     a) webhook POST /webhooks/mercadopago (instantâneo, precisa URL pública)
+     b) poller a cada 3 min consulta pendências no MP (funciona SEM url pública)
+  → cargo via Discord REST/gateway → DM + anúncio + assinatura (30 dias)
+Scheduler 08h: expireVipSubscriptionsForGuild() remove vencidos + avisa DM.
+Pagamentos do SnapFlow (external_reference=sess_*) são ignorados pelo webhook.
+```
+
+## Checklist pré-deploy
+
+- [ ] Cargos existem na ARENA: `💜 Apoiador`, `⭐ VIP`, `👑 Lendário` (confirmado via API em 2026-10-14)
+- [ ] `MP_ACCESS_TOKEN` de **produção** (`APP_USR-`) em mãos
+- [ ] Canal `📢┃comunicados` existe na ARENA (anúncios de adesão)
+- [ ] URL pública: **opcional** (só acelera via webhook; o poller cobre sem ela)
+
 ## Checklist pré-deploy
 
 - [ ] Cargos existem na ARENA: `💜 Apoiador`, `⭐ VIP`, `👑 Lendário` (confirmado via API em 2026-10-14)
@@ -36,11 +56,11 @@ npx pm2 restart caps-bot --update-env
 ```
 Conferir no log: `Bot conectado como CAPS BOT LOL#6241` e painel em `http://localhost:3030`.
 
-### 4. Validar webhook pela URL pública
+### 4. Validar webhook pela URL pública (opcional)
 ```powershell
 curl.exe -X POST "https://sua-url-fixa/webhooks/mercadopago?topic=payment" -H "Content-Type: application/json" --data "{}"
 ```
-Esperado: `OK` (200). Sem `data.id` ele só confirma que a rota está viva.
+Esperado: `OK` (200). Sem `data.id` ele só confirma que a rota está viva. **Sem URL pública, pule — o poller a cada 3 min assume.**
 
 ### 5. Compra real de validação (R$ 9,99)
 1. Na ARENA: `!clube` → **Assinar Apoiador** → e-mail → QR

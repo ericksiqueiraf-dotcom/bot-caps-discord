@@ -197,6 +197,15 @@ async function handleMpWebhook(
   if (String(payment?.status || '') !== 'approved') {
     return { handled: true, granted: false, reason: `status ${payment?.status}` };
   }
+  return finalizeApprovedVipPayment(payment, { config, discordRest, store, nowMs });
+}
+
+// Núcleo comum: pagamento aprovado (via webhook OU polling) -> cargo + registro.
+// Idempotente por paymentId.
+async function finalizeApprovedVipPayment(
+  payment,
+  { config, discordRest = createDiscordRest(), store = null, nowMs = Date.now() } = {}
+) {
   const ref = parseVipReference(payment?.external_reference);
   if (!ref) return { handled: false, reason: 'não é pagamento do clube' };
 
@@ -215,7 +224,11 @@ async function handleMpWebhook(
 
   const startedAt = new Date(nowMs).toISOString();
   const expiresAt = new Date(nowMs + tier.dias * 24 * 60 * 60 * 1000).toISOString();
-  const kept = subscriptions.filter((s) => !(String(s?.discordId) === ref.discordId && String(s?.guildId) === ref.guildId && s?.status === 'active'));
+  const kept = subscriptions.filter((s) => {
+    if (String(s?.paymentId || '') === String(payment.id)) return false;
+    if (String(s?.discordId) === ref.discordId && String(s?.guildId) === ref.guildId && s?.status === 'active') return false;
+    return true;
+  });
   kept.push({ discordId: ref.discordId, guildId: ref.guildId, tierKey: ref.tierKey, paymentId: String(payment.id), status: 'active', startedAt, expiresAt });
   await storeApi.saveVipSubscriptions({ subscriptions: kept });
 
@@ -226,6 +239,122 @@ async function handleMpWebhook(
     await discordRest.sendChannelMessage(channelId, `🎉 ${mention} agora faz parte do **${tier.roleName}**! Bem-vindo(a) ao clube 💎`).catch(() => null);
   }
   return { handled: true, granted: true, tierKey: ref.tierKey, discordId: ref.discordId, expiresAt };
+}
+
+// Registra a intenção de pagamento (poller acompanha até aprovar/expirar).
+async function recordPendingPayment(
+  { paymentId, guildId, discordId, tierKey, pixExpiresAt },
+  { store = null } = {}
+) {
+  const storeApi = store || require('./dataService');
+  const { subscriptions } = await storeApi.loadVipSubscriptions();
+  const kept = subscriptions.filter((s) => String(s?.paymentId || '') !== String(paymentId));
+  kept.push({
+    discordId: String(discordId), guildId: String(guildId), tierKey,
+    paymentId: String(paymentId), status: 'pending',
+    startedAt: new Date().toISOString(), pixExpiresAt: pixExpiresAt || null
+  });
+  await storeApi.saveVipSubscriptions({ subscriptions: kept });
+}
+
+// Polling (fallback do webhook; permite operar sem URL pública).
+// Consulta pagamentos pendentes e finaliza os aprovados.
+async function pollPendingVipPayments(
+  {
+    config,
+    mpFetch = fetch,
+    accessToken = process.env.MP_ACCESS_TOKEN,
+    discordRest = createDiscordRest(),
+    store = null,
+    nowMs = Date.now()
+  } = {}
+) {
+  if (!accessToken) return { checked: 0, granted: [], reason: 'sem token' };
+  const storeApi = store || require('./dataService');
+  const { subscriptions } = await storeApi.loadVipSubscriptions();
+  const pending = subscriptions.filter((s) => s?.status === 'pending');
+  const granted = [];
+  const expiredIds = new Set();
+  for (const sub of pending) {
+    if (sub?.pixExpiresAt && new Date(sub.pixExpiresAt).getTime() <= nowMs) {
+      expiredIds.add(String(sub.paymentId));
+      continue;
+    }
+    try {
+      const payment = await fetchMpPayment(sub.paymentId, { accessToken, mpFetch });
+      if (String(payment?.status || '') === 'approved') {
+        const result = await finalizeApprovedVipPayment(payment, { config, discordRest, store: storeApi, nowMs });
+        if (result.granted) granted.push(result);
+      }
+    } catch { /* tenta na próxima rodada */ }
+  }
+  if (expiredIds.size) {
+    const fresh = await storeApi.loadVipSubscriptions();
+    let changed = false;
+    for (const sub of fresh.subscriptions) {
+      if (sub?.status === 'pending' && expiredIds.has(String(sub?.paymentId))) {
+        sub.status = 'expired';
+        changed = true;
+      }
+    }
+    if (changed) await storeApi.saveVipSubscriptions(fresh);
+  }
+  return { checked: pending.length, granted };
+}
+
+// Versão do discordRest sobre o gateway (para o poller rodar dentro do bot).
+function createGatewayDiscordRest(client) {
+  return {
+    findRoleIdByName: async (guildId, roleName) => {
+      const guild = client?.guilds?.cache?.get?.(String(guildId)) || await client?.guilds?.fetch?.(String(guildId)).catch(() => null);
+      const role = guild?.roles?.cache?.find?.((r) => String(r?.name || '') === roleName);
+      return role ? String(role.id) : null;
+    },
+    addMemberRole: async (guildId, userId, roleId) => {
+      const guild = client?.guilds?.cache?.get?.(String(guildId)) || await client?.guilds?.fetch?.(String(guildId)).catch(() => null);
+      const member = await guild?.members?.fetch?.(String(userId)).catch(() => null);
+      if (!member) throw new Error('Membro não encontrado.');
+      await member.roles.add(roleId, 'Clube VIP: pagamento aprovado');
+    },
+    removeMemberRole: async () => null,
+    sendChannelMessage: async (channelId, content) => {
+      const channel = client?.channels?.cache?.get?.(String(channelId)) || await client?.channels?.fetch?.(String(channelId)).catch(() => null);
+      if (!channel?.isTextBased?.()) throw new Error('Canal indisponível.');
+      return channel.send(content);
+    },
+    findTextChannelIdByName: async (guildId, name) => {
+      const guild = client?.guilds?.cache?.get?.(String(guildId)) || await client?.guilds?.fetch?.(String(guildId)).catch(() => null);
+      const channel = guild?.channels?.cache?.find?.((c) => String(c?.name || '') === name && c?.isTextBased?.());
+      return channel ? String(channel.id) : null;
+    },
+    sendDm: async (userId, content) => {
+      const user = await client?.users?.fetch?.(String(userId)).catch(() => null);
+      if (!user) throw new Error('Usuário indisponível para DM.');
+      return user.send(content);
+    }
+  };
+}
+
+function startVipPaymentPoller({ intervalMs = 3 * 60 * 1000, config = null } = {}) {
+  if (!process.env.MP_ACCESS_TOKEN) {
+    console.log('[CLUBE] Poller de pagamentos desativado (sem MP_ACCESS_TOKEN).');
+    return null;
+  }
+  const timer = setInterval(async () => {
+    try {
+      const client = global.discordClient;
+      if (!client) return;
+      const result = await pollPendingVipPayments({
+        config: config || require('../config.json'),
+        discordRest: createGatewayDiscordRest(client)
+      });
+      if (result.granted?.length) console.log(`[CLUBE] Poller liberou ${result.granted.length} assinatura(s).`);
+    } catch (err) {
+      console.error('[CLUBE] Erro no poller de pagamentos:', err.message);
+    }
+  }, intervalMs);
+  if (typeof timer.unref === 'function') timer.unref();
+  return timer;
 }
 
 // Expira assinaturas vencidas (roda no bot, com objetos discord.js).
@@ -271,5 +400,10 @@ module.exports = {
   verifyMpSignature,
   createDiscordRest,
   handleMpWebhook,
+  finalizeApprovedVipPayment,
+  recordPendingPayment,
+  pollPendingVipPayments,
+  createGatewayDiscordRest,
+  startVipPaymentPoller,
   expireVipSubscriptionsForGuild
 };

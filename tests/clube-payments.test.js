@@ -126,8 +126,7 @@ describe('clube PIX (Mercado Pago)', () => {
     assert.equal(r2.granted, false);
   });
 
-  it('webhook não processa o mesmo pagamento 2x', async () => {
-    const mpFetch = async () => ({
+  it('webhook não processa o mesmo pagamento 2x', async () => {    const mpFetch = async () => ({
       ok: true, status: 200,
       json: async () => ({ id: 'pay-d', status: 'approved', external_reference: 'caps-vip:g1:u7:vip' })
     });
@@ -139,5 +138,54 @@ describe('clube PIX (Mercado Pago)', () => {
     );
     assert.equal(result.granted, false);
     assert.ok(!discordRest.calls.some((c) => c[0] === 'add'));
+  });
+});
+
+describe('poller de pagamentos (sem URL pública)', () => {
+  it('recordPendingPayment grava pendência', async () => {
+    const store = mockStore();
+    await payments.recordPendingPayment(
+      { paymentId: 'p1', guildId: 'g1', discordId: 'u1', tierKey: 'vip', pixExpiresAt: new Date(Date.now() + 60000).toISOString() },
+      { store }
+    );
+    const saved = store.saved();
+    assert.equal(saved.subscriptions.length, 1);
+    assert.equal(saved.subscriptions[0].status, 'pending');
+  });
+
+  it('poll aprova pendente e expira QR vencido', async () => {
+    const mpFetch = async (url) => ({
+      ok: true, status: 200,
+      json: async () => url.endsWith('/pay-ok')
+        ? { id: 'pay-ok', status: 'approved', external_reference: 'caps-vip:g1:u1:apoiador' }
+        : { id: 'pay-wait', status: 'pending', external_reference: 'caps-vip:g1:u2:vip' }
+    });
+    const store = mockStore([
+      { discordId: 'u1', guildId: 'g1', tierKey: 'apoiador', paymentId: 'pay-ok', status: 'pending', startedAt: '', pixExpiresAt: new Date(Date.now() + 60000).toISOString() },
+      { discordId: 'u2', guildId: 'g1', tierKey: 'vip', paymentId: 'pay-wait', status: 'pending', startedAt: '', pixExpiresAt: new Date(Date.now() + 60000).toISOString() },
+      { discordId: 'u3', guildId: 'g1', tierKey: 'vip', paymentId: 'pay-old', status: 'pending', startedAt: '', pixExpiresAt: new Date(Date.now() - 60000).toISOString() }
+    ]);
+    // store mock simplificado: save mescla com o inicial
+    let current = null;
+    const evolvingStore = {
+      loadVipSubscriptions: async () => current || { subscriptions: (await store.loadVipSubscriptions()).subscriptions },
+      saveVipSubscriptions: async (data) => { current = data; await store.saveVipSubscriptions(data); }
+    };
+    const discordRest = mockDiscordRest();
+    const result = await payments.pollPendingVipPayments({
+      config: CONFIG, mpFetch, accessToken: 'test-token', discordRest, store: evolvingStore
+    });
+    assert.equal(result.checked, 3);
+    assert.equal(result.granted.length, 1);
+    assert.ok(discordRest.calls.some((c) => c[0] === 'add' && c[2] === 'u1'));
+    const final = current.subscriptions;
+    assert.ok(final.some((s) => s.paymentId === 'pay-ok' && s.status === 'active'));
+    assert.ok(final.some((s) => s.paymentId === 'pay-old' && s.status === 'expired'));
+    assert.ok(final.some((s) => s.paymentId === 'pay-wait' && s.status === 'pending'));
+  });
+
+  it('poll sem token não faz nada', async () => {
+    const result = await payments.pollPendingVipPayments({ config: CONFIG, accessToken: '' });
+    assert.equal(result.checked, 0);
   });
 });

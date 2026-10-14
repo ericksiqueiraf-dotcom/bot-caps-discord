@@ -19,7 +19,7 @@ const {
 } = require('discord.js');
 
 const config = require('./config.json');
-const { createVipPixPayment, getClubeTierConfig } = require('./services/clubePaymentsService');
+const { createVipPixPayment, getClubeTierConfig, recordPendingPayment, startVipPaymentPoller } = require('./services/clubePaymentsService');
 const { createRiotService } = require('./services/riotService');
 const { handleTempVoiceStateUpdate } = require('./services/tempVoiceService');
 const {
@@ -413,6 +413,7 @@ client.once('ready', async () => {
   console.log(`Bot conectado como ${client.user.tag} | ${BOT_VERSION}`);
   await registerSlashCommands();
   startDailyRankScheduler();
+  startVipPaymentPoller({ config });
 
   // Retoma votacoes de MVP pendentes (se o bot reiniciou no meio de uma votacao)
   try {
@@ -779,6 +780,17 @@ client.on('interactionCreate', async (interaction) => {
           if (files.length) payload.files = files;
           if (payment.qrCode) payload.content = `PIX copia e cola:\n\`\`\`\n${payment.qrCode}\n\`\`\``;
           await interaction.editReply(payload).catch(() => null);
+          try {
+            await recordPendingPayment({
+              paymentId: payment.paymentId,
+              guildId: interaction.guildId,
+              discordId: interaction.user.id,
+              tierKey,
+              pixExpiresAt: payment.expiresAt
+            });
+          } catch (err) {
+            console.error('[CLUBE] Falha ao registrar pendência:', err.message);
+          }
         } catch (err) {
           await interaction.editReply({ content: `❌ Não consegui gerar o PIX: ${err.message}` }).catch(() => null);
         }
