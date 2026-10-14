@@ -275,6 +275,7 @@ database/                    ← fallback JSON local
 - `MP_ACCESS_TOKEN` (prod, mesmo validado na TESTE) copiado para `.env` do CAPS; `clubePagamentos` já estava no `config.json`.
 - Restart `caps-admin` + `caps-bot` (`--update-env`); boot limpo, `CAPS BOT LOL#6241` online e estável. Sem URL pública (poller de 3 min assume).
 - Validação pendente: primeira compra real na ARENA (`!clube` → botões devem aparecer).
+- **Incidente pós-deploy:** `caps-admin` entrou em loop (200+ restarts) — estava com script path apontando para `TESTRE/admin/app.js` (:3032), brigando pela porta com `caps-admin-teste`. Recriado no path certo (repo, :3030, HTTP 200). Mapa oficial: `caps-admin`=:3030 (repo), `caps-admin-teste`=:3032 (TESTRE), `lcl-admin`=:3031. Regra: após qualquer `pm2 start/restart`, conferir `pm2 describe` (script path + cwd).
 - Fluxo completo validado com R$ 9,99 real na TESTE: `!clube` → botão → modal e-mail → QR → pagamento → cargo `💜 Apoiador` automático + DM + anúncio (`docs/DEPLOY_ARENA_OFICIAL.md` tem o passo a passo da produção).
 - Infra de teste: `caps-admin-teste` na :3032 (a :3031 é do `lcl-admin`), túnel `cloudflared` → `PUBLIC_BASE_URL`, `MP_ACCESS_TOKEN` (teste e depois produção) no `.env` da TESTRE.
 - Pendente: reembolso dos R$ 9,99 no MP; deploy prod (token prod no `.env` do CAPS + URL fixa + restart `caps-bot`/`caps-admin`).

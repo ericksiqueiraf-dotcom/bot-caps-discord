@@ -38,7 +38,8 @@ MP_ACCESS_TOKEN=APP_USR-...
 MP_WEBHOOK_SECRET=... (opcional, recomendado)
 PUBLIC_BASE_URL=https://sua-url-fixa
 ```
-Porta do `caps-admin` prod: `3030` (não mexer — a :3031 é do `lcl-admin`).
+Porta do `caps-admin` prod: `3030` (não mexer — `lcl-admin` usa :3031 e `caps-admin-teste` usa :3032).
+Após qualquer operação no PM2, conferir `pm2 describe <nome>` (script path + exec cwd certos).
 
 ### 2. `config.json` (já vem com a seção; só conferir)
 ```json
