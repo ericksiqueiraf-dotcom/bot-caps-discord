@@ -1124,7 +1124,7 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
     } catch { /* sem store, anuncia normal */ }
 
     const guild = newMember.guild;
-    const target = guild.channels.cache.find((c) => c.name === '📢┃comunicados' && c.isTextBased?.())
+    const target = guild.channels.cache.find((c) => c.name === '👑┃parceiros' && c.isTextBased?.())
       || (config.textChannels?.welcomeChannelId ? await guild.channels.fetch(config.textChannels.welcomeChannelId).catch(() => null) : null);
     if (!target || !target.isTextBased?.()) return;
 

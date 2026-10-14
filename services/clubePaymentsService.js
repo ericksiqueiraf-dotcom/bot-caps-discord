@@ -234,7 +234,7 @@ async function finalizeApprovedVipPayment(
 
   const mention = `<@${ref.discordId}>`;
   await discordRest.sendDm(ref.discordId, `💎 Pagamento confirmado! Você agora é **${tier.roleName}** na CAPS Arena por ${tier.dias} dias. Obrigado por apoiar!`).catch(() => null);
-  const channelId = await discordRest.findTextChannelIdByName(ref.guildId, '📢┃comunicados').catch(() => null);
+  const channelId = await discordRest.findTextChannelIdByName(ref.guildId, '👑┃parceiros').catch(() => null);
   if (channelId) {
     await discordRest.sendChannelMessage(channelId, `🎉 ${mention} agora faz parte do **${tier.roleName}**! Bem-vindo(a) ao clube 💎`).catch(() => null);
   }
