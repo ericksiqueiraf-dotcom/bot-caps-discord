@@ -2433,7 +2433,7 @@ async function postMatchHistoryLog(guild, payload) {
 async function runClubePromoTick(now = new Date()) {
   const parts = getSaoPauloDateParts(now);
   if (!CLUBE_PROMO_HOURS.includes(parts.hour) || parts.minute !== 0) return { posted: 0, reason: 'fora de horário' };
-  const { loadSystemMeta, saveSystemMeta } = require('./dataService');
+  const { loadSystemMeta, saveSystemMeta } = require('../services/dataService');
   const systemMeta = await loadSystemMeta();
   const lastTs = systemMeta?.clubePromoLastAt || null;
   if (!shouldPostClubePromo(lastTs, now.getTime())) return { posted: 0, reason: 'intervalo mínimo' };
