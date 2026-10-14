@@ -7,9 +7,9 @@
 
 ## 🗓️ Última Sessão
 
-- **Data:** 2026-10-14
-- **Foco:** Instalador unificado (`instalar.js`) + auditoria e padronização dos cargos com emoticons + fixes no setup
-- **Status:** ✅ Concluído (CAPS 63/63, LCL 108/108, dry-run validado na CAPS ARENA, 3 bots reiniciados e online)
+- **Data:** 2026-10-14 (manhã)
+- **Foco:** Clube VIP com PIX validado de ponta a ponta (TESTE) + runbook de deploy na ARENA oficial
+- **Status:** ✅ Validado com pagamento real (cargo automático + DM + anúncio); deploy prod documentado e pendente
 
 ---
 
@@ -270,6 +270,11 @@ database/                    ← fallback JSON local
 - **Setup teste:** fix `msg.pin()`/`fetchPins()` em `setup-servidor.js`; setup rodado em CAPS TESTE e CAPS BOT TESTRE; `config.json` = TESTRE (backups `.bak-*`); bot precisa de restart + hierarquia acima dos cargos
 - **Layout ARENA replicado no TESTRE (2026-10-10):** modelo em `docs/SERVER_LAYOUT_CAPS_ARENA.md`; `setup-servidor.js` com planta ARENA (6 cats, 19 TXT, 11 VOZ, 11 cargos); aplicado em `CAPS BOT TESTE (1558217291123138561)`; `config.json` remapeado (fila/partidas/resultados/destaques/logs/ranking/cadastro + 3 lobbies com limite 10/10/30)
 - Validação: `npm test` 49/49, 13 suites
+
+### 2026-10-14 — Clube VIP com PIX validado + runbook ARENA oficial
+- Fluxo completo validado com R$ 9,99 real na TESTE: `!clube` → botão → modal e-mail → QR → pagamento → cargo `💜 Apoiador` automático + DM + anúncio (`docs/DEPLOY_ARENA_OFICIAL.md` tem o passo a passo da produção).
+- Infra de teste: `caps-admin-teste` na :3032 (a :3031 é do `lcl-admin`), túnel `cloudflared` → `PUBLIC_BASE_URL`, `MP_ACCESS_TOKEN` (teste e depois produção) no `.env` da TESTRE.
+- Pendente: reembolso dos R$ 9,99 no MP; deploy prod (token prod no `.env` do CAPS + URL fixa + restart `caps-bot`/`caps-admin`).
 
 ### 2026-10-14 — Clube VIP com PIX (fase 1, TESTE)
 - `services/clubePaymentsService.js` (novo): cria PIX no MP (`/v1/payments`, `external_reference=caps-vip:<guild>:<user>:<tier>`), webhook com anti-duplo e ignorando `sess_*` do SnapFlow, cargo via Discord REST, DM + anúncio, expiração de 30 dias (`expireVipSubscriptionsForGuild` no scheduler das 08h).
