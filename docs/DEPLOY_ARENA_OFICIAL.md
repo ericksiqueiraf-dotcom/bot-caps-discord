@@ -20,7 +20,7 @@ Pagamentos do SnapFlow (external_reference=sess_*) são ignorados pelo webhook.
 
 - [ ] Cargos existem na ARENA: `💜 Apoiador`, `⭐ VIP`, `👑 Lendário` (confirmado via API em 2026-10-14)
 - [ ] `MP_ACCESS_TOKEN` de **produção** (`APP_USR-`) em mãos
-- [ ] Canal `📢┃comunicados` existe na ARENA (anúncios de adesão)
+- [ ] Canal `👑┃parceiros` existe na ARENA (anúncios de adesão)
 - [ ] URL pública: **opcional** (só acelera via webhook; o poller cobre sem ela)
 
 ## Checklist pré-deploy
@@ -28,7 +28,7 @@ Pagamentos do SnapFlow (external_reference=sess_*) são ignorados pelo webhook.
 - [ ] Cargos existem na ARENA: `💜 Apoiador`, `⭐ VIP`, `👑 Lendário` (confirmado via API em 2026-10-14)
 - [ ] `MP_ACCESS_TOKEN` de **produção** (`APP_USR-`) em mãos
 - [ ] URL pública **fixa** apontando para o painel prod (VPS ou túnel fixo — o `trycloudflare.com` rotativo **não serve** para produção)
-- [ ] Canal `📢┃comunicados` existe na ARENA (anúncios de adesão)
+- [ ] Canal `👑┃parceiros` existe na ARENA (anúncios de adesão)
 
 ## Passo a passo
 
@@ -65,7 +65,7 @@ Esperado: `OK` (200). Sem `data.id` ele só confirma que a rota está viva. **Se
 
 ### 5. Compra real de validação (R$ 9,99)
 1. Na ARENA: `!clube` → **Assinar Apoiador** → e-mail → QR
-2. Pagar no banco → ✅ cargo `💜 Apoiador` + DM + anúncio no `📢┃comunicados`
+2. Pagar no banco → ✅ cargo `💜 Apoiador` + DM + anúncio no `👑┃parceiros`
 3. `!clube` mostra `1 membro`; `!perfil @comprador` mostra `💎 Clube VIP`
 4. Reembolsar em MP → Vendas → Devolver (assinatura continua ativa 30 dias; remover o cargo manual se quiser limpar o teste)
 
