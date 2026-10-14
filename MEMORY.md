@@ -272,6 +272,7 @@ database/                    ← fallback JSON local
 - Validação: `npm test` 49/49, 13 suites
 
 ### 2026-10-14 — Deploy clube VIP na ARENA oficial
+- Teste de lembrete validado de ponta a ponta: assinatura forjada vencendo em ~3 dias → DM real `milestone: 3d` → assinatura de teste removida; assinatura real (`apoiador:active` até 13/11) intacta.
 - `MP_ACCESS_TOKEN` (prod, mesmo validado na TESTE) copiado para `.env` do CAPS; `clubePagamentos` já estava no `config.json`.
 - Restart `caps-admin` + `caps-bot` (`--update-env`); boot limpo, `CAPS BOT LOL#6241` online e estável. Sem URL pública (poller de 3 min assume).
 - Validação pendente: primeira compra real na ARENA (`!clube` → botões devem aparecer).
