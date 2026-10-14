@@ -6,7 +6,8 @@ const {
   getMemberVipTier,
   getVipSeal,
   buildVipTierResolver,
-  buildClubeEmbed
+  buildClubeEmbed,
+  isRecentVipSubscription
 } = require('../utils/lobbyUtils');
 
 function mockMember(roleNames) {
@@ -55,8 +56,7 @@ describe('clube VIP (status, sem vantagem competitiva)', () => {
     assert.equal(buildVipTierResolver(null)('1'), '');
   });
 
-  it('buildClubeEmbed lista tiers, contagens e regra sem vantagem', () => {
-    const guild = mockGuild({}, { '💜 Apoiador': 3, '⭐ VIP': 0, '👑 Lendário': 1 });
+  it('buildClubeEmbed lista tiers, contagens e regra sem vantagem', () => {    const guild = mockGuild({}, { '💜 Apoiador': 3, '⭐ VIP': 0, '👑 Lendário': 1 });
     const embed = buildClubeEmbed(guild);
     const data = embed.toJSON();
     assert.match(data.title, /Clube VIP/);
@@ -66,5 +66,15 @@ describe('clube VIP (status, sem vantagem competitiva)', () => {
       assert.ok(names.includes(tier.name), `ficha do ${tier.name}`);
     }
     assert.ok(names.includes('3 membro(s)'));
+  });
+
+  it('isRecentVipSubscription evita anúncio duplicado do webhook', () => {
+    const now = Date.now();
+    const fresh = [{ status: 'active', guildId: 'g1', discordId: 'u1', startedAt: new Date(now - 60 * 1000).toISOString() }];
+    const old = [{ status: 'active', guildId: 'g1', discordId: 'u1', startedAt: new Date(now - 3600 * 1000).toISOString() }];
+    assert.equal(isRecentVipSubscription(fresh, 'g1', 'u1', now), true);
+    assert.equal(isRecentVipSubscription(old, 'g1', 'u1', now), false);
+    assert.equal(isRecentVipSubscription(fresh, 'g2', 'u1', now), false);
+    assert.equal(isRecentVipSubscription([], 'g1', 'u1', now), false);
   });
 });

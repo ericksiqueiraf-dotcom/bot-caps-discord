@@ -400,7 +400,8 @@ const {
   createInteractionContext,
   THEME,
   FOOTER_PREFIX,
-  VIP_TIERS
+  VIP_TIERS,
+  isRecentVipSubscription
 } = require('./utils/lobbyUtils');
 
 
@@ -1080,6 +1081,13 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
       return !had && has;
     });
     if (!gained) return;
+
+    // Assinatura recém-criada pelo webhook (que já anunciou): não duplicar.
+    try {
+      const { loadVipSubscriptions } = require('./services/dataService');
+      const { subscriptions } = await loadVipSubscriptions();
+      if (isRecentVipSubscription(subscriptions, newMember.guild?.id, newMember.id)) return;
+    } catch { /* sem store, anuncia normal */ }
 
     const guild = newMember.guild;
     const target = guild.channels.cache.find((c) => c.name === '📢┃comunicados' && c.isTextBased?.())

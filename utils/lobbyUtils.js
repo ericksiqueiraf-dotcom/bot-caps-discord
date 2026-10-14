@@ -185,6 +185,20 @@ function countVipTierMembers(guild, tierName) {
   } catch { return 0; }
 }
 
+// true se existe assinatura ativa criada há menos de `windowMs` (o webhook
+// já anunciou nesses casos — o listener não deve duplicar).
+function isRecentVipSubscription(subscriptions, guildId, discordId, nowMs = Date.now(), windowMs = 10 * 60 * 1000) {
+  try {
+    return (Array.isArray(subscriptions) ? subscriptions : []).some((sub) => {
+      if (sub?.status !== 'active') return false;
+      if (String(sub?.guildId || '') !== String(guildId || '')) return false;
+      if (String(sub?.discordId || '') !== String(discordId || '')) return false;
+      const startedAt = new Date(sub?.startedAt || 0).getTime();
+      return Number.isFinite(startedAt) && nowMs - startedAt < windowMs;
+    });
+  } catch { return false; }
+}
+
 function buildClubeEmbed(guild) {
   const embed = new EmbedBuilder()
     .setColor(THEME.RANK)
@@ -3002,6 +3016,7 @@ module.exports = {
   getVipSeal,
   buildVipTierResolver,
   buildClubeEmbed,
+  isRecentVipSubscription,
   buildRulesEmbed,
   RULES_SECTIONS,
   buildStaffEmbed,
