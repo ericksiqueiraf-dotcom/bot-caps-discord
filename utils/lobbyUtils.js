@@ -178,8 +178,102 @@ function buildVipTierResolver(guild) {
   };
 }
 
-function countVipTierMembers(guild, tierName) {
+// ─── !live + promo automática do clube ──────────────────────────────────────
+const AO_VIVO_ROLE_NAME = '🔴 Ao Vivo';
+const LIVE_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+const LIVE_ALLOWED_HOSTS = new Set([
+  'twitch.tv', 'www.twitch.tv',
+  'youtube.com', 'www.youtube.com', 'youtu.be',
+  'kick.com', 'www.kick.com'
+]);
+const CLUBE_PROMO_HOURS = [12, 19];
+const CLUBE_PROMO_MIN_GAP_MS = 10 * 60 * 60 * 1000;
+
+function parseLiveLink(raw) {
+  const text = String(raw || '').trim();
+  if (!/^https?:\/\//i.test(text)) return null;
+  let url = null;
   try {
+    url = new URL(text);
+  } catch { return null; }
+  if (!LIVE_ALLOWED_HOSTS.has(url.hostname.toLowerCase())) return null;
+  if (url.pathname.replace(/\//g, '').length === 0) return null;
+  const host = url.hostname.toLowerCase();
+  const platform = host.includes('twitch') ? 'Twitch' : host.includes('youtu') ? 'YouTube' : 'Kick';
+  return { url: url.toString(), platform };
+}
+
+function getLiveCooldownRemainingMs(lastTs, nowMs = Date.now()) {
+  if (!lastTs) return 0;
+  return Math.max(0, Number(lastTs) + LIVE_COOLDOWN_MS - nowMs);
+}
+
+function formatCooldownRemaining(ms) {
+  const totalMinutes = Math.ceil(ms / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours <= 0) return `${minutes}min`;
+  return `${hours}h${minutes ? ` ${minutes}min` : ''}`;
+}
+
+function buildLiveEmbed({ memberMention, url, platform }) {
+  return new EmbedBuilder()
+    .setColor('#FF0000')
+    .setTitle('🔴 AO VIVO')
+    .setDescription(`${memberMention} está ao vivo na **${platform}**!\n${url}`)
+    .setFooter({ text: `${FOOTER_PREFIX} • !live` })
+    .setTimestamp();
+}
+
+function buildClubePromoEmbed(config) {
+  const price = (key) => {
+    const value = Number(config?.clubePagamentos?.[key]?.preco);
+    return Number.isFinite(value) && value > 0 ? value : null;
+  };
+  const line = (emoji, name, key) => {
+    const value = price(key);
+    return `${emoji} **${name}**${value ? ` — R$ ${value.toFixed(2).replace('.', ',')}/30 dias` : ''}`;
+  };
+  return new EmbedBuilder()
+    .setColor(THEME.RANK)
+    .setTitle('💎 Já conhece o Clube VIP?')
+    .setDescription(
+      [line('💜', 'Apoiador', 'apoiador'), line('⭐', 'VIP', 'vip'), line('👑', 'Lendário', 'lendario')].join('\n')
+      + '\n\nStatus e comodidades **sem vantagem no jogo**. Use `!clube` para assinar via PIX.'
+    )
+    .setFooter({ text: `${FOOTER_PREFIX} • Clube VIP` })
+    .setTimestamp();
+}
+
+// Anti-duplicação da promo: só posta se passou o intervalo mínimo.
+function shouldPostClubePromo(lastPromoTs, nowMs = Date.now()) {
+  if (!lastPromoTs) return true;
+  const last = new Date(lastPromoTs).getTime();
+  if (!Number.isFinite(last)) return true;
+  return nowMs - last >= CLUBE_PROMO_MIN_GAP_MS;
+}
+
+function findPromoChannel(guild) {
+  try {
+    const channels = [...(guild?.channels?.cache?.values?.() || [])];
+    return channels.find((c) => c?.isTextBased?.() && String(c?.name || '') === '💬・geral-leagueoflegends')
+      || channels.find((c) => c?.isTextBased?.() && String(c?.name || '').includes('geral-leagueoflegends'))
+      || null;
+  } catch { return null; }
+}
+
+async function ensureAoVivoRole(guild) {
+  try {
+    const existing = guild?.roles?.cache?.find?.((r) => String(r?.name || '') === AO_VIVO_ROLE_NAME);
+    if (existing) {
+      if (!existing.mentionable) await existing.edit({ mentionable: true }).catch(() => null);
+      return existing;
+    }
+    return await guild?.roles?.create?.({ name: AO_VIVO_ROLE_NAME, color: '#FF0000', mentionable: true, reason: 'Clube VIP: cargo opt-in de !live' }).catch(() => null);
+  } catch { return null; }
+}
+
+function countVipTierMembers(guild, tierName) {  try {
     const role = guild?.roles?.cache?.find?.((item) => String(item?.name || '') === tierName);
     return Number(role?.members?.size || 0);
   } catch { return 0; }
@@ -215,7 +309,7 @@ function buildClubeEmbed(guild) {
       },
       {
         name: `👑 Lendário — ${countVipTierMembers(guild, '👑 Lendário')} membro(s)`,
-        value: 'Tudo do VIP • anúncio de destaque • nome no topo da lista de membros.'
+        value: 'Tudo do VIP • `!live <link>` (divulgue sua stream com ping opt-in, 1x a cada 6h — só Twitch/YouTube/Kick) • anúncio de destaque • nome no topo da lista de membros.'
       },
       {
         name: 'Como aderir',
@@ -2274,8 +2368,37 @@ async function postMatchHistoryLog(guild, payload) {
   await channel.send({ embeds: [summaryEmbed, detailEmbed] }).catch(() => null);
 }
 
-function startDailyRankScheduler() {
-  setInterval(async () => {
+// Promo automática do clube 2x/dia (12h e 19h SP) no geral, sem duplicar.
+async function runClubePromoTick(now = new Date()) {
+  const parts = getSaoPauloDateParts(now);
+  if (!CLUBE_PROMO_HOURS.includes(parts.hour) || parts.minute !== 0) return { posted: 0, reason: 'fora de horário' };
+  const { loadSystemMeta, saveSystemMeta } = require('./dataService');
+  const systemMeta = await loadSystemMeta();
+  const lastTs = systemMeta?.clubePromoLastAt || null;
+  if (!shouldPostClubePromo(lastTs, now.getTime())) return { posted: 0, reason: 'intervalo mínimo' };
+  let posted = 0;
+  for (const guild of global.discordClient?.guilds?.cache?.values?.() || []) {
+    try {
+      const channel = findPromoChannel(guild);
+      if (!channel) continue;
+      await channel.send({ embeds: [buildClubePromoEmbed(config)] });
+      posted += 1;
+    } catch { /* próxima guild */ }
+  }
+  if (posted > 0) {
+    systemMeta.clubePromoLastAt = now.toISOString();
+    await saveSystemMeta(systemMeta);
+  }
+  return { posted };
+}
+
+function startClubePromoScheduler() {
+  setInterval(() => {
+    runClubePromoTick(new Date()).catch((err) => console.error('[CLUBE] Erro na promo automática:', err.message));
+  }, 30000).unref?.();
+}
+
+function startDailyRankScheduler() {  setInterval(async () => {
     try {
       const now = getSaoPauloDateParts(new Date());
       const targetHour = Number(config.automation?.dailyRankUpdatesHour ?? 9);
@@ -3017,6 +3140,19 @@ module.exports = {
   buildVipTierResolver,
   buildClubeEmbed,
   isRecentVipSubscription,
+  AO_VIVO_ROLE_NAME,
+  LIVE_COOLDOWN_MS,
+  parseLiveLink,
+  getLiveCooldownRemainingMs,
+  formatCooldownRemaining,
+  buildLiveEmbed,
+  buildClubePromoEmbed,
+  shouldPostClubePromo,
+  findPromoChannel,
+  ensureAoVivoRole,
+  CLUBE_PROMO_HOURS,
+  runClubePromoTick,
+  startClubePromoScheduler,
   buildRulesEmbed,
   RULES_SECTIONS,
   buildStaffEmbed,

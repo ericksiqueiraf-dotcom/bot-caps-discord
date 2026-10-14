@@ -13,7 +13,8 @@
     { "name": "⭐ MVP", "color": "#9B59B6", "reason": "Bot dá/remove sozinho (MVP)" },
     { "name": "💜 Apoiador", "color": "#A855F7", "reason": "Tier 1 do clube VIP" },
     { "name": "⭐ VIP", "color": "#FFD700", "reason": "Tier 2 do clube VIP" },
-    { "name": "👑 Lendário", "color": "#FF2D78", "reason": "Tier 3 do clube VIP" }
+    { "name": "👑 Lendário", "color": "#FF2D78", "reason": "Tier 3 do clube VIP" },
+    { "name": "🔴 Ao Vivo", "color": "#FF0000", "reason": "Opt-in: recebe ping de !live (sem poderes)", "mentionable": true }
   ],
   "vipRoleNames": ["💜 Apoiador", "⭐ VIP", "👑 Lendário"],
   "textChannels": [

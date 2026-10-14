@@ -88,7 +88,12 @@ async function isDeletableWithoutTextLoss(channel) {
 
 async function ensureRole(guild, spec) {
   const existing = guild.roles.cache.find((role) => role.name === spec.name);
-  if (existing) return existing;
+  if (existing) {
+    if (spec.mentionable && !existing.mentionable && !DRY_RUN) {
+      await existing.edit({ mentionable: true }).catch(() => null);
+    }
+    return existing;
+  }
   if (DRY_RUN) {
     console.log(`+ criaria cargo "${spec.name}"`);
     return { id: `(novo-${spec.name})`, name: spec.name };
@@ -96,6 +101,7 @@ async function ensureRole(guild, spec) {
   const role = await guild.roles.create({
     name: spec.name,
     color: spec.color,
+    mentionable: Boolean(spec.mentionable),
     reason: `Organizar CAPS/LCL: ${spec.reason || spec.name}`
   });
   console.log(`+ cargo "${spec.name}" criado (${role.id})`);

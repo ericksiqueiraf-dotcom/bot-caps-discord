@@ -304,6 +304,11 @@ function buildSlashCommands() {
       .setName('toprankinfernal')
       .setDescription('Quem mais conquistou o INFERNAL na temporada.'),
     new SlashCommandBuilder().setName('clube').setDescription('Mostra o clube VIP: tiers, benefícios e membros.'),
+    new SlashCommandBuilder().setName('quero-live').setDescription('Entra/sai do ping 🔴 Ao Vivo.'),
+    new SlashCommandBuilder()
+      .setName('live')
+      .setDescription('Divulga sua live (só 👑 Lendário, 1x a cada 6h).')
+      .addStringOption((option) => option.setName('link').setDescription('Link da Twitch, YouTube ou Kick').setRequired(true)),
   ].map((command) => command.toJSON());
 }
 
@@ -382,6 +387,7 @@ const {
   expireInfernalRolesIfDue,
   parseQueueJoinButtonId,
   startDailyRankScheduler,
+  startClubePromoScheduler,
   movePlayersToTeamChannels,
   movePlayersToVoiceChannel,
   deleteVoiceChannelIfExists,
@@ -414,6 +420,7 @@ client.once('ready', async () => {
   await registerSlashCommands();
   startDailyRankScheduler();
   startVipPaymentPoller({ config });
+  startClubePromoScheduler();
 
   // Retoma votacoes de MVP pendentes (se o bot reiniciou no meio de uma votacao)
   try {
@@ -519,6 +526,13 @@ async function processCommand(message, rawContent) {
         break;
       case 'clube':
         await handlers.handleClubeCommand(message);
+        break;
+      case 'quero-live':
+      case 'querolive':
+        await handlers.handleQueroLiveCommand(message);
+        break;
+      case 'live':
+        await handlers.handleLiveCommand(message, args);
         break;
       case 'ficha':
       case 'perfil':
@@ -915,6 +929,14 @@ client.on('interactionCreate', async (interaction) => {
       case 'clube':
         await handlers.handleClubeCommand(context);
         break;
+      case 'quero-live':
+        await handlers.handleQueroLiveCommand(context);
+        break;
+      case 'live': {
+        const liveLink = interaction.options.getString('link');
+        await handlers.handleLiveCommand(context, liveLink ? [liveLink] : []);
+        break;
+      }
       case 'perfil':
       case 'ficha':
         await handlers.handlePlayerCardCommand(context, targetUser);

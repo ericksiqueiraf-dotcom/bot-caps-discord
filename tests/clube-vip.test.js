@@ -7,7 +7,14 @@ const {
   getVipSeal,
   buildVipTierResolver,
   buildClubeEmbed,
-  isRecentVipSubscription
+  isRecentVipSubscription,
+  parseLiveLink,
+  getLiveCooldownRemainingMs,
+  formatCooldownRemaining,
+  buildLiveEmbed,
+  buildClubePromoEmbed,
+  shouldPostClubePromo,
+  findPromoChannel
 } = require('../utils/lobbyUtils');
 
 function mockMember(roleNames) {
@@ -76,5 +83,51 @@ describe('clube VIP (status, sem vantagem competitiva)', () => {
     assert.equal(isRecentVipSubscription(old, 'g1', 'u1', now), false);
     assert.equal(isRecentVipSubscription(fresh, 'g2', 'u1', now), false);
     assert.equal(isRecentVipSubscription([], 'g1', 'u1', now), false);
+  });
+});
+
+describe('!live e promo automática', () => {
+  it('parseLiveLink aceita só Twitch/YouTube/Kick', () => {
+    assert.equal(parseLiveLink('https://twitch.tv/faker').platform, 'Twitch');
+    assert.equal(parseLiveLink('https://www.youtube.com/watch?v=x').platform, 'YouTube');
+    assert.equal(parseLiveLink('https://youtu.be/x').platform, 'YouTube');
+    assert.equal(parseLiveLink('https://kick.com/x').platform, 'Kick');
+    assert.equal(parseLiveLink('https://twitch.tv/'), null);
+    assert.equal(parseLiveLink('https://evil.com/twitch.tv/x'), null);
+    assert.equal(parseLiveLink('nao-link'), null);
+    assert.equal(parseLiveLink(''), null);
+  });
+
+  it('cooldown de 6h com formatacao', () => {
+    const now = Date.now();
+    assert.equal(getLiveCooldownRemainingMs(null, now), 0);
+    assert.ok(getLiveCooldownRemainingMs(now, now) > 5 * 3600 * 1000);
+    assert.equal(getLiveCooldownRemainingMs(now - 7 * 3600 * 1000, now), 0);
+    assert.equal(formatCooldownRemaining(30 * 60000), '30min');
+    assert.equal(formatCooldownRemaining(6 * 3600000), '6h');
+  });
+
+  it('buildLiveEmbed e promo respeitam limites', () => {
+    const live = buildLiveEmbed({ memberMention: '<@1>', url: 'https://twitch.tv/x', platform: 'Twitch' }).toJSON();
+    assert.match(live.title, /AO VIVO/);
+    const promo = buildClubePromoEmbed({ clubePagamentos: { apoiador: { preco: 9.99 } } }).toJSON();
+    assert.match(promo.title, /Clube VIP/);
+    assert.ok(JSON.stringify(promo).length < 6000);
+  });
+
+  it('shouldPostClubePromo com intervalo mínimo de 10h', () => {
+    const now = Date.now();
+    assert.equal(shouldPostClubePromo(null, now), true);
+    assert.equal(shouldPostClubePromo(new Date(now - 3600 * 1000).toISOString(), now), false);
+    assert.equal(shouldPostClubePromo(new Date(now - 11 * 3600 * 1000).toISOString(), now), true);
+  });
+
+  it('findPromoChannel acha o geral', () => {
+    const text = (name) => ({ name, isTextBased: () => true });
+    const guild = { channels: { cache: new Map([['1', text('🤖・comandos')], ['2', text('💬・geral-leagueoflegends')]]) } };
+    guild.channels.cache.values = function* () { yield* [...Map.prototype.values.call(this)]; };
+    const found = findPromoChannel(guild);
+    assert.equal(found?.name, '💬・geral-leagueoflegends');
+    assert.equal(findPromoChannel({ channels: { cache: new Map() } }), null);
   });
 });

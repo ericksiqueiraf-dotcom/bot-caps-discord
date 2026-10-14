@@ -36,7 +36,9 @@ const {
   buildSeasonHistoryEmbed, formatCustomRecord,
   postPlayerLogs, postMatchSummaryToSeasonLog, postSeasonSummaryToSeasonLog, postSmurfAlerts,
   getCustomPointsDelta, getCustomDisplayScore, buildTopInfernalEmbed, buildQueueFeedText, postQueueFeedMessage,
-  buildQueueJoinActionRow, getMemberVipTier, buildVipTierResolver, buildClubeEmbed
+  buildQueueJoinActionRow, getMemberVipTier, buildVipTierResolver, buildClubeEmbed,
+  parseLiveLink, getLiveCooldownRemainingMs, formatCooldownRemaining,
+  buildLiveEmbed, findPromoChannel, ensureAoVivoRole
 } = require('../utils/lobbyUtils');
 
 const { 
@@ -856,8 +858,49 @@ async function handlePlayerCardCommand(message, targetUser = null) {
   await sendToMessageChannel(message, { embeds: [buildPlayerCardEmbed(playerStats, selectedUser, getMemberVipTier(targetMember))] });
 }
 
-async function handleClubeCommand(message) {
-  const paymentsEnabled = Boolean(process.env.MP_ACCESS_TOKEN);
+async function handleQueroLiveCommand(message) {
+  const guild = message.guild;
+  if (!guild) return;
+  const role = await ensureAoVivoRole(guild);
+  if (!role) return await replyToMessage(message, 'Não consegui liberar o cargo 🔴 Ao Vivo agora. Tente de novo.');
+  const member = message.member;
+  if (!member) return;
+  if (member.roles.cache.has(role.id)) {
+    await member.roles.remove(role.id, '!quero-live: saiu').catch(() => null);
+    return await replyToMessage(message, '🔕 Você saiu do 🔴 Ao Vivo e não receberá pings de live.');
+  }
+  await member.roles.add(role.id, '!quero-live: entrou').catch(() => null);
+  return await replyToMessage(message, '🔔 Você entrou no 🔴 Ao Vivo e será avisado das lives!');
+}
+
+async function handleLiveCommand(message, args = []) {
+  const guild = message.guild;
+  if (!guild) return;
+  if (getMemberVipTier(message.member) !== '👑 Lendário') {
+    return await replyToMessage(message, '❌ O `!live` é exclusivo do **👑 Lendário**. Veja o `!clube`.');
+  }
+  const parsed = parseLiveLink(args.join(' '));
+  if (!parsed) {
+    return await replyToMessage(message, '❌ Uso: `!live <link da Twitch, YouTube ou Kick>`.');
+  }
+  const systemMeta = await loadSystemMeta();
+  systemMeta.liveCooldowns ||= {};
+  const remaining = getLiveCooldownRemainingMs(systemMeta.liveCooldowns[message.author.id]);
+  if (remaining > 0) {
+    return await replyToMessage(message, `⏳ Aguarde **${formatCooldownRemaining(remaining)}** para divulgar de novo.`);
+  }
+  const role = await ensureAoVivoRole(guild);
+  const embed = buildLiveEmbed({ memberMention: `<@${message.author.id}>`, url: parsed.url, platform: parsed.platform });
+  const target = findPromoChannel(guild) || message.channel;
+  const payload = { embeds: [embed] };
+  if (role) payload.content = `<@&${role.id}> 🔴 **${message.author.username}** está ao vivo!`;
+  await target.send(payload).catch(() => null);
+  systemMeta.liveCooldowns[message.author.id] = Date.now();
+  await saveSystemMeta(systemMeta);
+  return await replyToMessage(message, '🔴 Live divulgada!');
+}
+
+async function handleClubeCommand(message) {  const paymentsEnabled = Boolean(process.env.MP_ACCESS_TOKEN);
   const components = [];
   if (paymentsEnabled) {
     const { TIER_KEYS, TIER_ROLE_NAMES } = require('../services/clubePaymentsService');
@@ -1873,7 +1916,7 @@ module.exports = {
   handleSyncAllRolesCommand, handleSyncAllPlayersEloCommand, handleVictoryCommand, handleOnboardingCommand, handleClearCommand,
   handleRegisterCommand, handleNickUpdateCommand, handleSyncPlayerRankCommand, handleVoteCommand, pendingAutoStarts, triggerAutoStart,
   handleRematchCommand, handleRouletteCommand, handleRoletaSairCommand, handleRulesCommand, handleStaffCommand, handlePdlCommand,
-  handleResultVoteButton, handleClubeCommand,
+  handleResultVoteButton, handleClubeCommand, handleQueroLiveCommand, handleLiveCommand,
   findRecentVictoryByLetter,
   findPendingAutoStartLobby,
   resolveCleanupTargets

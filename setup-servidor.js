@@ -50,9 +50,12 @@ const VOICE_CHANNELS = PATTERN.voiceChannels.map((spec) =>
 );
 const PIN_NOTICES = PATTERN.pinNotices;
 
-async function findOrCreateRole(guild, { name, color, reason }) {
+async function findOrCreateRole(guild, { name, color, reason, mentionable = false }) {
   const existing = guild.roles.cache.find((r) => r.name === name);
   if (existing) {
+    if (mentionable && !existing.mentionable && !DRY_RUN) {
+      await existing.edit({ mentionable: true }).catch((e) => console.log(`     ⚠ tornar "${name}" mencionável: ${e.message}`));
+    }
     console.log(`   ✔ cargo "${name}" já existe (${existing.id})`);
     return existing;
   }
@@ -60,7 +63,7 @@ async function findOrCreateRole(guild, { name, color, reason }) {
     console.log(`   + criaria cargo "${name}"`);
     return { id: `(novo)`, name };
   }
-  const role = await guild.roles.create({ name, color, reason: `Setup CAPS Arena: ${reason}` });
+  const role = await guild.roles.create({ name, color, mentionable, reason: `Setup CAPS Arena: ${reason}` });
   console.log(`   + cargo "${name}" criado (${role.id})`);
   return role;
 }
