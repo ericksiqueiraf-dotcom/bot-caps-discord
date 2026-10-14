@@ -304,7 +304,7 @@ function buildSlashCommands() {
       .setName('toprankinfernal')
       .setDescription('Quem mais conquistou o INFERNAL na temporada.'),
     new SlashCommandBuilder().setName('clube').setDescription('Mostra o clube VIP: tiers, benefícios e membros.'),
-    new SlashCommandBuilder().setName('quero-live').setDescription('Entra/sai do ping 🔴 Ao Vivo.'),
+    new SlashCommandBuilder().setName('querolive').setDescription('Entra/sai do ping 🔴 Ao Vivo.'),
     new SlashCommandBuilder()
       .setName('live')
       .setDescription('Divulga sua live (só 👑 Lendário, 1x a cada 6h).')
@@ -527,8 +527,9 @@ async function processCommand(message, rawContent) {
       case 'clube':
         await handlers.handleClubeCommand(message);
         break;
-      case 'quero-live':
       case 'querolive':
+      case 'quero-live':
+      case 'queroaovivo':
         await handlers.handleQueroLiveCommand(message);
         break;
       case 'live':
@@ -929,7 +930,7 @@ client.on('interactionCreate', async (interaction) => {
       case 'clube':
         await handlers.handleClubeCommand(context);
         break;
-      case 'quero-live':
+      case 'querolive':
         await handlers.handleQueroLiveCommand(context);
         break;
       case 'live': {
