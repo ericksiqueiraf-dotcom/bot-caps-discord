@@ -1,0 +1,206 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R 5 0 R 7 0 R] /Count 3 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.27 841.89] /Resources << /Font << /F1 9 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 6913 >>
+stream
+BT /F1 17 Tf 0.08 0.08 0.08 rg 1 0 0 1 50.00 785.89 Tm (Inter-servidores N x J na CAPS ARENA) Tj ET
+BT /F1 9.5 Tf 0.42 0.42 0.42 rg 1 0 0 1 50.00 763.89 Tm (Especificacao tecnica e funcional - MD1 / MD3 | 10/10/2026) Tj ET
+BT /F1 12.5 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 744.89 Tm (0. Viabilidade - confirmacao) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 725.89 Tm (SIM, e viavel. O bot atual ja tem fila global, identidade por discordId, balanceamento interno,) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 712.69 Tm (criacao de canais de voz e locks por operacao. O que sera construido e um modulo novo ao lado do fluxo) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 699.49 Tm (atual: fila de TIMES fechados \(5 fixos\), match criado sempre na CAPS ARENA \(servidor neutro\), invites) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 686.29 Tm (gerados somente quando a partida estiver pronta, serie MD1 ou MD3 com alternancia/sorteio de lados,) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 673.09 Tm (ranking inter-servidores separado, W.O. por ausencia e permissoes restritas a Capitao/Staff. O fluxo) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 659.89 Tm (interno atual \(solo/party dentro de um servidor\) nao sera alterado para quem nao aderir.) Tj ET
+BT /F1 12.5 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 640.69 Tm (1. Regras de produto fechadas) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 621.69 Tm (-  Times de 5 fixos. Sem completar com avulsos e sem misturar jogadores de fora do time.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 608.49 Tm (-  MD1: partida unica, so para desafio 1x. Pontuacao menor.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 595.29 Tm (-  MD3: melhor de 3. Jogo 1 e Jogo 2 com lados alternados \(quem foi azul no 1 e vermelho no 2\). Jogo) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 582.09 Tm (   3 so acontece em caso de empate 1-1, com lados definidos por sorteio na hora.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 568.89 Tm (-  Pontuacao maior para quem joga MD3 \(serie mais longa vale mais que MD1\).) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 555.69 Tm (-  Ranking inter-servidores SEPARADO do ranking interno atual.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 542.49 Tm (-  Ausencia na ARENA dentro do prazo = W.O. \(adversario pontua, faltoso registra derrota\).) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 529.29 Tm (-  Somente Capitao/Staff pode: buscar time, aceitar desafio, confirmar presenca e lancar resultado.) Tj ET
+BT /F1 12.5 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 510.09 Tm (2. Arquitetura - onde encaixa) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 491.09 Tm (Monolito Node.js atual mantido. Novo modulo 'inter' ao lado do matchmaking interno:) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 477.89 Tm (commands/handlers/interCommandHandlers.js \(ou comandos !desafiar, !aceitar, !wo, !resultado-inter\),) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 464.69 Tm (application/use-cases/inter/ \(buscarTime, formarMatch, iniciarJogo, registrarResultadoJogo,) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 451.49 Tm (fecharSerie, aplicarWO\), services/interService.js + inviteService.js, e docs em database/inter*. O) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 438.29 Tm (fluxo interno \(enterQueue/startMatch/registerVictory\) nao muda; o inter usa playerStats e dataService) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 425.09 Tm (como base, mas escreve em docs proprios.) Tj ET
+BT /F1 10 Tf 0.22 0.22 0.22 rg 1 0 0 1 50.00 411.89 Tm (Por que arena neutra simplifica) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 397.89 Tm (-  N e J nunca hospedam: sem disputa de casa e sem permissao cruzada.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 384.69 Tm (-  Somente a ARENA precisa de CreateInstantInvite, canais de texto/voz e cargos de Capitao.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 371.49 Tm (-  Times ja vem formados por origem: dispensa o balanceador por MMR \(createBalancedTeams\) para o) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 358.29 Tm (   inter.) Tj ET
+BT /F1 12.5 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 339.09 Tm (3. Fluxo end-to-end) Tj ET
+BT /F1 10 Tf 0.22 0.22 0.22 rg 1 0 0 1 50.00 320.09 Tm (3.1 Busca \(em N e em J\)) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 306.09 Tm (-  Capitao em N: !desafiar \(ou /desafiar\) com os 5 marcados. Bot valida: 5 discordIds distintos,) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 292.89 Tm (   todos cadastrados \(puuid/discordId\), ninguem em fila/match ativo, autor tem cargo Capitao/Staff.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 279.69 Tm (-  Registro de busca: {guildId:N, capitaoId, jogadores[5], modo: 5x5 SR, serie: MD1|MD3, createdAt,) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 266.49 Tm (   expiresAt}. Mesmo em J.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 253.29 Tm (-  Matchmaking de times: dois registros compativeis \(mesmo modo, series compativeis\) formam o) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 240.09 Tm (   confronto. Regra simples fase 1: primeiro que chegou contra primeiro compativel \(FIFO\).) Tj ET
+BT /F1 10 Tf 0.22 0.22 0.22 rg 1 0 0 1 50.00 226.89 Tm (3.2 Formacao na ARENA \(match pronto\)) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 212.89 Tm (-  Bot cria na ARENA: categoria 'INTER N vs J', canais de texto do confronto e 2 vozes nomeadas pela) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 199.69 Tm (   origem \(ex. 'AZUL N' / 'VERM JOGO 1'\).) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 186.49 Tm (-  Define lados do Jogo 1 \(sorteio ou acordo; padrao: sorteio\) e registra match {matchId, guildA,) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 173.29 Tm (   guildB, serie, jogos[], placarA, placarB, ladoAtual, status}.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 160.09 Tm (-  SOMENTE AGORA gera 1 invite da ARENA \(canal fixo de convites, maxAge curto ex. 1h, maxUses =) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 146.89 Tm (   10+sobra, unique por match\) e envia: DM para os 10 + mencao publica nos servidores N e J com link) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 133.69 Tm (   e instrucoes.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 120.49 Tm (-  Nada de invite ao entrar na busca. Requisito atendido.) Tj ET
+BT /F1 10 Tf 0.22 0.22 0.22 rg 1 0 0 1 50.00 107.29 Tm (3.3 Jogos e lados) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 93.29 Tm (-  MD1: joga 1, lanca resultado, fecha serie, pontua \(peso 1x\).) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 80.09 Tm (-  MD3: Jogo 1 no lado sorteado; Jogo 2 com lados INVERTIDOS; se 2-0 fecha; se 1-1, sorteia lados do) Tj ET
+BT /F1 8 Tf 0.55 0.55 0.55 rg 1 0 0 1 277.63 33.00 Tm (pag 1/3) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.27 841.89] /Resources << /Font << /F1 9 0 R >> >> /Contents 6 0 R >>
+endobj
+6 0 obj
+<< /Length 7276 >>
+stream
+BT /F1 10 Tf 0.22 0.22 0.22 rg 1 0 0 1 50.00 791.89 Tm (3.4 Resultado, W.O. e fechamento) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 777.89 Tm (-  Capitao/Staff lanca !resultado-inter <jogo> <vencedor> ou ambos confirmam. Em MD3 o placar da) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 764.69 Tm (   serie acumula \(1-0, 1-1, 2-1\).) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 751.49 Tm (-  W.O.: se um time nao entrar na ARENA em X min \(sugestao: 15 min\) apos o invite, staff/ARENA aplica) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 738.29 Tm (   !wo. Serie fecha como 1-0 \(MD1\) ou 2-0 \(MD3\) para o presente.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 725.09 Tm (-  Fechamento: atualiza ranking inter, posta historico na ARENA + resumo em N e J, apaga canais) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 711.89 Tm (   temporarios.) Tj ET
+BT /F1 12.5 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 692.69 Tm (4. Modelo de dados \(Mongo docs + fallback JSON\)) Tj ET
+BT /F1 7.8 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 673.69 Tm (data.guildSettings: {guildId: {sharedInter: bool, capitaoRoleId, announceChannelId}}) Tj ET
+BT /F1 7.8 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 662.19 Tm (data.interBusca: {buscas: [{buscaId, guildId, capitaoId, jogadores[5 discordIds], serie: MD1|MD3, createdAt,) Tj ET
+BT /F1 7.8 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 650.69 Tm (expiresAt, status}]}}) Tj ET
+BT /F1 7.8 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 639.19 Tm (data.interMatches: {matches: {matchId: {guildA, guildB, serie, status, jogos: [{n, ladoA, ladoB, vencedor,) Tj ET
+BT /F1 7.8 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 627.69 Tm (wo?}], placarA, placarB, invite:{code,url,expiresAt}, canais:{categoriaId, textoId, vozAzulId, vozVermId},) Tj ET
+BT /F1 7.8 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 616.19 Tm (createdAt, closedAt}}}) Tj ET
+BT /F1 7.8 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 604.69 Tm (data.interRanking: {times: {guildId: {vitoriasMD1, derrotasMD1, seriesMD3V, seriesMD3D, jogosV, jogosD,) Tj ET
+BT /F1 7.8 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 593.19 Tm (pontos, wos}}}) Tj ET
+BT /F1 7.8 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 581.69 Tm (playerEntry inter carrega originGuildId sempre; match carrega playerOrigins {discordId: guildId} para) Tj ET
+BT /F1 7.8 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 570.19 Tm (auditoria.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 558.69 Tm (Migracao: docs novos com defaults vazios; playerStats e fila interna intactos. Pontos: MD1 vitoria = 3) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 545.49 Tm (pts \(sugestao\), MD3 serie vencida = 5 pts + 1 por jogo vencido \(sugestao, ajustar\). Derrota soma) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 532.29 Tm (jogos, nao pontos de serie.) Tj ET
+BT /F1 12.5 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 513.09 Tm (5. Invites - permissoes e entrega) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 494.09 Tm (Hoje o bot NAO cria invites \(grep createInvite = 0; unico convidar e tempVoiceService.js:426, que so) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 480.89 Tm (edita permissao + DM texto intra-guild\). Sera criado inviteService.js com) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 467.69 Tm (channel.createInvite\({maxAge:3600, maxUses:12, unique:true, reason}\). Requisitos: bot membro da ARENA) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 454.49 Tm (+ N + J \(para DM/mencao\), permissao CreateInstantInvite \(ou Gerenciar Canais\) no canal de convites da) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 441.29 Tm (ARENA, intents atuais \(Guilds, GuildMembers, GuildVoiceStates\) ja bastam.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 428.09 Tm (-  Entrega: DM aos 10 + mensagem publica em N, J e ARENA. DM fechada => fallback mencao publica) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 414.89 Tm (   \(padrao ja usado em tempVoiceService.js: dmFailed[]\).) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 401.69 Tm (-  Falhas: sem permissao/canal invalido => nao deixa match meio-criado; faz rollback \(apaga canais\) e) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 388.49 Tm (   avisa as origens. Invite expirado => gera novo sob lock e reenvia so aos pendentes.) Tj ET
+BT /F1 12.5 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 369.29 Tm (6. Concorrencia, timeouts e cancelamentos) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 350.29 Tm (-  Lock global inter \(ex. 'inter:global:busca' e 'inter:match:<matchId>'\) via withQueueOperationLock) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 337.09 Tm (   \(services/dataService.js:151\). Locks atuais sao por-guild; o inter precisa de lock proprio pois) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 323.89 Tm (   envolve 2 guilds + ARENA.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 310.69 Tm (-  Duplicata: antes de registrar busca e antes de fechar cada jogo, checar discordId em buscas ativas) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 297.49 Tm (   + interMatches ativos + fila/match internos \(findLobbyByPlayer + matches ativos\).) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 284.29 Tm (-  Timeouts: busca expira \(sugestao 30 min\); auto-start do Jogo com 5 min de tolerancia;) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 271.09 Tm (   pendingTimers em memoria com retomada no restart \(padrao index.js:440-450\).) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 257.89 Tm (-  Cancelamento: capitao pode retirar a busca antes do match \(!desafiar-cancelar\). Apos o match) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 244.69 Tm (   formado, so staff ARENA cancela \(apaga canais, libera times\). Mudanca de opt-out no meio da serie) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 231.49 Tm (   nao dissolve serie ativa.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 218.29 Tm (-  Dashboard: fila inter anunciada na ARENA + resumo em N/J. systemMeta.lastQueueMessageId hoje e) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 205.09 Tm (   global unico \(lobbyUtils.js:1935\) => usar mapa por guild no inter.) Tj ET
+BT /F1 12.5 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 185.89 Tm (7. Ranking inter separado - regras sugeridas) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 166.89 Tm (-  Tabela por servidor/time: pontos, series MD3 V/D, partidas MD1 V/D, jogos V/D, W.O.s.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 153.69 Tm (-  Pesos \(ajustaveis\): MD1 vitoria 3 pts; MD3 serie vencida 5 pts + 1 pt por jogo vencido; W.O. conta) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 140.49 Tm (   como serie/partida vencida sem ponto de jogo extra.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 127.29 Tm (-  Comandos: !inter-ranking, !inter-historico. Nao toca playerStats.modes nem top10/placar internos.) Tj ET
+BT /F1 12.5 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 108.09 Tm (8. Comandos e permissoes \(fase 1\)) Tj ET
+BT /F1 7.8 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 89.09 Tm (!desafiar [MD1|MD3] @p2 @p3 @p4 @p5  \(Capitao/Staff, no servidor de origem\)) Tj ET
+BT /F1 7.8 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 77.59 Tm (!desafiar-cancelar | !aceitar <buscaId> \(se modelo com aceite manual\)) Tj ET
+BT /F1 8 Tf 0.55 0.55 0.55 rg 1 0 0 1 277.63 33.00 Tm (pag 2/3) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.27 841.89] /Resources << /Font << /F1 9 0 R >> >> /Contents 8 0 R >>
+endobj
+8 0 obj
+<< /Length 6619 >>
+stream
+BT /F1 7.8 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 791.89 Tm (!wo <matchId> <time>  \(staff ARENA\)) Tj ET
+BT /F1 7.8 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 780.39 Tm (!inter-ranking | !inter-historico) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 768.89 Tm (Slash equivalents: /desafiar, /resultado-inter, /inter-ranking. Guard: cargo Capitao) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 755.69 Tm (\(config.roles.captainRoleId\) ou ManageMessages/Administrator. Validar sempre no servidor de origem +) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 742.49 Tm (na ARENA.) Tj ET
+BT /F1 12.5 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 723.29 Tm (9. Voz e canais na ARENA) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 704.29 Tm (-  Estrutura por match: categoria 'INTER N vs J', texto '#n-vs-j-serie', voz 'AZUL N \(Jogo 1\)' e) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 691.09 Tm (   'VERM J \(Jogo 1\)'. Jogo 2: renomeia/inverte. Jogo 3: sorteia e renomeia.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 677.89 Tm (-  Limite de voz = 5 por lado + staff. Mover apenas quem ja esta na ARENA \(movePlayersToVoiceChannel) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 664.69 Tm (   padrao\); quem nao entrou recebe aviso e pode entrar manual pelo invite.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 651.49 Tm (-  Ao fechar: mover todos para sala de espera da ARENA \(se houver\) e apagar canais do match) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 638.29 Tm (   \(deleteManagedChannelsForLobby\).) Tj ET
+BT /F1 12.5 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 619.09 Tm (10. Plano minimo de implementacao) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 600.09 Tm (-  1\) guildSettings + cargos/canais da ARENA \(setup + !inter-config\).) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 586.89 Tm (-  2\) interBusca: registrar/expirar/cancelar busca de 5 fixos com validacoes e lock global.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 573.69 Tm (-  3\) interMatches: formar match FIFO, criar canais na ARENA, sortear lados J1.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 560.49 Tm (-  4\) inviteService: criar invite so no match pronto + DM/mencoes + fallback + rollback.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 547.29 Tm (-  5\) Jogos: iniciar/alternar/sortear lados, registrar resultado por jogo, W.O., fechar serie) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 534.09 Tm (   MD1/MD3.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 520.89 Tm (-  6\) interRanking + historico separados + comandos de consulta.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 507.69 Tm (-  7\) Anuncios nas 3 guilds + limpeza de canais.) Tj ET
+BT /F1 12.5 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 488.49 Tm (11. Testes) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 469.49 Tm (-  busca.test: 5 fixos obrigatorios; capitao/staff only; duplicata cross \(em busca, em match ativo,) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 456.29 Tm (   em fila interna\) rejeitada.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 443.09 Tm (-  match.test: FIFO forma N vs J; canais criados com nomes de origem; invite NAO criado na busca,) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 429.89 Tm (   criado no match.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 416.69 Tm (-  lados.test: J1 sorteado; J2 invertido; J3 so se 1-1 e sorteado; MD1 fecha em 1 jogo.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 403.49 Tm (-  wo.test: ausencia apos timeout => serie 1-0/2-0, pontos ao presente, derrota ao ausente.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 390.29 Tm (-  ranking.test: MD3 vale mais que MD1; ranking inter nao altera playerStats interno.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 377.09 Tm (-  invite.test \(mock\): sem permissao => rollback sem canal orfao; DM fechada => fallback mencao;) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 363.89 Tm (   expirado => novo invite.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 350.69 Tm (-  concorrencia.test: duas buscas simultaneas nao geram 2 matches com o mesmo time.) Tj ET
+BT /F1 12.5 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 331.49 Tm (12. Riscos e pendencias) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 312.49 Tm (-  Prazo de W.O. \(sugestao 15 min\) e de expiracao de busca \(sugestao 30 min\) precisam de confirmacao.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 299.29 Tm (-  Pesos de pontos MD1 vs MD3 \(sugestao 3 vs 5+jogos\) precisam de confirmacao.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 286.09 Tm (-  Aceite manual \(!aceitar\) ou automatico FIFO? Sugerido FIFO automatico fase 1.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 272.89 Tm (-  Lock atual e em memoria \(1 instancia\). Inter exige 1 instancia ativa ate lock distribuido \(mesma) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 259.69 Tm (   limitacao ja documentada em PROJECT_CONTEXT.md\).) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 246.49 Tm (-  Bot precisa estar nas 3 guilds com permissoes; invites de servidor com verificacao alta podem) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 233.29 Tm (   exigir conta verificada.) Tj ET
+BT /F1 12.5 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 214.09 Tm (13. Referencias no codigo atual) Tj ET
+BT /F1 7.8 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 195.09 Tm (services/dataService.js: withQueueOperationLock, loadQueue/saveQueue, loadCurrentMatch, loadPlayerStats,) Tj ET
+BT /F1 7.8 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 183.59 Tm (loadSystemMeta) Tj ET
+BT /F1 7.8 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 172.09 Tm (application/use-cases/enterQueue.js + startMatch.js + cancelActiveMatch.js + registerVictory.js) Tj ET
+BT /F1 7.8 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 160.59 Tm (utils/lobbyUtils.js: findLobbyByPlayer, getOpenLobby, createLobbyChannels, createTeamChannelsForLobby,) Tj ET
+BT /F1 7.8 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 149.09 Tm (movePlayersToTeamChannels, updateQueueDashboard, sendMatchStartAnnouncement) Tj ET
+BT /F1 7.8 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 137.59 Tm (services/tempVoiceService.js:426 handleInviteCommand \(unico fluxo de convite, sem Invite\)) Tj ET
+BT /F1 7.8 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 126.09 Tm (index.js: intents, registerSlashCommands, messageCreate, interactionCreate, restart/auto-start) Tj ET
+BT /F1 7.8 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 114.59 Tm (config.json: allowedGuildIds, voiceChannels, textChannels | setup-servidor.js | admin/ | tests/*.test.js) Tj ET
+BT /F1 8 Tf 0.55 0.55 0.55 rg 1 0 0 1 277.63 33.00 Tm (pag 3/3) Tj ET
+endstream
+endobj
+9 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+xref
+0 10
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000133 00000 n 
+0000000265 00000 n 
+0000007230 00000 n 
+0000007362 00000 n 
+0000014690 00000 n 
+0000014822 00000 n 
+0000021493 00000 n 
+trailer
+<< /Size 10 /Root 1 0 R >>
+startxref
+21590
+%%EOF

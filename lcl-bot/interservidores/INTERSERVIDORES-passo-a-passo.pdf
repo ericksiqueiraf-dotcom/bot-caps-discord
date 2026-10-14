@@ -1,0 +1,98 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R 5 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.27 841.89] /Resources << /Font << /F1 7 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 6444 >>
+stream
+BT /F1 17 Tf 0.08 0.08 0.08 rg 1 0 0 1 50.00 785.89 Tm (INTERSERVIDORES CAPS ARENA - Passo a passo) Tj ET
+BT /F1 9.5 Tf 0.42 0.42 0.42 rg 1 0 0 1 50.00 763.89 Tm (Do zero ao teste: implementacao, instalacao, comandos e roteiro - 10/10/2026) Tj ET
+BT /F1 12.5 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 744.89 Tm (ETAPA 1 - Implementacao \(pronta\)) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 725.89 Tm (-  Regras em domain/inter/series.js \(MD1/MD3, 5 fixos, lados, pontos, W.O.\).) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 712.69 Tm (-  Casos de uso em application/use-cases/inter/ \(busca FIFO, resultado, ranking separado\).) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 699.49 Tm (-  Invites em services/inviteService.js \(criados SO no match pronto\).) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 686.29 Tm (-  Comandos texto + slash \(desafiar, resultado-inter, wo, inter-ranking, inter-historico\).) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 673.09 Tm (-  Banco: docs interBusca / interMatches / interRanking.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 659.89 Tm (-  Testes: npm test = 80/80 \(20 do inter\).) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 646.69 Tm (-  Atualizar o bot: pm2 restart caps-bot-teste \(teste\) ou pm2 restart caps-bot \(producao\). Nunca dois) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 633.49 Tm (   processos no mesmo token.) Tj ET
+BT /F1 12.5 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 614.29 Tm (ETAPA 2 - Instalar o bot nos 3 servidores) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 595.29 Tm (-  1. Developer Portal > seu app > OAuth2 > URL Generator; scopes bot + applications.commands.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 582.09 Tm (-  2. Permissoes: Gerenciar Canais, Criar Convite, Mover Membros, Enviar Mensagens, Inserir Links,) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 568.89 Tm (   Gerenciar Mensagens, Ler Historico, Conectar/Falar em voz.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 555.69 Tm (-  3. Autorize o MESMO bot em N, em J e na CAPS ARENA \(precisa de Gerenciar Servidor em cada um\).) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 542.49 Tm (-  4. Confira: bot online nos 3 + slash /desafiar visivel \(reinicie o processo se a guild ja tinha o) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 529.29 Tm (   bot\).) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 516.09 Tm (-  Nao crie outro token, processo ou banco: e um bot, um banco que enxerga os dois lados.) Tj ET
+BT /F1 12.5 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 496.89 Tm (ETAPA 3 - Configurar \(config.json > inter\)) Tj ET
+BT /F1 7.8 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 477.89 Tm ("inter": { "arenaGuildId": "<ID DA ARENA>", "inviteChannelId": "<canal texto ARENA>",) Tj ET
+BT /F1 7.8 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 466.39 Tm (  "announceChannelId": "<canal anuncio ARENA>", "buscaExpiryMinutes": 30,) Tj ET
+BT /F1 7.8 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 454.89 Tm (  "woTimeoutMinutes": 15, "md1WinPoints": 3, "md3SeriesPoints": 5, "md3GamePoint": 1 }) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 443.39 Tm (-  allowedGuildIds precisa conter N, J e ARENA \(ou lista vazia = todas\).) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 430.19 Tm (-  Reinicie o bot apos editar o config.json.) Tj ET
+BT /F1 12.5 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 410.99 Tm (ETAPA 4 - Preparar os times) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 391.99 Tm (-  Cada time: nome \(ex. TimeN\) + 5 jogadores fixos.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 378.79 Tm (-  Cargo Capitao \(ou Staff\) para quem opera \(config.roles.captainRoleId\).) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 365.59 Tm (-  Opcional: os 5 na mesma call de voz dispensam mencoes no !desafiar.) Tj ET
+BT /F1 12.5 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 346.39 Tm (ETAPA 5 - Criar a partida \(roteiro MD1\)) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 327.39 Tm (-  1. No servidor N: !desafiar MD1 TimeN @p2 @p3 @p4 @p5 -> busca posicao 1.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 314.19 Tm (-  2. No servidor J: !desafiar MD1 TimeJ @p6 @p7 @p8 @p9 -> MATCH FORMADO.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 300.99 Tm (-  3. Bot cria na ARENA: categoria INTER TimeN vs TimeJ + texto + vozes AZUL/VERMELHA com nomes dos) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 287.79 Tm (   times.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 274.59 Tm (-  4. Bot envia o convite por DM aos 10 e anuncia nas origens \(DM fechada -> link na mencao publica\).) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 261.39 Tm (-  5. Times entram na ARENA e jogam a personalizada no LoL.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 248.19 Tm (-  6. Capitao \(de N, J ou ARENA\): !resultado-inter 1 AZUL -> serie fechada, ranking atualizado, salas) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 234.99 Tm (   apagadas.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 221.79 Tm (-  7. Confira: !inter-ranking e !inter-historico.) Tj ET
+BT /F1 12.5 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 202.59 Tm (ETAPA 6 - Testar MD3 e W.O.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 183.59 Tm (-  1. Busca com MD3; Jogo 1 no lado sorteado -> !resultado-inter 1 AZUL.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 170.39 Tm (-  2. Jogo 2 com lados INVERTIDOS -> !resultado-inter 2 VERM \(exemplo\).) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 157.19 Tm (-  3. Se 1-1: Jogo 3 com lados SORTEADOS -> !resultado-inter 3 AZUL.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 143.99 Tm (-  4. W.O.: com serie aberta, !wo \(ausente = outro time\) -> fecha para o presente.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 130.79 Tm (-  Erros comuns: jogador em fila/partida \(!sair antes\), call com diferente de 5, autor fora da call,) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 117.59 Tm (   DM fechada \(usar link publico\).) Tj ET
+BT /F1 12.5 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 98.39 Tm (Comandos \(resumo\)) Tj ET
+BT /F1 7.8 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 79.39 Tm (!desafiar [MD1|MD3] <nome> [@p2 @p3 @p4 @p5]  \(sem mencoes: 5 na call\)) Tj ET
+BT /F1 7.8 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 67.89 Tm (!desafiar-cancelar | !resultado-inter [jogo] AZUL|VERM | !wo [A|B]) Tj ET
+BT /F1 8 Tf 0.55 0.55 0.55 rg 1 0 0 1 277.63 33.00 Tm (pag 1/2) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.27 841.89] /Resources << /Font << /F1 7 0 R >> >> /Contents 6 0 R >>
+endobj
+6 0 obj
+<< /Length 667 >>
+stream
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 791.89 Tm (-  Slash nao aparece -> ver pm2 logs e reiniciar.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 778.69 Tm (-  Sem convite -> falta permissao Criar Convite na ARENA.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 765.49 Tm (-  Jogador ocupado -> !sair / !desafiar-cancelar.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 752.29 Tm (-  Salas orfas -> apagar manual; buscas voltam sozinhas a fila.) Tj ET
+BT /F1 9.3 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 739.09 Tm (-  Busca sumiu -> expirou \(30 min\): desafiar de novo.) Tj ET
+BT /F1 8 Tf 0.55 0.55 0.55 rg 1 0 0 1 277.63 33.00 Tm (pag 2/2) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000127 00000 n 
+0000000259 00000 n 
+0000006755 00000 n 
+0000006887 00000 n 
+0000007605 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R >>
+startxref
+7702
+%%EOF

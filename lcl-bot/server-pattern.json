@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "description": "Padrao oficial de salas do LCL BOT (Liga Clandestina de LoL). O setup-servidor.js aplica este arquivo de forma idempotente: reusa/move/renomeia o que existe, cria o que falta e so apaga duplicada vazia. A sala de voz clandestina vive na categoria FILA (mesma dos bots CAPS); os textos do inter ficam separados na categoria 🔥・LCL.",
+  "categories": ["FILA", "🔥・LCL"],
+  "categoryMerges": {
+    "FILA": ["voz", "filas"]
+  },
+  "roles": [
+    { "name": "Staff", "color": "#E74C3C", "reason": "Equipe do servidor — opera !desafiar / !resultado-inter / !wo" },
+    { "name": "👑 Capitão de Customs", "color": "#F1C40F", "reason": "Opera o !desafiar / !resultado-inter" },
+    { "name": "Jogador", "color": "#3498DB", "reason": "Enxerga e digita nos canais 🔥・LCL e na call clandestina" }
+  ],
+  "vipRoleNames": [],
+  "textChannels": [
+    { "name": "🔥・fila-lcl", "category": "🔥・LCL", "configKey": "queueStatusChannelId", "talk": false, "aliases": ["fila-lcl"] },
+    { "name": "⚔️・partidas-lcl", "category": "🔥・LCL", "configKey": "matchOngoingChannelId", "talk": false, "aliases": ["partidas-lcl"] },
+    { "name": "📋・resultados-lcl", "category": "🔥・LCL", "configKey": "matchHistoryChannelId", "talk": false, "aliases": ["resultados-lcl"] },
+    { "name": "🥇・ranking-lcl", "category": "🔥・LCL", "configKey": "rankUpdatesChannelId", "talk": false, "aliases": ["ranking-lcl"] }
+  ],
+  "voiceChannels": [
+    { "name": "🔥・lobby-clandestino LCL", "category": "FILA", "configKey": "clandestinoQueueChannelId", "hidden": true, "userLimit": 5, "aliases": ["Lobby Clandestino", "🔥・lobby-clandestino", "lobby-clandestino LCL", "🔥・lobby-clandestino LCL"] }
+  ],
+  "interKeys": {
+    "inviteChannelId": "matchOngoingChannelId",
+    "announceChannelId": "matchOngoingChannelId",
+    "rankChannelId": "rankUpdatesChannelId"
+  },
+  "pinNotices": {
+    "🔥・fila-lcl": "🔥 **Fila clandestina** — entre na call do lobby clandestino e clique em **Entrar Queue LCL** p/ marcar presença (5/5 = time fechado). Só Capitão/Staff opera o `!desafiar`.",
+    "⚔️・partidas-lcl": "⚔️ **Partidas inter** — resultados (`!resultado-inter`) e W.O. (`!wo`) aqui. Convite da ARENA chega por DM.",
+    "📋・resultados-lcl": "📋 **Histórico inter** — séries fechadas e campeões.",
+    "🥇・ranking-lcl": "🏆 **Ranking inter** — pontos MD1/MD3 (separado do ranking interno)."
+  }
+}

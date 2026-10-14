@@ -12,7 +12,10 @@ const {
 const GUILD_ID = process.argv[2] || '1273653944169660427';
 const DRY_RUN = process.argv.includes('--dry-run');
 const CAPS_DIR = __dirname;
-const LCL_DIR = 'C:\\Users\\ErickSiqueira\\Documents\\LCL BOT';
+// LCL mora dentro do repo (lcl-bot/); mantém fallback p/ a pasta antiga externa.
+const LCL_DIR = [process.env.LCL_BOT_DIR, path.join(CAPS_DIR, 'lcl-bot'), 'C:\\Users\\ErickSiqueira\\Documents\\LCL BOT'].find((dir) => {
+  try { return dir && fs.existsSync(path.join(dir, 'server-pattern.json')); } catch { return false; }
+}) || path.join(CAPS_DIR, 'lcl-bot');
 
 const capsPattern = require(path.join(CAPS_DIR, 'server-pattern.json'));
 const lclPattern = require(path.join(LCL_DIR, 'server-pattern.json'));

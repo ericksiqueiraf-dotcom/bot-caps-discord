@@ -1,0 +1,171 @@
+%PDF-1.4
+%âãÏÓ
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R 5 0 R 7 0 R] /Count 3 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.27 841.89] /Resources << /Font << /F1 9 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 5917 >>
+stream
+BT /F1 16 Tf 0.08 0.08 0.08 rg 1 0 0 1 50.00 786.89 Tm (? Plano de implementação ? Matchmaking compartilhado + Inter-servidores + Dashboard Admin) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 760.69 Tm (Origem: feature de fila compartilhada entre servidores \(N x J na CAPS ARENA neutra\).) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 747.69 Tm (Restrições: modular, arquivos < 600 linhas, baixa complexidade ciclomática, sem race conditions,) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 734.69 Tm (paralelismo para dezenas/centenas de filas simultâneas, verificação independente ao final.) Tj ET
+BT /F1 12 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 712.49 Tm (Estado atual \(base pronta\)) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 690.29 Tm (-  Inter MD1/MD3 na arena: implementado, 80/80 testes \(`domain/inter/`,) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 677.29 Tm (   `application/use-cases/inter/`, `services/inviteService.js`\).) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 664.29 Tm (-  Painel local `admin/` \(Express+EJS, sem login, sem temas\) ? insuficiente para gestão multi-guild.) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 651.29 Tm (-  Lock em memória \(`withQueueOperationLock`\) ? 1 instância; `config.json` global por ambiente.) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 634.09 Tm (---) Tj ET
+BT /F1 12 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 611.89 Tm (FASE 0 ? Preparação \(1 sessão\)) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 589.69 Tm (0.1. Congelar escopo do MVP \(seção MVP abaixo\) e abrir branch `feat/shared-matchmaking`.) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 576.69 Tm (0.2. Backup código + banco \(`backups/`, `migrateToMongo.js` de volta se preciso\).) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 563.69 Tm (0.3. Definir matriz de guilds: N, J, ARENA \(IDs\) + quem tem Gerenciar Servidor em cada uma.) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 550.69 Tm (0.4. Criar épicos/issues por fase para delegação paralela.) Tj ET
+BT /F1 12 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 528.49 Tm (FASE 1 ? Fundação de dados e concorrência) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 506.29 Tm (1.1. `guildSettings` persistido: `{guildId: {sharedMatchmaking, sharedGroupId=null, interAtivo,) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 493.29 Tm (inviteChannelId, announceChannelId, capitaoRoleId}}` + load/save em `services/dataService.js` \(novo) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 480.29 Tm (módulo `services/guildSettingsService.js` se passar de ~150 linhas\).) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 467.29 Tm (1.2. Carimbar origem: `lobby.players[].originGuildId`, `lobby.{scope, destinationGuildId}`,) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 454.29 Tm (`match.playerOrigins` \(modo interno compartilhado\).) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 441.29 Tm (1.3. Lock distribuído por chave \(lease no Mongo, TTL 5?10s, dono+expiração\) em) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 428.29 Tm (`services/distributedLock.js`, mantendo a API `withQueueOperationLock\(key, fn\)`. Chaves:) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 415.29 Tm (`queue:<mode>:<format>` \(shared\), `inter:global:busca`, `inter:match:<id>`, `<guildId>:victory`.) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 402.29 Tm (1.4. `systemMeta.lastQueueMessageId` ? mapa por guild \(`dashboardMeta {guildId: messageId}`\).) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 389.29 Tm (1.5. Testes: `guild-settings`, `distributed-lock` \(lease, expiração, dois workers simulados\),) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 376.29 Tm (`dashboard-meta`.) Tj ET
+BT /F1 12 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 354.09 Tm (FASE 2 ? Núcleo do matchmaking compartilhado) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 331.89 Tm (2.1. Pool shared por `shared:<mode>:<format>` para guilds com `sharedMatchmaking=true`; guilds `false`) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 318.89 Tm (usam caminho atual intacto.) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 305.89 Tm (2.2. Anti-duplicata global: checar `discordId` em lobbies + waitingLists + matches ativos + buscas) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 292.89 Tm (inter antes de entrar.) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 279.89 Tm (2.3. Eleição de destino: maioria de origem ? desempate \(quem completou / round-robin / menor carga\) ?) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 266.89 Tm (`preferredHostGuildId` opcional.) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 253.89 Tm (2.4. Timeouts/cancelamentos cross-guild: `!sair` remove de qualquer pool; dashboards atualizados em) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 240.89 Tm (todas as guilds participantes; `!shared leave` \(staff\) retira pendentes da guild.) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 227.89 Tm (2.5. Testes: `shared-queue` \(2 guilds enchem 1 lobby\), `destination`, `concurrency` \(entradas) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 214.89 Tm (paralelas A+B\), `leave-cross-guild`.) Tj ET
+BT /F1 12 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 192.69 Tm (FASE 3 ? Invites e notificações \(base pronta, estender\)) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 170.49 Tm (3.1. `services/inviteService.js`: reutilizar; adicionar renovação de invite expirado + `inviteDelivery) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 157.49 Tm ({sent, dmFailed}` por match.) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 144.49 Tm (3.2. Fallbacks: DM fechada ? menção pública; sem permissão ? rollback sem canal órfão \(padrão já) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 131.49 Tm (implementado no inter\).) Tj ET
+BT /F1 8 Tf 0.55 0.55 0.55 rg 1 0 0 1 277.63 33.00 Tm (pag 1/3) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.27 841.89] /Resources << /Font << /F1 9 0 R >> >> /Contents 6 0 R >>
+endobj
+6 0 obj
+<< /Length 5821 >>
+stream
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 791.89 Tm (3.3. Testes: `invite-renew`, `invite-rollback` \(mocks\).) Tj ET
+BT /F1 12 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 769.69 Tm (FASE 4 ? Inter N x J na ARENA \(base pronta\)) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 747.49 Tm (4.1. Manter buscas FIFO, MD1/MD3, sorteio J3, ranking separado, W.O. \(já implementado\).) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 734.49 Tm (4.2. Grupos explícitos fase 2: `sharedGroupId` filtra pares de buscas \(só mesmo grupo se forma match\).) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 721.49 Tm (4.3. `setup-servidor.js`: passar a gravar `inter.*`/`guildSettings` por guild em vez de sobrescrever o) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 708.49 Tm (global.) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 695.49 Tm (4.4. Testes: já existem 20; adicionar `shared-group` quando 4.2 entrar.) Tj ET
+BT /F1 12 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 673.29 Tm (FASE 5 ? Dashboard web administrativo \(novo\)) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 651.09 Tm (Situação: `admin/` local sem login não serve para gestão multi-guild. Construir `admin/` v2:) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 633.89 Tm (5.1. **Auth local \(sem segredo em chat/commit\):** script `admin/create-admin.js` executado **pelo dono) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 620.89 Tm (no servidor**, que grava hash bcrypt em coleção `adminUsers` \(usuário inicial criado na primeira) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 607.89 Tm (execução via terminal\). Sessão por cookie httpOnly. Níveis: `admin` \(tudo\) e `viewer` \(só leitura\).) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 594.89 Tm (5.2. **Temas claro/escuro:** toggle com CSS variables + persistência em `localStorage`; sem framework) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 581.89 Tm (novo \(EJS + CSS próprio, como hoje\).) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 568.89 Tm (5.3. **Telões \(leitura\):** filas por guild/modo, matches ativos, buscas inter, séries recentes,) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 555.89 Tm (ranking inter + interno, jogadores \(busca por nick/discordId\), logs de temporada, saúde \(uptime, DB,) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 542.89 Tm (locks, erros recentes\).) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 529.89 Tm (5.4. **Ações \(admin\):** cancelar busca, aplicar W.O., fechar série, remover jogador da fila, reenviar) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 516.89 Tm (invite, editar `guildSettings` \(on/off shared, canais, pontos\), exportar backup.) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 503.89 Tm (5.5. **Limites de módulo:** um arquivo por tela em `admin/routes/`, um por serviço em) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 490.89 Tm (`admin/services/`; nenhum > 600 linhas; sem regra de negócio \(só chama use-cases\).) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 477.89 Tm (5.6. Testes: `admin-auth` \(login/logout, níveis\), `admin-actions` \(cada ação via use-case mockado\).) Tj ET
+BT /F1 12 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 455.69 Tm (FASE 6 ? Endurecimento e escala) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 433.49 Tm (6.1. Particionar chaves de lock por `mode:format` \(paralelismo real entre filas distintas\).) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 420.49 Tm (6.2. Fila de jobs \(em-processo primeiro: `workers/` com retry/backoff\) para Riot API, anúncios e) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 407.49 Tm (limpeza.) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 394.49 Tm (6.3. Rate limit + circuit breaker na Riot API.) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 381.49 Tm (6.4. Observabilidade: log estruturado por comando/match \(`correlationId`\), métricas de fila \(tempo) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 368.49 Tm (médio até formar\).) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 355.49 Tm (6.5. Teste de carga simulada: dezenas de filas formando em paralelo sem lost update.) Tj ET
+BT /F1 12 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 333.29 Tm (FASE 7 ? Verificação independente) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 311.09 Tm (Agente/revisor separado \(outra sessão ou pessoa\) executa o checklist e só aprova com tudo verde:) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 293.89 Tm (-  [ ] Cada requisito do MVP tem teste automatizado correspondente \(mapear requisito?teste\).) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 280.89 Tm (-  [ ] `npm test` 100% verde; nenhum arquivo de código > 600 linhas \(`wc -l` auditado\).) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 267.89 Tm (-  [ ] Sem `grep` de `createInvite` fora de `inviteService.js`; sem webhook improvisado.) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 254.89 Tm (-  [ ] Simulação de corrida \(2 entradas simultâneas\) sem duplicata nem overfill.) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 241.89 Tm (-  [ ] Fluxo manual na TESTRE: busca ? match ? invite ? resultado ? ranking ? limpeza.) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 228.89 Tm (-  [ ] Dashboard: login, temas, telas e ações conferidos; nenhum segredo no repo \(`git grep` por) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 215.89 Tm (   token/senha\).) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 202.89 Tm (-  [ ] Relatório de achados com severidade; bugs críticos bloqueiam o merge.) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 185.69 Tm (---) Tj ET
+BT /F1 12 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 163.49 Tm (?? Recorte do MVP \(entrega mínima com valor\)) Tj ET
+BT /F1 8 Tf 0.55 0.55 0.55 rg 1 0 0 1 277.63 33.00 Tm (pag 2/3) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.27 841.89] /Resources << /Font << /F1 9 0 R >> >> /Contents 8 0 R >>
+endobj
+8 0 obj
+<< /Length 4095 >>
+stream
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 791.89 Tm (**Entra no MVP:**) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 778.89 Tm (-  Inter MD1/MD3 na arena com 5 fixos \(pronto\) + elenco pela call \(pronto\).) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 765.89 Tm (-  Opt-in por guild \(`sharedMatchmaking` em `guildSettings`; default off, interno intacto\).) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 752.89 Tm (-  Pool shared por `mode:format` + eleição de destino por maioria + invite só no match pronto.) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 739.89 Tm (-  Ranking inter separado + W.O. + comandos texto/slash + `!ajuda`/`!staff`.) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 726.89 Tm (-  Dashboard v1: **login local + leitura** \(filas, matches, buscas, ranking, logs\) + temas) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 713.89 Tm (   claro/escuro + ação única: cancelar busca.) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 700.89 Tm (-  Lock atual \(1 instância\) com aviso documentado; testes de concorrência em-processo.) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 683.69 Tm (**Fica para depois \(pós-MVP\):**) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 670.69 Tm (-  Grupos explícitos \(`sharedGroupId`\), lock distribuído multi-instância, fila de jobs/BullMQ, rate) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 657.69 Tm (   limiter Riot, ações avançadas do dashboard \(WO, edição de settings, export\), métricas e carga.) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 640.49 Tm (**Critério de pronto do MVP:** checklist da Fase 7 aplicado só ao escopo acima + teste funcional na) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 627.49 Tm (TESTRE com 2 times de 5.) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 610.29 Tm (---) Tj ET
+BT /F1 12 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 588.09 Tm (? Delegação paralela sugerida \(subagentes\)) Tj ET
+BT /F1 7.4 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 565.89 Tm (| Frente | Escopo | Independente de |) Tj ET
+BT /F1 7.4 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 554.89 Tm (|---|---|---|) Tj ET
+BT /F1 7.4 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 543.89 Tm (| A. Núcleo shared \(Fase 2\) | pool, destino, anti-duplicata | ? \(base\) |) Tj ET
+BT /F1 7.4 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 532.89 Tm (| B. Lock distribuído \(1.3\) | `distributedLock.js` + testes | A \(contrato da API mantido\) |) Tj ET
+BT /F1 7.4 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 521.89 Tm (| C. Dashboard UI \(5.2?5.3\) | telas leitura + temas | A/B |) Tj ET
+BT /F1 7.4 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 510.89 Tm (| D. Dashboard ações+auth \(5.1, 5.4\) | login, cancelar busca | C \(rotas\) |) Tj ET
+BT /F1 7.4 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 499.89 Tm (| E. Testes e2e/stress \(6.5, Fase 7 parcial\) | cenários e scripts | A?D |) Tj ET
+BT /F1 7.4 Tf 0.25 0.25 0.25 rg 1 0 0 1 50.00 488.89 Tm (| F. Docs/help \(ajuda, STAFF, MEMORY\) | textos | A |) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 473.69 Tm (A aguarda B apenas na integração final \(troca do lock\). C, D, E, F rodam em paralelo após os contratos) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 460.69 Tm (\(assinaturas de use-cases\) congelados na Fase 0.) Tj ET
+BT /F1 12 Tf 0.10 0.10 0.10 rg 1 0 0 1 50.00 438.49 Tm (? Credenciais \(procedimento seguro\)) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 416.29 Tm (-  Nunca gerar nem compartilhar senhas/tokens em chat, issue ou commit.) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 403.29 Tm (-  O dono executa `node admin/create-admin.js <usuario>` **no servidor do bot**; o script pede a) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 390.29 Tm (   senha no terminal e grava só o hash.) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 377.29 Tm (-  Tokens de bot continuam em `.env` \(ignorado pelo git\). Rotação: gerar novo no Portal ? trocar no) Tj ET
+BT /F1 9.2 Tf 0.15 0.15 0.15 rg 1 0 0 1 50.00 364.29 Tm (   `.env` ? `pm2 restart --update-env`.) Tj ET
+BT /F1 8 Tf 0.55 0.55 0.55 rg 1 0 0 1 277.63 33.00 Tm (pag 3/3) Tj ET
+endstream
+endobj
+9 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+xref
+0 10
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000133 00000 n 
+0000000265 00000 n 
+0000006234 00000 n 
+0000006366 00000 n 
+0000012239 00000 n 
+0000012371 00000 n 
+0000016518 00000 n 
+trailer
+<< /Size 10 /Root 1 0 R >>
+startxref
+16615
+%%EOF

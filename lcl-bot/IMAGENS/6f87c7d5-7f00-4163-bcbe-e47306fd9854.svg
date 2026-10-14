@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080">
+  <!-- LCL v2 — premium minimalista flat 2.0, irma da LOGO PURO CAPS -->
+  <rect width="1080" height="1080" fill="none"/>
+  <!-- hexagono base: quase-preto vinho chapado + borda dourada fina -->
+  <polygon points="540,90 853,271 853,633 540,814 227,633 227,271"
+    fill="#16121a" stroke="#C9A227" stroke-width="14" stroke-linejoin="round"/>
+  <!-- elmo em negativo: vermelho chapado (recorte geometrico, sem detalhe 3D) -->
+  <g fill="#FF2D2D">
+    <!-- capacete -->
+    <path d="M540 220 L680 300 L660 560 L610 640 L610 480 L565 445 L565 640 L515 640 L515 445 L470 480 L470 640 L420 560 L400 300 Z"/>
+    <!-- fendas dos olhos (fundo aparece) -->
+    <path d="M465 500 L465 570 L505 595 L505 520 Z" fill="#16121a"/>
+    <path d="M615 500 L615 570 L575 595 L575 520 Z" fill="#16121a"/>
+    <!-- crista central -->
+    <rect x="524" y="250" width="32" height="200" rx="10" fill="#FF2D2D"/>
+  </g>
+  <!-- sigla -->
+  <text x="540" y="950" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="150" font-weight="900" letter-spacing="18" fill="#C9A227">LCL</text>
+  <text x="540" y="995" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="30" letter-spacing="10" fill="#8a8a95">LIGA CLANDESTINA</text>
+</svg>

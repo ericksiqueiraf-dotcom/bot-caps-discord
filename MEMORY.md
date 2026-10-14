@@ -271,6 +271,12 @@ database/                    ← fallback JSON local
 - **Layout ARENA replicado no TESTRE (2026-10-10):** modelo em `docs/SERVER_LAYOUT_CAPS_ARENA.md`; `setup-servidor.js` com planta ARENA (6 cats, 19 TXT, 11 VOZ, 11 cargos); aplicado em `CAPS BOT TESTE (1558217291123138561)`; `config.json` remapeado (fila/partidas/resultados/destaques/logs/ranking/cadastro + 3 lobbies com limite 10/10/30)
 - Validação: `npm test` 49/49, 13 suites
 
+### 2026-10-14 — LCL migrado para dentro do repo (`lcl-bot/`)
+- Pasta externa `Documents/LCL BOT` movida para `lcl-bot/` no repo (125 arquivos; `node_modules` reinstalado via `npm ci`, `.bak` descartados, `.env` preservado e ignorado).
+- `instalar.js` e `organize-official-discord.js` apontam p/ `lcl-bot/` (fallback p/ pasta antiga mantido).
+- PM2 `lcl-bot`/`lcl-admin` recadastrados no novo path (ids 6/7), `pm2 save`, login confirmado no log. Pasta antiga removida.
+- Validação: LCL 108/108 no novo path.
+
 ### 2026-10-14 — Instalador unificado + cargos padronizados com emoticons
 - **`instalar.js` (novo):** `node instalar.js` interativo (pede GUILD_ID + `caps|lcl|ambos`) ou direto `node instalar.js <GUILD_ID> <bot> [--dry-run]`; `ambos` roda `organize-official-discord.js` e é o recomendado p/ servidor compartilhado (evita drift de `captainRoleId`/`visitanteRoleId` entre os 2 configs).
 - **Padrão = servidor real:** `Capitão` → `👑 Capitão de Customs`, `INFERNAL` → `🔥 INFERNAL`, `MVP player` → `⭐ MVP` (nomes confirmados via API na CAPS ARENA, 37 cargos); `Staff`/`Jogador`/VIPs já coincidiam e foram mantidos. `Visitante` removido do pattern CAPS (nem CAPS nem LCL criam mais; o existente é preservado).

@@ -1,0 +1,10 @@
+node_modules/
+.env
+.env.bak*
+*.bak*
+npm-debug.log*
+bot.stdout.log
+bot.stderr.log
+# Backups locais (os ZIPs contem .env com tokens - NUNCA subir)
+backups/
+*.log

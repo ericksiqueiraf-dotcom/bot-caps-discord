@@ -1,0 +1,28 @@
+{
+  "name": "bot-caps-discord",
+  "version": "1.0.0",
+  "description": "Bot de Discord para organizar partidas personalizadas de League of Legends com balanceamento por elo.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "admin:start": "node admin/app.js",
+    "test": "node --test \"tests/*.test.js\""
+  },
+  "keywords": [
+    "discord",
+    "league-of-legends",
+    "riot-api",
+    "discord.js"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.9.0",
+    "discord.js": "^14.18.0",
+    "dotenv": "^16.4.7",
+    "ejs": "^5.0.1",
+    "express": "^5.2.1",
+    "mime-db": "^1.54.0",
+    "mongodb": "^7.1.1"
+  }
+}

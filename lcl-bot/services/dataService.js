@@ -1,0 +1,398 @@
+const fs = require('fs');
+const path = require('path');
+const { MongoClient } = require('mongodb');
+const { QUEUE_MODES } = require('../domain/constants/queueModes');
+
+const MONGODB_URI = process.env.MONGODB_URI;
+// Banco separado por ambiente (ex: MONGODB_DB=caps-bot-teste). Sem a var, usa o da producao.
+const DB_NAME = process.env.MONGODB_DB || 'caps-bot';
+const DATA_DIR = path.join(__dirname, '..', 'database');
+
+const LOCAL_FILES = {
+  queue: { file: 'queue.json', fallback: { lobbies: {} } },
+  playerStats: { file: 'playerStats.json', fallback: { players: {} } },
+  currentMatch: { file: 'currentMatch.json', fallback: { matches: {} } },
+  seasonMeta: {
+    file: 'seasonMeta.json',
+    fallback: {
+      currentSeason: 1,
+      startedAt: new Date().toISOString(),
+      phase: 'testing',
+      officialSeasonStarted: false,
+      testingCycle: 1
+    }
+  },
+  seasonHistory: { file: 'seasonHistory.json', fallback: { seasons: [] } },
+  systemMeta: { file: 'systemMeta.json', fallback: { lastQueueMessageId: null } },
+  contentTemplates: { file: 'contentTemplates.json', fallback: { onboarding: {}, welcome: {} } },
+  interBusca: { file: 'interBusca.json', fallback: { buscas: [] } },
+  interMatches: { file: 'interMatches.json', fallback: { matches: {} } },
+  interRanking: { file: 'interRanking.json', fallback: { times: {} } },
+  lclQueue: { file: 'lclQueue.json', fallback: { players: [] } },
+  guildSettings: { file: 'guildSettings.json', fallback: { guilds: {} } },
+  dashboardMeta: { file: 'dashboardMeta.json', fallback: { messages: {} } },
+  adminUsers: { file: 'adminUsers.json', fallback: { users: {} } }
+};
+
+let client = null;
+let db = null;
+let storageMode = null;
+
+function ensureLocalDataFiles() {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+
+  for (const { file, fallback } of Object.values(LOCAL_FILES)) {
+    const filePath = path.join(DATA_DIR, file);
+    if (!fs.existsSync(filePath)) {
+      fs.writeFileSync(filePath, JSON.stringify(fallback, null, 2));
+    }
+  }
+}
+
+function readLocalDoc(id, fallback) {
+  ensureLocalDataFiles();
+  const config = LOCAL_FILES[id];
+  if (!config) return fallback;
+
+  try {
+    const filePath = path.join(DATA_DIR, config.file);
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return fallback;
+  }
+}
+
+function writeLocalDoc(id, data) {
+  ensureLocalDataFiles();
+  const config = LOCAL_FILES[id];
+  if (!config) return;
+
+  const filePath = path.join(DATA_DIR, config.file);
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+}
+
+async function getDb() {
+  if (db) return db;
+  if (storageMode === 'local') return null;
+
+  if (!MONGODB_URI) {
+    storageMode = 'local';
+    console.warn('[DB] MONGODB_URI ausente. Usando arquivos locais em database/.');
+    return null;
+  }
+
+  try {
+    client = new MongoClient(MONGODB_URI, { serverSelectionTimeoutMS: 10000 });
+    await client.connect();
+    db = client.db(DB_NAME);
+    storageMode = 'mongo';
+    console.log(`[DB] Conectado ao MongoDB (${DB_NAME}).`);
+    return db;
+  } catch (error) {
+    storageMode = 'local';
+    db = null;
+    client = null;
+    console.warn(`[DB] Falha ao conectar no MongoDB (${error.code || error.name}: ${error.message}). Usando arquivos locais em database/.`);
+    return null;
+  }
+}
+
+async function ensureDataFiles() {
+  const database = await getDb();
+  if (!database) {
+    ensureLocalDataFiles();
+    return;
+  }
+
+  const col = database.collection('data');
+  const defaults = [
+    { _id: 'queue', data: { lobbies: {}, waitingLists: {} } },
+    { _id: 'playerStats', data: { players: {} } },
+    { _id: 'currentMatch', data: { matches: {} } },
+    {
+      _id: 'seasonMeta',
+      data: {
+        currentSeason: 1,
+        startedAt: new Date().toISOString(),
+        phase: 'testing',
+        officialSeasonStarted: false,
+        testingCycle: 1
+      }
+    },
+    { _id: 'seasonHistory', data: { seasons: [] } },
+    { _id: 'systemMeta', data: { lastQueueMessageId: null } },
+    { _id: 'contentTemplates', data: { onboarding: {}, welcome: {} } },
+    { _id: 'interBusca', data: { buscas: [] } },
+    { _id: 'interMatches', data: { matches: {} } },
+    { _id: 'interRanking', data: { times: {} } },
+    { _id: 'lclQueue', data: { players: [] } },
+    { _id: 'guildSettings', data: { guilds: {} } },
+    { _id: 'dashboardMeta', data: { messages: {} } },
+    { _id: 'adminUsers', data: { users: {} } }
+  ];
+
+  for (const doc of defaults) {
+    await col.updateOne({ _id: doc._id }, { $setOnInsert: doc }, { upsert: true });
+  }
+}
+
+async function readDoc(id, fallback) {
+  const database = await getDb();
+  if (!database) {
+    return readLocalDoc(id, fallback);
+  }
+
+  const doc = await database.collection('data').findOne({ _id: id });
+  return doc ? doc.data : fallback;
+}
+
+async function writeDoc(id, data) {
+  const database = await getDb();
+  if (!database) {
+    writeLocalDoc(id, data);
+    return;
+  }
+
+  await database.collection('data').updateOne(
+    { _id: id },
+    { $set: { data } },
+    { upsert: true }
+  );
+}
+
+const queueOperationLocks = new Map();
+
+async function withQueueOperationLock(lockKey, operation) {
+  const currentLock = queueOperationLocks.get(lockKey) || Promise.resolve();
+  let releaseLock;
+  const nextLock = new Promise((resolve) => {
+    releaseLock = resolve;
+  });
+
+  queueOperationLocks.set(lockKey, currentLock.then(() => nextLock));
+  await currentLock;
+
+  try {
+    return await operation();
+  } finally {
+    releaseLock();
+    if (queueOperationLocks.get(lockKey) === nextLock) {
+      queueOperationLocks.delete(lockKey);
+    }
+  }
+}
+
+async function loadQueue() {
+  const parsed = await readDoc('queue', { lobbies: {}, waitingLists: {} });
+  return {
+    lobbies: parsed?.lobbies && typeof parsed.lobbies === 'object' ? parsed.lobbies : {},
+    waitingLists: parsed?.waitingLists && typeof parsed.waitingLists === 'object' ? parsed.waitingLists : {}
+  };
+}
+
+async function saveQueue(data) {
+  await writeDoc('queue', data);
+}
+
+async function loadPlayerStats() {
+  const parsed = await readDoc('playerStats', { players: {} });
+  if (!parsed.players || typeof parsed.players !== 'object') return { players: {} };
+  return parsed;
+}
+
+async function savePlayerStats(data) {
+  await writeDoc('playerStats', data);
+}
+
+async function loadCurrentMatch() {
+  const parsed = await readDoc('currentMatch', { matches: {} });
+  if (parsed.matches && typeof parsed.matches === 'object') return { matches: parsed.matches };
+  return { matches: {} };
+}
+
+async function saveCurrentMatch(data) {
+  await writeDoc('currentMatch', data);
+}
+
+async function loadSeasonMeta() {
+  const parsed = await readDoc('seasonMeta', {
+    currentSeason: 1,
+    startedAt: new Date().toISOString(),
+    phase: 'testing',
+    officialSeasonStarted: false,
+    testingCycle: 1
+  });
+
+  return {
+    currentSeason: Number(parsed.currentSeason || 1),
+    startedAt: parsed.startedAt || new Date().toISOString(),
+    phase: parsed.phase === 'official' ? 'official' : 'testing',
+    officialSeasonStarted: Boolean(parsed.officialSeasonStarted),
+    testingCycle: Number(parsed.testingCycle || parsed.currentSeason || 1)
+  };
+}
+
+async function saveSeasonMeta(data) {
+  await writeDoc('seasonMeta', data);
+}
+
+async function loadSeasonHistory() {
+  const parsed = await readDoc('seasonHistory', { seasons: [] });
+  if (!Array.isArray(parsed.seasons)) return { seasons: [] };
+  return parsed;
+}
+
+async function saveSeasonHistory(data) {
+  await writeDoc('seasonHistory', data);
+}
+
+async function loadSystemMeta() {
+  const parsed = await readDoc('systemMeta', { lastQueueMessageId: null });
+  return { lastQueueMessageId: null, ...parsed };
+}
+
+async function saveSystemMeta(data) {
+  await writeDoc('systemMeta', data);
+}
+
+async function loadContentTemplates() {
+  const parsed = await readDoc('contentTemplates', { onboarding: {}, welcome: {} });
+  return {
+    onboarding: parsed?.onboarding && typeof parsed.onboarding === 'object' ? parsed.onboarding : {},
+    welcome: parsed?.welcome && typeof parsed.welcome === 'object' ? parsed.welcome : {}
+  };
+}
+
+async function saveContentTemplates(data) {
+  await writeDoc('contentTemplates', data);
+}
+
+async function loadInterBusca() {
+  const parsed = await readDoc('interBusca', { buscas: [] });
+  if (!parsed || !Array.isArray(parsed.buscas)) return { buscas: [] };
+  return parsed;
+}
+
+async function saveInterBusca(data) {
+  await writeDoc('interBusca', data);
+}
+
+async function loadInterMatches() {
+  const parsed = await readDoc('interMatches', { matches: {} });
+  if (!parsed || !parsed.matches || typeof parsed.matches !== 'object') return { matches: {} };
+  return parsed;
+}
+
+async function saveInterMatches(data) {
+  await writeDoc('interMatches', data);
+}
+
+async function loadInterRanking() {
+  const parsed = await readDoc('interRanking', { times: {} });
+  if (!parsed || !parsed.times || typeof parsed.times !== 'object') return { times: {} };
+  return parsed;
+}
+
+async function saveInterRanking(data) {
+  await writeDoc('interRanking', data);
+}
+
+// Presença da fila clandestina (#🔥・fila-lcl): quem está pronto p/ o desafio.
+// Sem Riot/cadastro — só Discord id + voz no lobby clandestino. Puro por guild? Não:
+// o doc é global como o restante do estado; o painel filtra por guildId.
+async function loadLclQueue() {
+  const parsed = await readDoc('lclQueue', { players: [] });
+  if (!parsed || !Array.isArray(parsed.players)) return { players: [] };
+  return { players: parsed.players.filter((p) => p && p.discordId) };
+}
+
+async function saveLclQueue(data) {
+  await writeDoc('lclQueue', data);
+}
+
+const DEFAULT_GUILD_SETTINGS = {
+  sharedMatchmaking: false,
+  sharedGroupId: null,
+  interAtivo: true,
+  inviteChannelId: null,
+  announceChannelId: null
+};
+
+async function loadGuildSettings() {
+  const parsed = await readDoc('guildSettings', { guilds: {} });
+  if (!parsed || typeof parsed !== 'object' || !parsed.guilds || typeof parsed.guilds !== 'object') {
+    return { guilds: {} };
+  }
+  return parsed;
+}
+
+async function saveGuildSettings(data) {
+  await writeDoc('guildSettings', data);
+}
+
+function getGuildSetting(settingsData, guildId) {
+  const stored = settingsData?.guilds?.[String(guildId)];
+  return { ...DEFAULT_GUILD_SETTINGS, ...(stored || {}) };
+}
+
+async function loadDashboardMeta() {
+  const parsed = await readDoc('dashboardMeta', { messages: {} });
+  if (!parsed || typeof parsed !== 'object' || !parsed.messages || typeof parsed.messages !== 'object') {
+    return { messages: {} };
+  }
+  return parsed;
+}
+
+async function saveDashboardMeta(data) {
+  await writeDoc('dashboardMeta', data);
+}
+
+async function loadAdminUsers() {
+  const parsed = await readDoc('adminUsers', { users: {} });
+  if (!parsed || typeof parsed !== 'object' || !parsed.users || typeof parsed.users !== 'object') {
+    return { users: {} };
+  }
+  return parsed;
+}
+
+async function saveAdminUsers(data) {
+  await writeDoc('adminUsers', data);
+}
+
+module.exports = {
+  ensureDataFiles,
+  withQueueOperationLock,
+  loadQueue,
+  saveQueue,
+  loadPlayerStats,
+  savePlayerStats,
+  loadCurrentMatch,
+  saveCurrentMatch,
+  loadSeasonMeta,
+  saveSeasonMeta,
+  loadSeasonHistory,
+  saveSeasonHistory,
+  loadSystemMeta,
+  saveSystemMeta,
+  loadContentTemplates,
+  saveContentTemplates,
+  loadInterBusca,
+  saveInterBusca,
+  loadInterMatches,
+  saveInterMatches,
+  loadInterRanking,
+  saveInterRanking,
+  loadLclQueue,
+  saveLclQueue,
+  loadGuildSettings,
+  saveGuildSettings,
+  getGuildSetting,
+  DEFAULT_GUILD_SETTINGS,
+  loadDashboardMeta,
+  saveDashboardMeta,
+  loadAdminUsers,
+  saveAdminUsers,
+  QUEUE_MODES
+};

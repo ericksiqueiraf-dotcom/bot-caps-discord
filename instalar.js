@@ -16,8 +16,7 @@
 // PRÉ-REQUISITOS:
 //   - O bot escolhido já convidado no servidor COM permissão de Administrador.
 //   - .env com DISCORD_TOKEN válido na pasta do bot escolhido:
-//       CAPS -> BOT CAPS DISCORD/.env
-//       LCL  -> LCL BOT/.env
+//       CAPS -> .env da raiz | LCL -> lcl-bot/.env
 //       AMBOS -> usa o token do CAPS (organize-official-discord.js)
 const { spawnSync } = require('child_process');
 const fs = require('fs');
@@ -51,6 +50,7 @@ const BOTS = {
 function resolveLclDir() {
   const candidates = [
     process.env.LCL_BOT_DIR,
+    path.join(CAPS_DIR, 'lcl-bot'),
     path.join(CAPS_DIR, '..', 'LCL BOT'),
     'C:\\Users\\ErickSiqueira\\Documents\\LCL BOT'
   ].filter(Boolean);
@@ -59,7 +59,7 @@ function resolveLclDir() {
       if (fs.existsSync(path.join(dir, 'setup-servidor.js'))) return dir;
     } catch { /* ignora */ }
   }
-  return path.join(CAPS_DIR, '..', 'LCL BOT');
+  return path.join(CAPS_DIR, 'lcl-bot');
 }
 
 function printHelp() {

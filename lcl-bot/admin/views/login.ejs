@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Entrar · Caps Bot Admin</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+    <script>
+      try {
+        var t = localStorage.getItem('caps-theme');
+        if (!t) t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div class="page-shell login-shell">
+      <section class="panel login-panel">
+        <p class="eyebrow">Dashboard</p>
+        <h1>Caps Bot Admin</h1>
+        <% if (flash.error) { %><div class="flash flash-error"><%= flash.error %></div><% } %>
+        <form method="post" action="/login" class="login-form">
+          <label>Usuário
+            <input type="text" name="username" autocomplete="username" required />
+          </label>
+          <label>Senha
+            <input type="password" name="password" autocomplete="current-password" required />
+          </label>
+          <div class="action-row">
+            <button type="submit">Entrar</button>
+          </div>
+        </form>
+        <p class="helper-text">Sem usuário? O dono cria com <code>node admin/create-admin.js &lt;usuario&gt; [admin|viewer]</code> no servidor do bot.</p>
+      </section>
+    </div>
+  </body>
+</html>

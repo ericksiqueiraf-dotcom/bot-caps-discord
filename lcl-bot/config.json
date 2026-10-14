@@ -1,0 +1,77 @@
+{
+  "prefix": "!",
+  "region": "br1",
+  "roles": {
+    "registeredPlayerRoleId": "1559621161342599240",
+    "infernalRoleName": "🔥 INFERNAL",
+    "mvpPlayerRoleName": "⭐ MVP",
+    "captainRoleId": "1559621160478445609",
+    "visitanteRoleId": "1559613494595428483"
+  },
+  "voiceChannels": {
+    "classicQueueChannelId": "1558440536447393814",
+    "classicTierSQueueChannelId": "1558440538049482833",
+    "aramQueueChannelId": "1558440539383267421",
+    "clandestinoQueueChannelId": "1559621201196875927",
+    "postMatchWaitingChannelId": "1558446935797399623",
+    "postMatchTierSWaitingChannelId": "1558440530579300352"
+  },
+  "tempVoice": {
+    "hubChannelId": "",
+    "userLimit": 10,
+    "deleteDelaySeconds": 60,
+    "allowedRoleNames": [
+      "👑 Capitão de Customs",
+      "Staff",
+      "⭐ VIP",
+      "👑 Lendário"
+    ],
+    "allowedRoleIds": [
+      "1558440451650883645"
+    ],
+    "managerRoleIds": [
+      "1558440451650883645"
+    ]
+  },
+  "tierS": {
+    "minBaseMmr": 2000,
+    "tiers": [
+      "EMERALD",
+      "DIAMOND",
+      "MASTER",
+      "GRANDMASTER",
+      "CHALLENGER"
+    ]
+  },
+  "roulette": {
+    "timeoutSeconds": 300,
+    "warnSeconds": 240
+  },
+  "textChannels": {
+    "rankUpdatesChannelId": "1559621193194020955",
+    "matchHistoryChannelId": "1559621183048122458",
+    "mvpAnnouncementsChannelId": "1558440509914087524",
+    "queueStatusChannelId": "1559621164756635661",
+    "matchOngoingChannelId": "1559621173518536714",
+    "welcomeChannelId": "1558225015063978044",
+    "playerLogChannelId": "1558440511424168017",
+    "seasonLogChannelId": "1558440512913014845",
+    "smurfAlertChannelId": ""
+  },
+  "allowedGuildIds": [],
+  "automation": {
+    "dailyRankUpdatesHour": 8,
+    "dailyRankUpdatesMinute": 0
+  },
+  "inter": {
+    "arenaGuildId": "1273653944169660427",
+    "inviteChannelId": "1559621173518536714",
+    "announceChannelId": "1559621173518536714",
+    "buscaExpiryMinutes": 30,
+    "woTimeoutMinutes": 15,
+    "rankChannelId": "1559621193194020955",
+    "md1WinPoints": 2,
+    "md3Win20Points": 5,
+    "md3Win21Points": 4
+  }
+}
