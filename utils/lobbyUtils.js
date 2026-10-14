@@ -205,7 +205,7 @@ function buildClubeEmbed(guild) {
       },
       {
         name: 'Como aderir',
-        value: 'Fale com a Staff — a ativação é manual por enquanto.'
+        value: 'Clique em **Assinar** no tier desejado e pague via PIX — ativação automática. Sem botões abaixo? Fale com a Staff.'
       }
     )
     .setFooter({ text: `${FOOTER_PREFIX} • Clube VIP` })
