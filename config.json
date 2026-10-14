@@ -48,6 +48,11 @@
     "dailyRankUpdatesHour": 8,
     "dailyRankUpdatesMinute": 0
   },
+  "clubePagamentos": {
+    "apoiador": { "preco": 9.99, "dias": 30 },
+    "vip": { "preco": 19.99, "dias": 30 },
+    "lendario": { "preco": 29.99, "dias": 30 }
+  },
   "tempVoice": {
     "userLimit": 10,
     "deleteDelaySeconds": 60,

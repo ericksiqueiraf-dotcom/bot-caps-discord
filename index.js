@@ -14,10 +14,12 @@ const {
   ButtonStyle,
   ModalBuilder,
   TextInputBuilder,
-  TextInputStyle
+  TextInputStyle,
+  AttachmentBuilder
 } = require('discord.js');
 
 const config = require('./config.json');
+const { createVipPixPayment, getClubeTierConfig } = require('./services/clubePaymentsService');
 const { createRiotService } = require('./services/riotService');
 const { handleTempVoiceStateUpdate } = require('./services/tempVoiceService');
 const {
@@ -36,6 +38,9 @@ const ONBOARDING_BUTTON_IDS = {
 };
 const ONBOARDING_MODAL_ID = 'onboarding_lol_registration';
 const ONBOARDING_MODAL_FIELD_ID = 'riot_nickname';
+const CLUBE_BUY_PREFIX = 'clube:buy:';
+const CLUBE_EMAIL_MODAL_PREFIX = 'clube:email:';
+const CLUBE_EMAIL_FIELD_ID = 'clube_email';
 
 const {
   ensureDataFiles,
@@ -298,6 +303,7 @@ function buildSlashCommands() {
     new SlashCommandBuilder()
       .setName('toprankinfernal')
       .setDescription('Quem mais conquistou o INFERNAL na temporada.'),
+    new SlashCommandBuilder().setName('clube').setDescription('Mostra o clube VIP: tiers, benefícios e membros.'),
   ].map((command) => command.toJSON());
 }
 
@@ -393,7 +399,8 @@ const {
   normalizeDiscordPayload,
   createInteractionContext,
   THEME,
-  FOOTER_PREFIX
+  FOOTER_PREFIX,
+  VIP_TIERS
 } = require('./utils/lobbyUtils');
 
 
@@ -507,6 +514,9 @@ async function processCommand(message, rawContent) {
         break;
       case 'toprankinfernal':
         await handlers.handleTopInfernalCommand(message);
+        break;
+      case 'clube':
+        await handlers.handleClubeCommand(message);
         break;
       case 'ficha':
       case 'perfil':
@@ -689,6 +699,31 @@ client.on('interactionCreate', async (interaction) => {
         return;
       }
 
+      if (String(interaction.customId || '').startsWith(CLUBE_BUY_PREFIX)) {
+        const tierKey = String(interaction.customId).slice(CLUBE_BUY_PREFIX.length);
+        const tier = getClubeTierConfig(config, tierKey);
+        if (!tier) {
+          await interaction.reply({ content: 'Tier inválido.', ephemeral: true }).catch(() => null);
+          return;
+        }
+        if (!process.env.MP_ACCESS_TOKEN) {
+          await interaction.reply({ content: '💳 Assinaturas PIX em configuração — fale com a Staff.', ephemeral: true }).catch(() => null);
+          return;
+        }
+        const modal = new ModalBuilder()
+          .setCustomId(`${CLUBE_EMAIL_MODAL_PREFIX}${tierKey}`)
+          .setTitle(`Assinar ${tier.roleName} — R$ ${tier.preco.toFixed(2).replace('.', ',')}`);
+        const emailInput = new TextInputBuilder()
+          .setCustomId(CLUBE_EMAIL_FIELD_ID)
+          .setLabel('Seu e-mail (para o PIX)')
+          .setPlaceholder('voce@email.com')
+          .setRequired(true)
+          .setStyle(TextInputStyle.Short);
+        modal.addComponents(new ActionRowBuilder().addComponents(emailInput));
+        await interaction.showModal(modal);
+        return;
+      }
+
       const queueJoin = parseQueueJoinButtonId(interaction.customId);
       if (queueJoin) {
         await interaction.deferReply({ ephemeral: true }).catch(() => null);
@@ -715,6 +750,39 @@ client.on('interactionCreate', async (interaction) => {
 
   if (interaction.isModalSubmit()) {
     try {
+      if (String(interaction.customId || '').startsWith(CLUBE_EMAIL_MODAL_PREFIX)) {
+        await interaction.deferReply({ ephemeral: true }).catch(() => null);
+        const tierKey = String(interaction.customId).slice(CLUBE_EMAIL_MODAL_PREFIX.length);
+        const email = interaction.fields.getTextInputValue(CLUBE_EMAIL_FIELD_ID)?.trim();
+        try {
+          const payment = await createVipPixPayment({
+            tierKey,
+            email,
+            discordId: interaction.user.id,
+            guildId: interaction.guildId,
+            config
+          });
+          const files = [];
+          if (payment.qrCodeBase64) {
+            files.push({
+              attachment: Buffer.from(payment.qrCodeBase64, 'base64'),
+              name: 'pix-qrcode.png'
+            });
+          }
+          const embed = new EmbedBuilder()
+            .setTitle(`💎 ${payment.tier.roleName} — R$ ${payment.tier.preco.toFixed(2).replace('.', ',')}`)
+            .setDescription(`Pague no app do seu banco (vale por ${30} min). Assim que o PIX for confirmado, o cargo entra **sozinho**.\n${payment.ticketUrl ? `[Abrir no Mercado Pago](${payment.ticketUrl})` : ''}`)
+            .setColor('#00C851');
+          if (payment.qrCodeBase64) embed.setImage('attachment://pix-qrcode.png');
+          const payload = { embeds: [embed] };
+          if (files.length) payload.files = files;
+          if (payment.qrCode) payload.content = `PIX copia e cola:\n\`\`\`\n${payment.qrCode}\n\`\`\``;
+          await interaction.editReply(payload).catch(() => null);
+        } catch (err) {
+          await interaction.editReply({ content: `❌ Não consegui gerar o PIX: ${err.message}` }).catch(() => null);
+        }
+        return;
+      }
       if (interaction.customId === ONBOARDING_MODAL_ID) {
         await interaction.deferReply({ ephemeral: true }).catch(() => null);
         const nickname = interaction.fields.getTextInputValue(ONBOARDING_MODAL_FIELD_ID)?.trim();
@@ -830,6 +898,9 @@ client.on('interactionCreate', async (interaction) => {
         break;
       case 'toprankinfernal':
         await handlers.handleTopInfernalCommand(context);
+        break;
+      case 'clube':
+        await handlers.handleClubeCommand(context);
         break;
       case 'perfil':
       case 'ficha':
@@ -997,6 +1068,28 @@ client.on('guildMemberAdd', async (member) => {
     embeds: [welcomeEmbed],
     components: [onboardingActions]
   }).catch((err) => console.error('[BOAS-VINDAS] Erro ao enviar mensagem:', err));
+});
+
+// Anúncio de entrada no clube VIP: quando um membro GANHA um tier, posta em
+// #comunicados (ou boas-vindas). Puro status — sem vantagem competitiva.
+client.on('guildMemberUpdate', async (oldMember, newMember) => {
+  try {
+    const gained = (VIP_TIERS || []).map((t) => t.name).find((name) => {
+      const had = oldMember.roles.cache.some((role) => role.name === name);
+      const has = newMember.roles.cache.some((role) => role.name === name);
+      return !had && has;
+    });
+    if (!gained) return;
+
+    const guild = newMember.guild;
+    const target = guild.channels.cache.find((c) => c.name === '📢┃comunicados' && c.isTextBased?.())
+      || (config.textChannels?.welcomeChannelId ? await guild.channels.fetch(config.textChannels.welcomeChannelId).catch(() => null) : null);
+    if (!target || !target.isTextBased?.()) return;
+
+    await target.send(`🎉 ${newMember} agora faz parte do **${gained}**! Bem-vindo(a) ao clube 💎`).catch(() => null);
+  } catch (err) {
+    console.error('[CLUBE] Erro no anúncio de boas-vindas:', err.message);
+  }
 });
 
 client.login(DISCORD_TOKEN);

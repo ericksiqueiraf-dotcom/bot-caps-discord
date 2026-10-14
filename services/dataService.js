@@ -115,6 +115,7 @@ async function ensureDataFiles() {
     },
     { _id: 'seasonHistory', data: { seasons: [] } },
     { _id: 'systemMeta', data: { lastQueueMessageId: null, queueDashboardMessageIds: {} } },
+    { _id: 'vipSubscriptions', data: { subscriptions: [] } },
     { _id: 'contentTemplates', data: { onboarding: {}, welcome: {} } }
   ];
 
@@ -261,6 +262,18 @@ async function saveContentTemplates(data) {
   await writeDoc('contentTemplates', data);
 }
 
+// Assinaturas do clube VIP: [{ discordId, guildId, tierKey, paymentId, status, startedAt, expiresAt }]
+async function loadVipSubscriptions() {
+  const parsed = await readDoc('vipSubscriptions', { subscriptions: [] });
+  const list = Array.isArray(parsed?.subscriptions) ? parsed.subscriptions : [];
+  return { subscriptions: list };
+}
+
+async function saveVipSubscriptions(data) {
+  const list = Array.isArray(data?.subscriptions) ? data.subscriptions : [];
+  await writeDoc('vipSubscriptions', { subscriptions: list });
+}
+
 module.exports = {
   ensureDataFiles,
   withQueueOperationLock,
@@ -278,5 +291,7 @@ module.exports = {
   saveSystemMeta,
   loadContentTemplates,
   saveContentTemplates,
+  loadVipSubscriptions,
+  saveVipSubscriptions,
   QUEUE_MODES
 };

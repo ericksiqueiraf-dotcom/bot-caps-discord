@@ -1,4 +1,4 @@
-const { ChannelType, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { ChannelType, EmbedBuilder, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const config = require('../config.json');
 const { parseModeAndFormatArgs, shouldMirrorAramGroupedStats } = require('../domain/queue/selection');
 const { enterQueue } = require('../application/use-cases/enterQueue');
@@ -36,7 +36,7 @@ const {
   buildSeasonHistoryEmbed, formatCustomRecord,
   postPlayerLogs, postMatchSummaryToSeasonLog, postSeasonSummaryToSeasonLog, postSmurfAlerts,
   getCustomPointsDelta, getCustomDisplayScore, buildTopInfernalEmbed, buildQueueFeedText, postQueueFeedMessage,
-  buildQueueJoinActionRow
+  buildQueueJoinActionRow, getMemberVipTier, buildVipTierResolver, buildClubeEmbed
 } = require('../utils/lobbyUtils');
 
 const { 
@@ -821,7 +821,7 @@ async function handlePingCommand(message) {
 async function handleLeaderboardCommand(message, args = []) {
   const statsData = await loadPlayerStats();
   const { mode, format, tierSOnly } = parseModeAndFormatArgs(args);
-  const embed = buildLeaderboardEmbed(statsData, mode, format, { tierSOnly });
+  const embed = buildLeaderboardEmbed(statsData, mode, format, { tierSOnly, tierResolver: buildVipTierResolver(message.guild) });
   await sendToMessageChannel(message, { embeds: [embed] });
 }
 
@@ -829,7 +829,7 @@ async function handleTopTenCommand(message, args = []) {
   const statsData = await loadPlayerStats();
   const seasonMeta = await loadSeasonMeta();
   const { mode, format, tierSOnly } = parseModeAndFormatArgs(args);
-  const embed = buildTopTenEmbed(statsData, seasonMeta, mode, format, { tierSOnly });
+  const embed = buildTopTenEmbed(statsData, seasonMeta, mode, format, { tierSOnly, tierResolver: buildVipTierResolver(message.guild) });
   await sendToMessageChannel(message, { embeds: [embed] });
 }
 
@@ -852,7 +852,29 @@ async function handlePlayerCardCommand(message, targetUser = null) {
   const statsData = await loadPlayerStats();
   const playerStats = Object.values(statsData.players || {}).find(p => p.discordId === selectedUser.id);
   if (!playerStats) return await replyToMessage(message, 'Jogador nao registrado no sistema.');
-  await sendToMessageChannel(message, { embeds: [buildPlayerCardEmbed(playerStats, selectedUser)] });
+  const targetMember = message.guild?.members?.cache?.get?.(selectedUser.id) || null;
+  await sendToMessageChannel(message, { embeds: [buildPlayerCardEmbed(playerStats, selectedUser, getMemberVipTier(targetMember))] });
+}
+
+async function handleClubeCommand(message) {
+  const paymentsEnabled = Boolean(process.env.MP_ACCESS_TOKEN);
+  const components = [];
+  if (paymentsEnabled) {
+    const { TIER_KEYS, TIER_ROLE_NAMES } = require('../services/clubePaymentsService');
+    const row = new ActionRowBuilder().addComponents(
+      TIER_KEYS.map((tierKey) =>
+        new ButtonBuilder()
+          .setCustomId(`clube:buy:${tierKey}`)
+          .setLabel(`Assinar ${TIER_ROLE_NAMES[tierKey]}`)
+          .setStyle(ButtonStyle.Primary)
+      )
+    );
+    components.push(row);
+  }
+  const payload = { embeds: [buildClubeEmbed(message.guild)] };
+  if (components.length) payload.components = components;
+  else payload.content = '💳 Assinaturas PIX em configuração — fale com a Staff.';
+  await sendToMessageChannel(message, payload);
 }
 
 async function handleHelpCommand(message) {
@@ -864,7 +886,7 @@ async function handleHelpCommand(message) {
     .addFields(
       { name: '🕹️ Cadastro (1x)', value: '`!cadastrar Nick#TAG` • Vincula sua conta Riot\n`!nick Nick#TAG` • Atualiza seu nick' },
       { name: '🎮 Jogador (1/2) — Fila e voto', value: '`!regras` • Regulamento completo\n`!entrar` • Fila Classic (no canal Lobby Classic ou Lobby TIER S)\n`!entrar aram` • Fila ARAM\n`!entrar aram 2x2` • ARAM formato\n`!fila` • Mostra jogadores em sala\n`!espera` • Entra na espera (🔥 INFERNAL entra na posição 5)\n`!esperatiers` • Espera do Lobby TIER S (só Esmeralda+)\n`!espera ver` • Mostra a ordem\n`!espera sair` • Sai da espera\n`!sair` • Sai da sala\n`!votar 1/2` • Vota no vencedor (abre painel com botões p/ os 10 votarem)\n`!votar` • Reabre o painel de votação' },
-      { name: '🎮 Jogador (2/2) — Ranking', value: '`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking geral (CLASSIC = pontos custom)\n`!placar tiers` • Só Esmeralda+\n`!top10` • Top 10 CLASSIC por pontos custom, desempate por winrate\n`!top10 tiers` • Top 10 só Esmeralda+\n`!topstreak` • Ranking Streak 🔥\n`!toprankinfernal` • Quem mais pegou INFERNAL na temporada 🔥\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
+      { name: '🎮 Jogador (2/2) — Ranking', value: '`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking geral (CLASSIC = pontos custom)\n`!placar tiers` • Só Esmeralda+\n`!top10` • Top 10 CLASSIC por pontos custom, desempate por winrate\n`!top10 tiers` • Top 10 só Esmeralda+\n`!topstreak` • Ranking Streak 🔥\n`!toprankinfernal` • Quem mais pegou INFERNAL na temporada 🔥\n`!clube` • Clube VIP: tiers, benefícios e membros 💎\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
       { name: '🛠️ Staff', value: '`!staff` • Guia completo da staff\n`!pdl @u -50 motivo` • Ajuste/punição de PDL Classic (só Admin)\n`!remover @u`, `!limpar [qnt]`, `!limparsalas [sala]` • Limpa sala A/B/C (sem letra = todas)\n`!sincronizarelo @u`, `!sincronizartodos` (ou `!sync todos`), `!sync`, `!onboarding`' },
       { name: '⚙️ Partida (Staff)', value: '`!start [sala]`, `!vitoria [1|2] [sala]`, `!cancelarstart [sala]`\n`!rematch [sala]` • Volta os 10 pra fila, rebalanceia e inicia na hora' },
       { name: '📊 Temporada', value: '`!temporadas`, `!resetgeral` (Admin)' }
@@ -1851,7 +1873,7 @@ module.exports = {
   handleSyncAllRolesCommand, handleSyncAllPlayersEloCommand, handleVictoryCommand, handleOnboardingCommand, handleClearCommand,
   handleRegisterCommand, handleNickUpdateCommand, handleSyncPlayerRankCommand, handleVoteCommand, pendingAutoStarts, triggerAutoStart,
   handleRematchCommand, handleRouletteCommand, handleRoletaSairCommand, handleRulesCommand, handleStaffCommand, handlePdlCommand,
-  handleResultVoteButton,
+  handleResultVoteButton, handleClubeCommand,
   findRecentVictoryByLetter,
   findPendingAutoStartLobby,
   resolveCleanupTargets

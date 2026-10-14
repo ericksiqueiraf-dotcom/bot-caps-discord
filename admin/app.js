@@ -23,6 +23,7 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
 app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 app.use('/static', express.static(path.join(__dirname, 'public')));
 
 function buildRedirect(res, message, type = 'success', query = '') {
@@ -128,6 +129,26 @@ app.post('/matches/:matchId/delete', async (req, res) => {
     return buildRedirect(res, 'Partida removida do estado salvo.');
   } catch (error) {
     return buildRedirect(res, error.message, 'error');
+  }
+});
+
+// Webhook do Mercado Pago (PIX do clube VIP). Sempre responde 200 rápido;
+// o processamento consulta o pagamento direto na API do MP.
+app.post('/webhooks/mercadopago', async (req, res) => {
+  try {
+    const config = require('../config.json');
+    const { handleMpWebhook } = require('../services/clubePaymentsService');
+    const result = await handleMpWebhook(
+      { query: req.query, body: req.body, headers: req.headers },
+      { config }
+    );
+    console.log('[WEBHOOK MP]', JSON.stringify({ dataId: req.query?.['data.id'], ...result }));
+    return res.status(200).send('OK');
+  } catch (error) {
+    console.error('[WEBHOOK MP] Erro:', error.message);
+    // 500 faz o MP tentar de novo; 401 (assinatura) não.
+    const status = /assinatura/i.test(error.message) ? 401 : 500;
+    return res.status(status).send(error.message);
   }
 });
 

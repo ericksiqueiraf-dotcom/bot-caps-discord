@@ -47,7 +47,8 @@ async function handleStartCommandFlow({
 
   const commandChannelId = message.channelId || message.channel?.id || null;
   if (commandChannelId !== config.textChannels.matchOngoingChannelId) {
-    await replyToMessage(message, { embeds: [buildTeamsEmbed(useCaseResult.teams, useCaseResult.chs, useCaseResult.lobby)] });
+    const { buildVipTierResolver } = require('../../utils/lobbyUtils');
+    await replyToMessage(message, { embeds: [buildTeamsEmbed(useCaseResult.teams, buildVipTierResolver(message.guild))] });
   }
 }
 

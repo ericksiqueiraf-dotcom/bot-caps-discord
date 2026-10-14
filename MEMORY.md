@@ -271,8 +271,14 @@ database/                    ← fallback JSON local
 - **Layout ARENA replicado no TESTRE (2026-10-10):** modelo em `docs/SERVER_LAYOUT_CAPS_ARENA.md`; `setup-servidor.js` com planta ARENA (6 cats, 19 TXT, 11 VOZ, 11 cargos); aplicado em `CAPS BOT TESTE (1558217291123138561)`; `config.json` remapeado (fila/partidas/resultados/destaques/logs/ranking/cadastro + 3 lobbies com limite 10/10/30)
 - Validação: `npm test` 49/49, 13 suites
 
-### 2026-10-14 — LCL migrado para dentro do repo (`lcl-bot/`)
-- Pasta externa `Documents/LCL BOT` movida para `lcl-bot/` no repo (125 arquivos; `node_modules` reinstalado via `npm ci`, `.bak` descartados, `.env` preservado e ignorado).
+### 2026-10-14 — Clube VIP com PIX (fase 1, TESTE)
+- `services/clubePaymentsService.js` (novo): cria PIX no MP (`/v1/payments`, `external_reference=caps-vip:<guild>:<user>:<tier>`), webhook com anti-duplo e ignorando `sess_*` do SnapFlow, cargo via Discord REST, DM + anúncio, expiração de 30 dias (`expireVipSubscriptionsForGuild` no scheduler das 08h).
+- `!clube` com botões por tier → modal de e-mail → QR PNG + copia-e-cola (efêmero); sem `MP_ACCESS_TOKEN`, mostra "em configuração".
+- `admin/app.js`: `POST /webhooks/mercadopago` (com `express.json()`); `config.json`: `clubePagamentos` 9,99/19,99/29,99.
+- Testes `clube-payments.test.js` (7 casos); suíte 74/74. Sync TESTRE (preservando `.env`/`config.json`/`database/`); `caps-bot-teste` + novo `caps-admin-teste` (:3032 — :3031 é do `lcl-admin`) reiniciados e online; webhook responde OK.
+- Pendente p/ validar de ponta a ponta: `MP_ACCESS_TOKEN` (+`PUBLIC_BASE_URL` do túnel) no `.env` da TESTRE + `cloudflared` apontando p/ :3032.
+
+### 2026-10-14 — LCL migrado para dentro do repo (`lcl-bot/`)- Pasta externa `Documents/LCL BOT` movida para `lcl-bot/` no repo (125 arquivos; `node_modules` reinstalado via `npm ci`, `.bak` descartados, `.env` preservado e ignorado).
 - `instalar.js` e `organize-official-discord.js` apontam p/ `lcl-bot/` (fallback p/ pasta antiga mantido).
 - PM2 `lcl-bot`/`lcl-admin` recadastrados no novo path (ids 6/7), `pm2 save`, login confirmado no log. Pasta antiga removida.
 - Validação: LCL 108/108 no novo path.
