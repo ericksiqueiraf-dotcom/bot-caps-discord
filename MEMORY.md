@@ -271,7 +271,10 @@ database/                    ← fallback JSON local
 - **Layout ARENA replicado no TESTRE (2026-10-10):** modelo em `docs/SERVER_LAYOUT_CAPS_ARENA.md`; `setup-servidor.js` com planta ARENA (6 cats, 19 TXT, 11 VOZ, 11 cargos); aplicado em `CAPS BOT TESTE (1558217291123138561)`; `config.json` remapeado (fila/partidas/resultados/destaques/logs/ranking/cadastro + 3 lobbies com limite 10/10/30)
 - Validação: `npm test` 49/49, 13 suites
 
-### 2026-10-14 — Clube VIP com PIX validado + runbook ARENA oficial
+### 2026-10-14 — Deploy clube VIP na ARENA oficial
+- `MP_ACCESS_TOKEN` (prod, mesmo validado na TESTE) copiado para `.env` do CAPS; `clubePagamentos` já estava no `config.json`.
+- Restart `caps-admin` + `caps-bot` (`--update-env`); boot limpo, `CAPS BOT LOL#6241` online e estável. Sem URL pública (poller de 3 min assume).
+- Validação pendente: primeira compra real na ARENA (`!clube` → botões devem aparecer).
 - Fluxo completo validado com R$ 9,99 real na TESTE: `!clube` → botão → modal e-mail → QR → pagamento → cargo `💜 Apoiador` automático + DM + anúncio (`docs/DEPLOY_ARENA_OFICIAL.md` tem o passo a passo da produção).
 - Infra de teste: `caps-admin-teste` na :3032 (a :3031 é do `lcl-admin`), túnel `cloudflared` → `PUBLIC_BASE_URL`, `MP_ACCESS_TOKEN` (teste e depois produção) no `.env` da TESTRE.
 - Pendente: reembolso dos R$ 9,99 no MP; deploy prod (token prod no `.env` do CAPS + URL fixa + restart `caps-bot`/`caps-admin`).
@@ -283,7 +286,8 @@ database/                    ← fallback JSON local
 - Testes `clube-payments.test.js` (7 casos); suíte 74/74. Sync TESTRE (preservando `.env`/`config.json`/`database/`); `caps-bot-teste` + novo `caps-admin-teste` (:3032 — :3031 é do `lcl-admin`) reiniciados e online; webhook responde OK.
 - Pendente p/ validar de ponta a ponta: `MP_ACCESS_TOKEN` (+`PUBLIC_BASE_URL` do túnel) no `.env` da TESTRE + `cloudflared` apontando p/ :3032.
 
-### 2026-10-14 — LCL migrado para dentro do repo (`lcl-bot/`)- Pasta externa `Documents/LCL BOT` movida para `lcl-bot/` no repo (125 arquivos; `node_modules` reinstalado via `npm ci`, `.bak` descartados, `.env` preservado e ignorado).
+### 2026-10-14 — LCL migrado para dentro do repo (`lcl-bot/`)
+- Pasta externa `Documents/LCL BOT` movida para `lcl-bot/` no repo (125 arquivos; `node_modules` reinstalado via `npm ci`, `.bak` descartados, `.env` preservado e ignorado).
 - `instalar.js` e `organize-official-discord.js` apontam p/ `lcl-bot/` (fallback p/ pasta antiga mantido).
 - PM2 `lcl-bot`/`lcl-admin` recadastrados no novo path (ids 6/7), `pm2 save`, login confirmado no log. Pasta antiga removida.
 - Validação: LCL 108/108 no novo path.
