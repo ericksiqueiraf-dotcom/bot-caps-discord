@@ -816,6 +816,13 @@ client.on('interactionCreate', async (interaction) => {
           await handlers.handleLeaveCommand(context);
           return;
         }
+        if (queueJoin.mode === 'espera') {
+          const context = createInteractionContext(interaction, {
+            content: '!espera'
+          });
+          await handlers.handleWaitingListCommand(context, []);
+          return;
+        }
         if (queueJoin.mode === 'tiers' && !isMemberInTierSVoiceChannel(interaction.member)) {
           const context = createInteractionContext(interaction, {
             content: '!entrar'

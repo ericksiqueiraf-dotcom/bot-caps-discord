@@ -29,12 +29,17 @@ describe('painel da fila (botoes)', () => {
     assert.deepStrictEqual(parseQueueJoinButtonId(QUEUE_JOIN_BUTTON_IDS.TIERS), { mode: 'tiers', args: [] });
   });
 
-  it('action row tem CAPS + ARAM + TIERS + Sair da Fila', () => {
+  it('parse reconhece esperar fila', () => {
+    assert.deepStrictEqual(parseQueueJoinButtonId('queue:espera:join'), { mode: 'espera', args: [] });
+    assert.deepStrictEqual(parseQueueJoinButtonId(QUEUE_JOIN_BUTTON_IDS.ESPERA), { mode: 'espera', args: [] });
+  });
+
+  it('action row tem CAPS + ARAM + TIERS + Esperar + Sair da Fila', () => {
     const row = buildQueueJoinActionRow();
     const json = row.toJSON();
     assert.strictEqual(json.type, 1);
-    assert.strictEqual(json.components.length, 4);
-    const [classic, aram, tiers, leave] = json.components;
+    assert.strictEqual(json.components.length, 5);
+    const [classic, aram, tiers, espera, leave] = json.components;
     assert.strictEqual(classic.custom_id, QUEUE_JOIN_BUTTON_IDS.CLASSIC);
     assert.strictEqual(classic.label, 'Entrar Queue CAPS');
     assert.strictEqual(classic.style, 3); // Success
@@ -44,6 +49,9 @@ describe('painel da fila (botoes)', () => {
     assert.strictEqual(tiers.custom_id, QUEUE_JOIN_BUTTON_IDS.TIERS);
     assert.strictEqual(tiers.label, 'Entrar Queue TIERS');
     assert.strictEqual(tiers.style, 2); // Secondary
+    assert.strictEqual(espera.custom_id, QUEUE_JOIN_BUTTON_IDS.ESPERA);
+    assert.strictEqual(espera.label, 'Esperar Fila');
+    assert.strictEqual(espera.style, 1); // Primary
     assert.strictEqual(leave.custom_id, QUEUE_JOIN_BUTTON_IDS.LEAVE);
     assert.strictEqual(leave.label, 'Sair da Fila');
     assert.strictEqual(leave.style, 4); // Danger
@@ -53,6 +61,7 @@ describe('painel da fila (botoes)', () => {
     assert.strictEqual(QUEUE_JOIN_BUTTON_IDS.CLASSIC, 'queue:classic:join');
     assert.strictEqual(QUEUE_JOIN_BUTTON_IDS.ARAM, 'queue:aram:join');
     assert.strictEqual(QUEUE_JOIN_BUTTON_IDS.TIERS, 'queue:tiers:join');
+    assert.strictEqual(QUEUE_JOIN_BUTTON_IDS.ESPERA, 'queue:espera:join');
     assert.strictEqual(QUEUE_JOIN_BUTTON_IDS.LEAVE, 'queue:leave');
   });
 

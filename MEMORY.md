@@ -283,6 +283,10 @@ database/                    ← fallback JSON local
 - **4) Sala 2.0 (dono):** `!salalock [abrir]` (tranca Connect dos cargos, dono sempre entra; flag `locked` no registro + 🔒 no `!salahub`), `!salalimit <0-99>`, `!salaexpulsar @u` (só quem está na sala; não expulsa a si/bots). Prefixo + slash (`/salalock`, `/salalimit`, `/salaexpulsar`) + `!ajuda`. TESTRE + prod.
 - Validação: suíte **146/146**; `node --check` nos 8 arquivos; ambos bots reiniciados e online.
 
+### 2026-10-15 — Botão Esperar Fila no #fila
+- 5º botão (azul): entra na espera Classic (`!espera`), com resposta privada de posição. TESTRE + prod.
+- Testes atualizados (21/21); ambos bots reiniciados e online — painel do `#fila` reconstruído com os 5 botões.
+
 ### 2026-10-15 — Botão Entrar Queue TIERS no #fila
 - 4º botão (cinza): exige estar no `Lobby TIER S` (avisa se não estiver); com o canal certo, chama o fluxo `!entrar` que resolve tier S sozinho (inclui gate Esmeralda IV+). TESTRE + prod.
 - Testes atualizados (20/20); ambos bots reiniciados e online — painel do `#fila` reconstruído com os 4 botões.

@@ -1241,6 +1241,7 @@ const QUEUE_JOIN_BUTTON_IDS = {
   CLASSIC: 'queue:classic:join',
   ARAM: 'queue:aram:join',
   TIERS: 'queue:tiers:join',
+  ESPERA: 'queue:espera:join',
   LEAVE: 'queue:leave'
 };
 
@@ -1253,6 +1254,9 @@ function parseQueueJoinButtonId(customId) {
   }
   if (customId === QUEUE_JOIN_BUTTON_IDS.TIERS) {
     return { mode: 'tiers', args: [] };
+  }
+  if (customId === QUEUE_JOIN_BUTTON_IDS.ESPERA) {
+    return { mode: 'espera', args: [] };
   }
   if (customId === QUEUE_JOIN_BUTTON_IDS.LEAVE) {
     return { mode: 'leave', args: [] };
@@ -1274,6 +1278,10 @@ function buildQueueJoinActionRow() {
       .setCustomId(QUEUE_JOIN_BUTTON_IDS.TIERS)
       .setLabel('Entrar Queue TIERS')
       .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId(QUEUE_JOIN_BUTTON_IDS.ESPERA)
+      .setLabel('Esperar Fila')
+      .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId(QUEUE_JOIN_BUTTON_IDS.LEAVE)
       .setLabel('Sair da Fila')
