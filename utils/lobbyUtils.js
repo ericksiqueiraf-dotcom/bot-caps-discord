@@ -1773,11 +1773,15 @@ const STAFF_SECTIONS = [
   },
   {
     name: '🧹 Filas e salas — organizar e limpar',
-    value: '`!pdl @jogador -50 motivo` • Punição/ajuste de PDL Classic, só Admin (-500 a +500, com auditoria no log).\n`!remover @jogador` • Tira alguém da fila (🔥 INFERNAL só sai com Admin).\n`!limparsalas A` • Apaga a sala A vazia/travada (sem letra = todas; com partida ativa, recusa).\n`!limpar 10` • Apaga 10 mensagens do canal.\n`!espera` + `!limparespera` • Ver a espera e (staff) zerá-la.\n`!reset` • Emergência: limpa filas e partidas (não mexe em pontos).'
+    value: '`!pdl @jogador -50 motivo` • Punição/ajuste de PDL Classic, só Admin (-500 a +500, com auditoria no log).\n`!remover @jogador` • Tira alguém da fila (🔥 INFERNAL só sai com Admin).\n`!limparsalas A` • Apaga a sala A vazia/travada (sem letra = todas; com partida ativa, recusa).\n`!limpar 10` • Apaga 10 mensagens do canal.\n`!espera` + `!limparespera` • Ver a espera e (staff) zerá-la.\n`!salahub` • Ver salas temporárias ativas (dono e ocupação).\n`!reset` • Emergência: limpa filas e partidas (não mexe em pontos).'
   },
   {
     name: '🎖️ Elos e cargos — manter atualizado',
     value: '`!sincronizarelo @jogador` • Atualiza elo Riot + cargo de um jogador (mostra se o cargo falhou).\n`!sincronizartodos` • Atualiza TODO MUNDO (demora ~2,5s por jogador; use com calma).\n`!sync` • Reaplica cargos pelo elo já salvo (sem chamar a Riot).\n`!sync infernal` • Limpa INFERNALs travados/órfãos.'
+  },
+  {
+    name: '💎 Clube VIP — assinaturas',
+    value: '`!clubeadmin` • Assinaturas ativas por tier, com vencimento de cada uma.\n`!clube` • O que o jogador vê (tiers, preços, botões de assinar).'
   },
   {
     name: '📊 Temporada — só Admin, com fila vazia',

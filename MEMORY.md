@@ -271,6 +271,11 @@ database/                    ← fallback JSON local
 - **Layout ARENA replicado no TESTRE (2026-10-10):** modelo em `docs/SERVER_LAYOUT_CAPS_ARENA.md`; `setup-servidor.js` com planta ARENA (6 cats, 19 TXT, 11 VOZ, 11 cargos); aplicado em `CAPS BOT TESTE (1558217291123138561)`; `config.json` remapeado (fila/partidas/resultados/destaques/logs/ranking/cadastro + 3 lobbies com limite 10/10/30)
 - Validação: `npm test` 49/49, 13 suites
 
+### 2026-10-15 — !ajuda enxuto, !staff completo
+- **`!ajuda` agora é só jogador:** seções `🛠️ Staff`, `⚙️ Partida (Staff)` e `📊 Temporada` viraram 1 linha apontando p/ `!staff`. Mantidas: cadastro, fila/voto, ranking, clube VIP, salas temporárias.
+- **`!staff` (`STAFF_SECTIONS`) ganhou:** `!salahub` na seção de limpeza + nova seção `💎 Clube VIP — assinaturas` (`!clubeadmin` + `!clube`). Testes usam `STAFF_SECTIONS.length` dinâmico — seguem verdes (`rules`, `info-embeds`, `clube-vip`: 15/15).
+- TESTRE + prod; ambos bots reiniciados e online.
+
 ### 2026-10-15 — Sugestões aplicadas (ordem 1→4)
 - **1) `!ajuda`:** nova seção `🔊 Salas temporárias` (`!salahub`/`!sala`/`!convidar`/`!limparvoz`) + `!clubeadmin` na seção Staff. TESTRE + prod.
 - **2) Registro sem lixo:** auto-delete agora dá `unregisterTempRoom` (apagou ou sumiu); listener novo `channelDelete` limpa o registro quando a sala é apagada manualmente. TESTRE + prod.
