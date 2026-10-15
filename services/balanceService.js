@@ -119,21 +119,52 @@ function createBalancedTeams(players) {
   }
 
   const sortedPlayers = [...players].sort((a, b) => getBalanceWeight(b) - getBalanceWeight(a));
-  const bestCombination = findBestSnakeArrangement(sortedPlayers);
+  const bestSplit = findBestTeamSplit(sortedPlayers);
 
-  if (!bestCombination) {
+  if (!bestSplit) {
     throw new Error('Nao foi possivel criar times equilibrados.');
   }
 
-  const teams = applySnakeDraft(bestCombination);
-
   return {
-    teamOne: teams.teamOne,
-    teamTwo: teams.teamTwo,
-    teamOneMmr: calculateTeamMmr(teams.teamOne),
-    teamTwoMmr: calculateTeamMmr(teams.teamTwo),
-    difference: Math.abs(calculateTeamMmr(teams.teamOne) - calculateTeamMmr(teams.teamTwo))
+    teamOne: bestSplit.teamOne,
+    teamTwo: bestSplit.teamTwo,
+    teamOneMmr: calculateTeamMmr(bestSplit.teamOne),
+    teamTwoMmr: calculateTeamMmr(bestSplit.teamTwo),
+    difference: Math.abs(calculateTeamMmr(bestSplit.teamOne) - calculateTeamMmr(bestSplit.teamTwo))
   };
+}
+
+// Busca exaustiva: testa todas as metades possíveis (fixando o 1º jogador
+// num time para não avaliar espelhos) e fica com a menor diferença de elo.
+// 5x5 = 126 combinações; 4x4 = 35; 1x1 = 1. Barato e ótimo garantido.
+function findBestTeamSplit(sortedPlayers) {
+  const half = sortedPlayers.length / 2;
+  let best = null;
+  let smallestDifference = Number.POSITIVE_INFINITY;
+
+  function explore(index, teamOne) {
+    if (teamOne.length === half) {
+      const inOne = new Set(teamOne);
+      const teamTwo = sortedPlayers.filter((p) => !inOne.has(p));
+      const difference = Math.abs(calculateTeamMmr(teamOne) - calculateTeamMmr(teamTwo));
+      if (difference < smallestDifference) {
+        smallestDifference = difference;
+        best = { teamOne: [...teamOne], teamTwo };
+      }
+      return;
+    }
+    if (index >= sortedPlayers.length) return;
+    // Poda: ainda dá para completar o time?
+    if (teamOne.length + (sortedPlayers.length - index) < half) return;
+    teamOne.push(sortedPlayers[index]);
+    explore(index + 1, teamOne);
+    teamOne.pop();
+    // O 1º jogador (maior elo) fica sempre no time 1: corta espelhos pela metade.
+    if (index > 0) explore(index + 1, teamOne);
+  }
+
+  explore(0, []);
+  return best;
 }
 
 function findBestSnakeArrangement(players) {

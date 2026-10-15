@@ -283,6 +283,11 @@ database/                    ← fallback JSON local
 - **4) Sala 2.0 (dono):** `!salalock [abrir]` (tranca Connect dos cargos, dono sempre entra; flag `locked` no registro + 🔒 no `!salahub`), `!salalimit <0-99>`, `!salaexpulsar @u` (só quem está na sala; não expulsa a si/bots). Prefixo + slash (`/salalock`, `/salalimit`, `/salaexpulsar`) + `!ajuda`. TESTRE + prod.
 - Validação: suíte **146/146**; `node --check` nos 8 arquivos; ambos bots reiniciados e online.
 
+### 2026-10-15 — Balance exaustivo (ótimo garantido)
+- `createBalancedTeams` trocou heurística (32 combos) por busca exaustiva (5x5 = 126 divisões, com poda e corte de espelhos). Na partida B auditada: 455 → **375** (ótimo provado por força bruta).
+- Importante: o bot equilibra a **soma dos elos** — com lobby misto (Master + Pratas), algum time sempre fica com o Master + elos baixos. Sensação de injustiça individual é esperada; o PDL compensa (ganhar de time mais forte vale mais).
+- TESTRE + prod; suíte 149/149; ambos bots online.
+
 ### 2026-10-15 — Botão Esperar Fila no #fila
 - 5º botão (azul): entra na espera Classic (`!espera`), com resposta privada de posição. TESTRE + prod.
 - Testes atualizados (21/21); ambos bots reiniciados e online — painel do `#fila` reconstruído com os 5 botões.
