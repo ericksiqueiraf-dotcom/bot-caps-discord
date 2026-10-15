@@ -288,6 +288,11 @@ database/                    ← fallback JSON local
 - Importante: o bot equilibra a **soma dos elos** — com lobby misto (Master + Pratas), algum time sempre fica com o Master + elos baixos. Sensação de injustiça individual é esperada; o PDL compensa (ganhar de time mais forte vale mais).
 - TESTRE + prod; suíte 149/149; ambos bots online.
 
+### 2026-10-15 — AFK 5min → 🥱Ausente
+- Canal AFK do servidor configurado via API: `🥱Ausente` (estava sem canal, timeout 900s) → timeout **300s**. Quem ficar 5min sem atividade em voz cai no Ausente automaticamente (recurso nativo do Discord).
+- `server-pattern.json` (TESTRE + prod): `🥱Ausente` registrado com `preserve: true` em COMUNIDADE — setup futuro não apaga nem mexe nas permissões.
+- Teste `setup-blueprint` segue verde (16/16).
+
 ### 2026-10-15 — Botão Esperar Fila no #fila
 - 5º botão (azul): entra na espera Classic (`!espera`), com resposta privada de posição. TESTRE + prod.
 - Testes atualizados (21/21); ambos bots reiniciados e online — painel do `#fila` reconstruído com os 5 botões.

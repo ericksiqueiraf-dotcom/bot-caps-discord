@@ -49,6 +49,7 @@
     { "name": "⏳・sala-de-espera-tier-s", "category": "FILA", "configKey": "postMatchTierSWaitingChannelId", "hidden": true, "aliases": ["⏳ Sala de Espera Tier S", "Sala de Espera Tier S"] },
     { "name": "⚒️ FLEX", "category": "💬・COMUNIDADE", "configKey": null, "hidden": true },
     { "name": "☠️ SoloQ", "category": "💬・COMUNIDADE", "configKey": null, "hidden": true },
+    { "name": "🥱Ausente", "category": "💬・COMUNIDADE", "configKey": null, "preserve": true },
     { "name": "HUB", "category": "💎・CLUBE VIP", "tempVoiceKey": "hubChannelId", "aliases": ["➕ Criar sala", "Criar sala"] },
     { "name": "🔥・lobby-clandestino LCL", "category": "FILA", "configKey": null, "userLimit": 5, "preserve": true },
     { "name": "👑 Lounge VIP", "category": "💎・CLUBE VIP", "configKey": null, "vip": true }
