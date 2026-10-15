@@ -401,7 +401,8 @@ function listTempRooms(guild) {
       result.push({
         channel,
         owner: owner?.user?.tag || data.ownerId,
-        memberCount: channel.members.size
+        memberCount: channel.members.size,
+        locked: Boolean(data.locked)
       });
     }
   }
@@ -413,6 +414,108 @@ function isTempRoomOwner(member, channelId) {
   const guild = member.guild;
   const ownerId = getTempRoomOwner(channelId, guild.id);
   return ownerId === member.id || member.permissions?.has(PermissionFlagsBits.Administrator);
+}
+
+function getUserTempRoomChannel(guild, userId) {
+  const roomId = getUserTempRoom(userId, guild.id);
+  if (!roomId) return null;
+  return guild.channels.cache.get(roomId) || null;
+}
+
+async function setTempRoomLock(ownerMember, locked) {
+  const guild = ownerMember.guild;
+  const roomId = getUserTempRoom(ownerMember.id, guild.id);
+  if (!roomId) {
+    return { success: false, message: 'Você não possui uma sala temporária ativa.' };
+  }
+
+  const channel = await guild.channels.fetch(roomId).catch(() => null);
+  if (!channel || !isManagedTempVoiceChannel(channel)) {
+    unregisterTempRoom(roomId, guild.id);
+    return { success: false, message: 'Sua sala temporária não existe mais.' };
+  }
+
+  try {
+    const creatorRoleIds = getConfiguredCreatorRoles(guild);
+    for (const roleId of creatorRoleIds) {
+      await channel.permissionOverwrites.edit(roleId, { Connect: !locked }).catch(() => null);
+    }
+    const registry = loadTempVoiceRegistry();
+    if (registry[guild.id]?.[roomId]) {
+      registry[guild.id][roomId].locked = locked;
+      saveTempVoiceRegistry(registry);
+    }
+    return {
+      success: true,
+      locked,
+      message: locked
+        ? '🔒 Sala trancada: ninguém novo entra (só você, dono).'
+        : '🔓 Sala destrancada: cargos permitidos podem entrar de novo.'
+    };
+  } catch (error) {
+    return { success: false, message: `Falha ao ${locked ? 'trancar' : 'destrancar'}: ${error.message}` };
+  }
+}
+
+async function setTempRoomLimit(ownerMember, limit) {
+  const guild = ownerMember.guild;
+  const roomId = getUserTempRoom(ownerMember.id, guild.id);
+  if (!roomId) {
+    return { success: false, message: 'Você não possui uma sala temporária ativa.' };
+  }
+
+  const channel = await guild.channels.fetch(roomId).catch(() => null);
+  if (!channel || !isManagedTempVoiceChannel(channel)) {
+    unregisterTempRoom(roomId, guild.id);
+    return { success: false, message: 'Sua sala temporária não existe mais.' };
+  }
+
+  const value = Number(limit);
+  if (!Number.isInteger(value) || value < 0 || value > 99) {
+    return { success: false, message: 'Use `!salalimit <0-99>` (0 = sem limite).' };
+  }
+
+  try {
+    await channel.setUserLimit(value, `Limite alterado por ${ownerMember.user?.tag || ownerMember.id}`);
+    return { success: true, message: value === 0 ? 'Limite de usuários removido (sem limite).' : `Limite da sala: **${value}** usuário(s).` };
+  } catch (error) {
+    return { success: false, message: `Falha ao mudar o limite: ${error.message}` };
+  }
+}
+
+async function kickFromTempRoom(ownerMember, targetUser) {
+  const guild = ownerMember.guild;
+  const roomId = getUserTempRoom(ownerMember.id, guild.id);
+  if (!roomId) {
+    return { success: false, message: 'Você não possui uma sala temporária ativa.' };
+  }
+
+  const channel = await guild.channels.fetch(roomId).catch(() => null);
+  if (!channel || !isManagedTempVoiceChannel(channel)) {
+    unregisterTempRoom(roomId, guild.id);
+    return { success: false, message: 'Sua sala temporária não existe mais.' };
+  }
+
+  const targetMember = await guild.members.fetch(targetUser.id).catch(() => null);
+  if (!targetMember) {
+    return { success: false, message: 'Usuário não encontrado no servidor.' };
+  }
+  if (targetMember.id === ownerMember.id) {
+    return { success: false, message: 'Você não pode se expulsar da própria sala.' };
+  }
+  if (targetMember.user?.bot) {
+    return { success: false, message: 'Não é possível expulsar bots.' };
+  }
+  if (!targetMember.voice?.channel || targetMember.voice.channel.id !== channel.id) {
+    return { success: false, message: 'Este usuário não está na sua sala.' };
+  }
+
+  try {
+    await targetMember.voice.disconnect(`Removido da sala por ${ownerMember.user?.tag || ownerMember.id}`);
+    return { success: true, message: `${targetMember} foi removido da sua sala.` };
+  } catch (error) {
+    return { success: false, message: `Falha ao remover: ${error.message}` };
+  }
 }
 
 module.exports = {
@@ -431,5 +534,8 @@ module.exports = {
   renameTempRoom,
   deleteTempRoom,
   listTempRooms,
-  isTempRoomOwner
+  isTempRoomOwner,
+  setTempRoomLock,
+  setTempRoomLimit,
+  kickFromTempRoom
 };

@@ -59,6 +59,18 @@ const {
 const getRiotService = () => global.riotService;
 
 /**
+ * Trava de level mínimo da conta Riot (config.cadastro.minSummonerLevel).
+ * Fail-open quando o level é desconhecido (ex.: cache antigo sem o campo).
+ */
+function getSummonerLevelGate(summonerLevel) {
+  const minLevel = Number(config.cadastro?.minSummonerLevel || 0);
+  const level = Number(summonerLevel);
+  if (!(minLevel > 0) || !(level > 0)) return { ok: true, minLevel, level: null };
+  if (level < minLevel) return { ok: false, minLevel, level };
+  return { ok: true, minLevel, level };
+}
+
+/**
  * Atribui o cargo definido em config.roles.registeredPlayerRoleId apos !cadastrar / !nick.
  */
 async function grantRegisteredPlayerRole(guild, userId) {
@@ -383,6 +395,11 @@ async function handleRegisterCommand(message, args) {
     }
     await replyToMessage(message, '⏳ Validando sua conta na Riot...');
     const rankProfile = await global.riotService.getPlayerRankProfile(nickname);
+    const levelGate = getSummonerLevelGate(rankProfile.summonerLevel);
+    if (!levelGate.ok) {
+      await replyToMessage(message, `❌ Conta level ${levelGate.level}. O mínimo para jogar na CAPS Arena é level ${levelGate.minLevel} — upe sua conta e tente de novo.`);
+      return;
+    }
     const playerStats = await loadPlayerStats();
 
     // Busca entrada anterior do mesmo discordId para migrar o histórico de partidas
@@ -442,6 +459,11 @@ async function handleNickUpdateCommand(message, args) {
       if (storedEntry?.puuid) global.riotService.invalidateCache(storedEntry.puuid);
     }
     const rankProfile = await global.riotService.getPlayerRankProfile(nickname);
+    const nickLevelGate = getSummonerLevelGate(rankProfile.summonerLevel);
+    if (!nickLevelGate.ok) {
+      await replyToMessage(message, `❌ Conta level ${nickLevelGate.level}. O mínimo para jogar na CAPS Arena é level ${nickLevelGate.minLevel} — upe sua conta e tente de novo.`);
+      return;
+    }
     const playerStats = await loadPlayerStats();
     const storedStats = getStoredPlayerStats(playerStats, { discordId: message.author.id, nickname: rankProfile.nickname, puuid: rankProfile.puuid });
     upsertPlayerStats(playerStats, { discordId: message.author.id, nickname: rankProfile.nickname, puuid: rankProfile.puuid }, {
@@ -987,7 +1009,7 @@ async function handleHelpCommand(message) {
       { name: '🎮 Jogador (1/2) — Fila e voto', value: '`!regras` • Regulamento completo\n`!entrar` • Fila Classic (no canal Lobby Classic ou Lobby TIER S)\n`!entrar aram` • Fila ARAM\n`!entrar aram 2x2` • ARAM formato\n`!fila` • Mostra jogadores em sala\n`!espera` • Entra na espera (🔥 INFERNAL entra na posição 5)\n`!esperatiers` • Espera do Lobby TIER S (só Esmeralda+)\n`!espera ver` • Mostra a ordem\n`!espera sair` • Sai da espera\n`!sair` • Sai da sala\n`!votar 1/2` • Vota no vencedor (abre painel com botões p/ os 10 votarem)\n`!votar` • Reabre o painel de votação' },
       { name: '🎮 Jogador (2/2) — Ranking', value: '`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking geral (CLASSIC = pontos custom)\n`!placar tiers` • Só Esmeralda+\n`!top10` • Top 10 CLASSIC por pontos custom, desempate por winrate\n`!top10 tiers` • Top 10 só Esmeralda+\n`!topstreak` • Ranking Streak 🔥\n`!toprankinfernal` • Quem mais pegou INFERNAL na temporada 🔥\n`!clube` • Clube VIP: tiers, benefícios e membros 💎\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
       { name: '💎 Clube VIP', value: '`!clube` • Tiers, assinatura PIX e renovação -10%\n`!querolive` • Entrar/sair do ping 🔴 Ao Vivo\n`!live <link>` • Divulgar live Twitch/YouTube/Kick (só 👑 Lendário, 1x a cada 6h)' },
-      { name: '🔊 Salas temporárias (dono da sala)', value: 'Entre no ➕・criar-sala para ganhar sua sala\n`!salahub` • Lista as salas ativas\n`!sala` • Mostra sua sala • `!sala <nome>` renomeia\n`!convidar @u` • Chama alguém p/ sua sala\n`!limparvoz` • Apaga sua sala (dentro dela)' },
+      { name: '🔊 Salas temporárias (dono da sala)', value: 'Entre no ➕・criar-sala para ganhar sua sala\n`!salahub` • Lista as salas ativas\n`!sala` • Mostra sua sala • `!sala <nome>` renomeia\n`!convidar @u` • Chama alguém p/ sua sala\n`!salalock` • Tranca (`!salalock abrir` destranca)\n`!salalimit <0-99>` • Limite de usuários (0 = sem limite)\n`!salaexpulsar @u` • Remove alguém da sala\n`!limparvoz` • Apaga sua sala (dentro dela)' },
       { name: '🛠️ Staff', value: '`!staff` • Guia completo da staff (partida, roleta, limpeza, PDL, elos, temporada, clube)\nComandos de staff ficam só no `!staff` para não poluir esta lista.' }
     )
     .setFooter({ text: `${FOOTER_PREFIX} • Ajuda Atualizada` })
@@ -1927,8 +1949,8 @@ async function handleSalaHubCommand(message, args = []) {
       return await replyToMessage(message, '📭 Nenhuma sala temporária ativa no momento.');
     }
     
-    const lines = rooms.map((r) => 
-      `🔊 **${r.channel.name}** — Dono: ${r.owner} — ${r.memberCount} membro(s)`
+    const lines = rooms.map((r) =>
+      `${r.locked ? '🔒' : '🔊'} **${r.channel.name}** — Dono: ${r.owner} — ${r.memberCount} membro(s)`
     );
     
     await replyToMessage(message, `**Salas temporárias ativas (${rooms.length}):**\n${lines.join('\n')}`);
@@ -2020,6 +2042,55 @@ async function handleSalaCommand(message, args = []) {
   }
 }
 
+async function handleSalaLockCommand(message, args = []) {
+  try {
+    const { setTempRoomLock } = require('../services/tempVoiceService');
+    const arg = String(args[0] || '').toLowerCase();
+    const unlockWords = ['abrir', 'aberta', 'aberto', 'unlock', 'off', 'destrancar'];
+    const locked = !unlockWords.includes(arg);
+    const result = await setTempRoomLock(message.member, locked);
+    await replyToMessage(message, result.message);
+  } catch (error) {
+    console.error('[ERRO] !salalock:', error);
+    await replyToMessage(message, `❌ Erro ao trancar sala: \`${error.message}\``);
+  } finally {
+    if (message.deletable) await message.delete().catch(() => null);
+  }
+}
+
+async function handleSalaLimitCommand(message, args = []) {
+  try {
+    const { setTempRoomLimit } = require('../services/tempVoiceService');
+    if (args.length === 0) {
+      return await replyToMessage(message, '❌ Use: `!salalimit <0-99>` (0 = sem limite).');
+    }
+    const result = await setTempRoomLimit(message.member, args[0]);
+    await replyToMessage(message, result.message);
+  } catch (error) {
+    console.error('[ERRO] !salalimit:', error);
+    await replyToMessage(message, `❌ Erro ao mudar limite: \`${error.message}\``);
+  } finally {
+    if (message.deletable) await message.delete().catch(() => null);
+  }
+}
+
+async function handleSalaExpulsarCommand(message, args = [], targetUserOverride = null) {
+  try {
+    const { kickFromTempRoom } = require('../services/tempVoiceService');
+    const targetUser = targetUserOverride || message.mentions.users.first();
+    if (!targetUser) {
+      return await replyToMessage(message, '❌ Use: `!salaexpulsar @usuario` para remover alguém da sua sala.');
+    }
+    const result = await kickFromTempRoom(message.member, targetUser);
+    await replyToMessage(message, result.message);
+  } catch (error) {
+    console.error('[ERRO] !salaexpulsar:', error);
+    await replyToMessage(message, `❌ Erro ao expulsar: \`${error.message}\``);
+  } finally {
+    if (message.deletable) await message.delete().catch(() => null);
+  }
+}
+
 async function handleRoletaSairCommand(message, args = []) {
   const { handleRouletteOptOutFlow } = require('./handlers/rouletteCommandHandlers');
   try {
@@ -2087,6 +2158,8 @@ module.exports = {
   handleRematchCommand, handleRouletteCommand, handleRoletaSairCommand, handleRulesCommand, handleStaffCommand, handlePdlCommand,
   handleResultVoteButton, handleClubeCommand, handleClubeAdminCommand, handleQueroLiveCommand, handleLiveCommand,
   handleSalaHubCommand, handleConvidarCommand, handleLimparVozCommand, handleSalaCommand,
+  handleSalaLockCommand, handleSalaLimitCommand, handleSalaExpulsarCommand,
+  getSummonerLevelGate,
   findRecentVictoryByLetter,
   findPendingAutoStartLobby,
   resolveCleanupTargets

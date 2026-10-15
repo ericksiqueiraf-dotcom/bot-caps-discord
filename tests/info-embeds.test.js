@@ -2,7 +2,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
 
-const { buildRulesEmbed, buildStaffEmbed, RULES_SECTIONS, STAFF_SECTIONS } = require('../utils/lobbyUtils');
+const { buildRulesEmbed, buildStaffEmbed, buildOnboardingGuideEmbed, RULES_SECTIONS, STAFF_SECTIONS, ONBOARDING_SECTIONS } = require('../utils/lobbyUtils');
 
 function assertDiscordLimits(embed, label) {
   const json = embed.toJSON();
@@ -22,9 +22,18 @@ describe('embeds informativos por sala', () => {
     assertDiscordLimits(embed, 'regras');
   });
 
-  // buildOnboardingGuideEmbed nao existe em utils/lobbyUtils.js (nao exportada;
-  // setup-servidor.js importa mas protege com typeof — ver BUG abaixo). Sem
-  // equivalente real de onboarding, cobre o 2o embed fixo real: buildStaffEmbed.
+  it('guia: titulo fixo + campos ONBOARDING_SECTIONS + dentro dos limites (sem guild)', () => {
+    const embed = buildOnboardingGuideEmbed();
+    assert.strictEqual(embed.data.title, '🧩 Como jogar na CAPS Arena');
+    assert.strictEqual(embed.data.fields.length, ONBOARDING_SECTIONS.length);
+    assertDiscordLimits(embed, 'onboarding');
+  });
+
+  it('guia com guild usa o nome do servidor', () => {
+    const embed = buildOnboardingGuideEmbed({ name: 'Servidor X' });
+    assert.ok(embed.data.description.includes('Servidor X'));
+  });
+
   it('staff: titulo fixo + campos STAFF_SECTIONS + dentro dos limites (sem guild)', () => {
     const embed = buildStaffEmbed();
     assert.strictEqual(embed.data.title, '🛠️ Guia da Staff — CAPS Arena');

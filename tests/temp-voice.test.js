@@ -241,6 +241,90 @@ describe('voz temporaria (tempVoice) — API atual', () => {
     }
   });
 
+  it('!salalock tranca e destranca a sala do dono', async () => {
+    const bak = backupConfig();
+    try {
+      config.tempVoice = { ...(bak || {}), hubChannelId: 'hubZ', allowedRoleIds: [], allowedRoleNames: [] };
+      const guild = mockGuild();
+      guild.id = 'glock';
+      const overwrites = {};
+      const room = mockVoiceChannel({ id: 'roomK', name: '➕・Sala', guild, memberCount: 1 });
+      room.permissionOverwrites = { edit: async (id, perms) => { overwrites[id] = perms; } };
+      guild.channels.cache.set('roomK', room);
+      guild.channels.fetch = async (id) => guild.channels.cache.get(id) || null;
+      tempVoice.registerTempRoom('roomK', 'u1', 'glock');
+      try {
+        const locked = await tempVoice.setTempRoomLock(mockMember({ id: 'u1', guild }), true);
+        assert.equal(locked.success, true);
+        assert.equal(locked.locked, true);
+
+        const unlocked = await tempVoice.setTempRoomLock(mockMember({ id: 'u1', guild }), false);
+        assert.equal(unlocked.success, true);
+        assert.equal(unlocked.locked, false);
+
+        const semSala = await tempVoice.setTempRoomLock(mockMember({ id: 'ninguem', guild }), true);
+        assert.equal(semSala.success, false);
+      } finally {
+        tempVoice.unregisterTempRoom('roomK', 'glock');
+      }
+    } finally {
+      restoreConfig(bak);
+    }
+  });
+
+  it('!salalimit valida 0-99 e aplica no canal', async () => {
+    const guild = mockGuild();
+    guild.id = 'glim';
+    const room = mockVoiceChannel({ id: 'roomL2', name: '➕・Sala', guild, memberCount: 1 });
+    let applied = null;
+    room.setUserLimit = async (v) => { applied = v; };
+    guild.channels.cache.set('roomL2', room);
+    guild.channels.fetch = async (id) => guild.channels.cache.get(id) || null;
+    tempVoice.registerTempRoom('roomL2', 'u1', 'glim');
+    try {
+      const ok = await tempVoice.setTempRoomLimit(mockMember({ id: 'u1', guild }), '5');
+      assert.equal(ok.success, true);
+      assert.equal(applied, 5);
+
+      const zero = await tempVoice.setTempRoomLimit(mockMember({ id: 'u1', guild }), '0');
+      assert.equal(zero.success, true);
+      assert.equal(applied, 0);
+
+      assert.equal((await tempVoice.setTempRoomLimit(mockMember({ id: 'u1', guild }), '100')).success, false);
+      assert.equal((await tempVoice.setTempRoomLimit(mockMember({ id: 'u1', guild }), 'abc')).success, false);
+      assert.equal((await tempVoice.setTempRoomLimit(mockMember({ id: 'ninguem', guild }), '5')).success, false);
+    } finally {
+      tempVoice.unregisterTempRoom('roomL2', 'glim');
+    }
+  });
+
+  it('!salaexpulsar remove quem esta na sala do dono', async () => {
+    const guild = mockGuild();
+    guild.id = 'gexp';
+    const room = mockVoiceChannel({ id: 'roomE', name: '➕・Sala', guild, memberCount: 2 });
+    guild.channels.cache.set('roomE', room);
+    guild.channels.fetch = async (id) => guild.channels.cache.get(id) || null;
+    tempVoice.registerTempRoom('roomE', 'dono', 'gexp');
+    try {
+      const dono = mockMember({ id: 'dono', guild });
+      let desconectado = false;
+      const alvo = mockMember({ id: 'alvo', guild, voiceChannel: { id: 'roomE' } });
+      alvo.voice.disconnect = async () => { desconectado = true; };
+      guild.members.cache.set('alvo', alvo);
+      const r1 = await tempVoice.kickFromTempRoom(dono, { id: 'alvo' });
+      assert.equal(r1.success, true);
+      assert.equal(desconectado, true);
+
+      const fora = mockMember({ id: 'fora', guild, voiceChannel: { id: 'outra' } });
+      guild.members.cache.set('fora', fora);
+      assert.equal((await tempVoice.kickFromTempRoom(dono, { id: 'fora' })).success, false);
+      assert.equal((await tempVoice.kickFromTempRoom(dono, { id: 'dono' })).success, false);
+      assert.equal((await tempVoice.kickFromTempRoom(mockMember({ id: 'sem', guild }), { id: 'alvo' })).success, false);
+    } finally {
+      tempVoice.unregisterTempRoom('roomE', 'gexp');
+    }
+  });
+
   it('auto-delete apaga sala vazia e limpa o registro', async () => {
     const bak = backupConfig();
     try {

@@ -238,6 +238,13 @@ function buildSlashCommands() {
     new SlashCommandBuilder().setName('convidar').setDescription('Convida alguém para sua sala temporária.')
       .addUserOption((option) => option.setName('usuario').setDescription('Usuário a convidar').setRequired(true)),
     new SlashCommandBuilder().setName('limparvoz').setDescription('Apaga sua sala temporária (use dentro dela).'),
+    new SlashCommandBuilder().setName('salalock').setDescription('Tranca/destranca sua sala temporária.')
+      .addStringOption((option) => option.setName('acao').setDescription('Trancar ou destrancar').setRequired(false)
+        .addChoices({ name: 'Trancar', value: 'trancar' }, { name: 'Destrancar', value: 'destrancar' })),
+    new SlashCommandBuilder().setName('salalimit').setDescription('Limite de usuários da sua sala (0 = sem limite).')
+      .addIntegerOption((option) => option.setName('limite').setDescription('0 a 99').setRequired(true).setMinValue(0).setMaxValue(99)),
+    new SlashCommandBuilder().setName('salaexpulsar').setDescription('Remove alguém da sua sala temporária.')
+      .addUserOption((option) => option.setName('usuario').setDescription('Usuário a remover').setRequired(true)),
     new SlashCommandBuilder().setName('roleta').setDescription('Participa da roleta de quem sai (losers).')
       .addIntegerOption((option) => option.setName('quantidade').setDescription('Quantos saem (1-5)').setRequired(false))
       .addStringOption((option) => option.setName('sala').setDescription('Letra da sala, ex.: A').setRequired(false))
@@ -339,6 +346,7 @@ const {
   formatDateTimeForHistory,
   getArchivedSeasonLabel,
   getQueueChannel,
+  isGuildAllowed,
   isMemberInQueueVoiceChannel,
   formatRank,
   formatQueueMode,
@@ -636,6 +644,15 @@ async function processCommand(message, rawContent) {
       case 'sala':
         await handlers.handleSalaCommand(message, args);
         break;
+      case 'salalock':
+        await handlers.handleSalaLockCommand(message, args);
+        break;
+      case 'salalimit':
+        await handlers.handleSalaLimitCommand(message, args);
+        break;
+      case 'salaexpulsar':
+        await handlers.handleSalaExpulsarCommand(message, args);
+        break;
       case 'pdl':
         await handlers.handlePdlCommand(message, args);
         break;
@@ -698,6 +715,10 @@ client.on('messageCreate', async (message) => {
     return;
   }
 
+  if (!isGuildAllowed(message.guild.id)) {
+    return;
+  }
+
   const lines = message.content
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -714,6 +735,10 @@ client.on('messageCreate', async (message) => {
 
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.guild) {
+    return;
+  }
+
+  if (!isGuildAllowed(interaction.guild.id)) {
     return;
   }
 
@@ -999,6 +1024,17 @@ client.on('interactionCreate', async (interaction) => {
         break;
       case 'limparvoz':
         await handlers.handleLimparVozCommand(context);
+        break;
+      case 'salalock': {
+        const acao = interaction.options.getString('acao');
+        await handlers.handleSalaLockCommand(context, acao ? [acao] : []);
+        break;
+      }
+      case 'salalimit':
+        await handlers.handleSalaLimitCommand(context, [String(interaction.options.getInteger('limite'))]);
+        break;
+      case 'salaexpulsar':
+        await handlers.handleSalaExpulsarCommand(context, [], targetUser);
         break;
       case 'regras':
         await handlers.handleRulesCommand(context);

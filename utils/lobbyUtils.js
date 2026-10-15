@@ -371,14 +371,18 @@ function getArchivedSeasonLabel(season) {
 
   return `Temporada #${season.seasonNumber}`;
 }
+function isGuildAllowed(guildId) {
+  const list = Array.isArray(config?.allowedGuildIds) ? config.allowedGuildIds.map(String) : [];
+  if (list.length === 0) return true;
+  return list.includes(String(guildId || ''));
+}
+
 function getQueueChannel(guild) {
   return {
     classicQueueChannel: guild.channels.cache.get(config.voiceChannels.classicQueueChannelId),
     aramQueueChannel: guild.channels.cache.get(config.voiceChannels.aramQueueChannelId)
   };
 }
-
-
 const TIER_S_MIN_MMR = Number(config.tierS?.minBaseMmr || 2000);
 const TIER_S_TIERS = (config.tierS?.tiers || ['EMERALD', 'DIAMOND', 'MASTER', 'GRANDMASTER', 'CHALLENGER'])
   .map((tier) => String(tier || '').toUpperCase());
@@ -1789,6 +1793,42 @@ const STAFF_SECTIONS = [
   }
 ];
 
+const ONBOARDING_SECTIONS = [
+  {
+    name: '👋 1. Cadastre sua conta',
+    value: 'Digite `!cadastrar SeuNick#TAG` (ex: `!cadastrar Faker#BR1`) aqui ou no canal de comandos. Conta precisa ser level 30+. Mudou de conta? `!nick Nick#TAG` atualiza.'
+  },
+  {
+    name: '🎮 2. Entre na fila',
+    value: 'Entre num canal de voz 🎮・lobby (classic, tier S ou aram) e digite `!entrar`. Com 10 jogadores a partida começa sozinha, com times equilibrados pelo elo.'
+  },
+  {
+    name: '🗳️ 3. Jogou? Vote',
+    value: 'No fim da partida vote com `!votar 1` ou `!votar 2` (ou clique nos botões). Com 6 votos a vitória registra sozinha. Depois vote no MVP no canal de destaques.'
+  },
+  {
+    name: '❓ 4. Ajuda',
+    value: '`!ajuda` • lista de comandos\n`!regras` • regulamento completo\n`!perfil` • sua ficha e seus pontos'
+  }
+];
+
+function buildOnboardingGuideEmbed(guild = null) {
+  const embed = new EmbedBuilder()
+    .setColor(THEME.INFO)
+    .setTitle('🧩 Como jogar na CAPS Arena')
+    .setDescription(
+      guild?.name
+        ? `Bem-vindo à **${guild.name}**! Em 3 passos você já está jogando.`
+        : 'Bem-vindo! Em 3 passos você já está jogando.'
+    )
+    .setFooter({ text: `${FOOTER_PREFIX} • Como jogar` })
+    .setTimestamp();
+  for (const section of ONBOARDING_SECTIONS) {
+    embed.addFields({ name: section.name, value: section.value });
+  }
+  return embed;
+}
+
 function buildStaffEmbed() {
   const embed = new EmbedBuilder()
     .setColor(THEME.WARNING)
@@ -3133,6 +3173,7 @@ module.exports = {
   formatDateTimeForHistory,
   getArchivedSeasonLabel,
   getQueueChannel,
+  isGuildAllowed,
   isMemberInQueueVoiceChannel,
   formatRank,
   formatQueueMode,
@@ -3232,6 +3273,8 @@ module.exports = {
   RULES_SECTIONS,
   buildStaffEmbed,
   STAFF_SECTIONS,
+  buildOnboardingGuideEmbed,
+  ONBOARDING_SECTIONS,
   buildSeasonHistoryEmbed,
   resetStatsForNewSeason,
   deepClone,
