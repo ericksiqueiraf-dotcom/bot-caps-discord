@@ -288,6 +288,11 @@ database/                    ← fallback JSON local
 - Importante: o bot equilibra a **soma dos elos** — com lobby misto (Master + Pratas), algum time sempre fica com o Master + elos baixos. Sensação de injustiça individual é esperada; o PDL compensa (ganhar de time mais forte vale mais).
 - TESTRE + prod; suíte 149/149; ambos bots online.
 
+### 2026-10-15 — Boas-vindas que vendem (item 2 do plano)
+- Texto novo de boas-vindas nos defaults (`contentTextService`, TESTRE + prod): título com vaga esperando, chamada 10 jogadores/PDL/roleta/MVP/INFERNAL + "2 minutos". DB vazio nos 2 → defaults mandam.
+- 3º botão **⚡ Quero jogar agora** (verde) abre direto o modal de Nick#TAG; fluxo de cadastro inalterado. TESTRE + prod.
+- Teste atualizado (6/6); ambos bots reiniciados e online. Vale para os próximos que entrarem (mensagem antiga não muda).
+
 ### 2026-10-15 — AFK 5min → 🥱Ausente
 - Canal AFK do servidor configurado via API: `🥱Ausente` (estava sem canal, timeout 900s) → timeout **300s**. Quem ficar 5min sem atividade em voz cai no Ausente automaticamente (recurso nativo do Discord).
 - `server-pattern.json` (TESTRE + prod): `🥱Ausente` registrado com `preserve: true` em COMUNIDADE — setup futuro não apaga nem mexe nas permissões.

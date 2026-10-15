@@ -34,7 +34,8 @@ const RIOT_API_KEY = process.env.RIOT_API_KEY;
 const BOT_VERSION = 'v1.8.0';
 const ONBOARDING_BUTTON_IDS = {
   LOL_PLAYER: 'onboarding_lol_player',
-  NON_PLAYER: 'onboarding_non_player'
+  NON_PLAYER: 'onboarding_non_player',
+  QUICK_START: 'onboarding_quick_start'
 };
 const ONBOARDING_MODAL_ID = 'onboarding_lol_registration';
 const ONBOARDING_MODAL_FIELD_ID = 'riot_nickname';
@@ -749,7 +750,7 @@ client.on('interactionCreate', async (interaction) => {
 
   if (interaction.isButton()) {
     try {
-      if (interaction.customId === ONBOARDING_BUTTON_IDS.LOL_PLAYER) {
+      if (interaction.customId === ONBOARDING_BUTTON_IDS.LOL_PLAYER || interaction.customId === ONBOARDING_BUTTON_IDS.QUICK_START) {
         const modal = new ModalBuilder()
           .setCustomId(ONBOARDING_MODAL_ID)
           .setTitle('Cadastro LoL');
@@ -1213,6 +1214,10 @@ client.on('guildMemberAdd', async (member) => {
       .setCustomId(ONBOARDING_BUTTON_IDS.LOL_PLAYER)
       .setLabel('Jogo LoL')
       .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId(ONBOARDING_BUTTON_IDS.QUICK_START)
+      .setLabel('⚡ Quero jogar agora')
+      .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId(ONBOARDING_BUTTON_IDS.NON_PLAYER)
       .setLabel('Nao jogo LoL')

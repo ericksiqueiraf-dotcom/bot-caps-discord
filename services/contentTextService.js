@@ -1,16 +1,16 @@
 const DEFAULT_CONTENT_TEMPLATES = {
   welcome: {
-    titleTemplate: 'Bem-vindo a {{serverName}}',
-    description: 'Escolha abaixo como voce vai usar o servidor. Jogadores de LoL precisam concluir o cadastro antes de liberar o acesso completo.',
+    titleTemplate: '🏟️ Bem-vindo à {{serverName}}, {{username}} — sua vaga está esperando!',
+    description: '🔥 **10 jogadores por partida • ranking com PDL • roleta, MVP e cargo INFERNAL**\nDo cadastro à primeira partida em **2 minutos**: cadastre seu Nick#TAG e digite `!entrar` no lobby.',
     rulesTitle: 'Como funciona o acesso',
     rulesText: 'Quem joga LoL precisa usar `!cadastrar Nick#TAG` para receber o cargo de jogador e liberar os canais privados de texto e voz.\nQuem nao joga LoL permanece apenas com as salas abertas do servidor.',
     unlockTitle: 'Se voce joga LoL',
-    unlockText: 'Clique em **Jogo LoL** e depois envie:\n```bash\n!cadastrar Nick#TAG\n```\nApos o cadastro, o bot libera o cargo automaticamente.',
+    unlockText: 'Clique em **Jogo LoL** ou **⚡ Quero jogar agora** e depois envie:\n```bash\n!cadastrar Nick#TAG\n```\nApos o cadastro, o bot libera o cargo automaticamente.',
     howToPlayTitle: 'Se voce nao joga LoL',
     howToPlayText: 'Clique em **Nao jogo LoL** para permanecer somente com os canais abertos, sem receber cargo de jogador.',
     commandsTitle: 'Comandos importantes',
-    commandsText: '`!cadastrar Nick#TAG` - libera o acesso completo\n`!nick Nick#TAG` - atualiza o cadastro\n`!ajuda` - mostra todos os comandos',
-    footerText: 'Caps Bot - Acesso inicial'
+    commandsText: '`!cadastrar Nick#TAG` - libera o acesso completo\n`!entrar` - entra na fila rapidinho\n`!ajuda` - mostra todos os comandos',
+    footerText: 'Caps Bot • CAPS Arena'
   },
   onboarding: {
     title: 'CAPS Arena - Guia de Inicio Rapido',

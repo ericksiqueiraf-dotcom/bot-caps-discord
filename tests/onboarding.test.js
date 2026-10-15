@@ -42,9 +42,13 @@ describe('onboarding 2 passos', () => {
     assert.ok(!Number.isNaN(Date.parse(update.rulesAcceptedAt)));
   });
 
-  it('welcome templates expoem o passo de cadastro', () => {
+  it('welcome templates vendem a Arena (vaga + 2 minutos + cadastro)', () => {
     const resolved = getResolvedContentTemplates({});
     assert.ok(String(resolved.welcome.rulesText).includes('!cadastrar'));
+    assert.ok(String(resolved.welcome.titleTemplate).includes('{{username}}'));
+    assert.ok(String(resolved.welcome.description).includes('2 minutos'));
+    assert.ok(String(resolved.welcome.description).includes('!entrar'));
+    assert.ok(String(resolved.welcome.unlockText).includes('Quero jogar agora'));
     assert.ok(String(resolved.onboarding.registrationTitle).includes('PASSO 1'));
     assert.ok(String(resolved.welcome.commandsText).includes('!cadastrar'));
   });
