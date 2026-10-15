@@ -1239,7 +1239,8 @@ function getQueueFeedChannelId() {
 
 const QUEUE_JOIN_BUTTON_IDS = {
   CLASSIC: 'queue:classic:join',
-  ARAM: 'queue:aram:join'
+  ARAM: 'queue:aram:join',
+  LEAVE: 'queue:leave'
 };
 
 function parseQueueJoinButtonId(customId) {
@@ -1248,6 +1249,9 @@ function parseQueueJoinButtonId(customId) {
   }
   if (customId === QUEUE_JOIN_BUTTON_IDS.ARAM) {
     return { mode: QUEUE_MODES.ARAM, args: [QUEUE_MODES.ARAM] };
+  }
+  if (customId === QUEUE_JOIN_BUTTON_IDS.LEAVE) {
+    return { mode: 'leave', args: [] };
   }
   return null;
 }
@@ -1261,7 +1265,11 @@ function buildQueueJoinActionRow() {
     new ButtonBuilder()
       .setCustomId(QUEUE_JOIN_BUTTON_IDS.ARAM)
       .setLabel('Entrar Queue ARAM')
-      .setStyle(ButtonStyle.Primary)
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId(QUEUE_JOIN_BUTTON_IDS.LEAVE)
+      .setLabel('Sair da Fila')
+      .setStyle(ButtonStyle.Danger)
   );
 }
 

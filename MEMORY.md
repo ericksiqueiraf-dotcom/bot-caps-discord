@@ -283,6 +283,10 @@ database/                    ← fallback JSON local
 - **4) Sala 2.0 (dono):** `!salalock [abrir]` (tranca Connect dos cargos, dono sempre entra; flag `locked` no registro + 🔒 no `!salahub`), `!salalimit <0-99>`, `!salaexpulsar @u` (só quem está na sala; não expulsa a si/bots). Prefixo + slash (`/salalock`, `/salalimit`, `/salaexpulsar`) + `!ajuda`. TESTRE + prod.
 - Validação: suíte **146/146**; `node --check` nos 8 arquivos; ambos bots reiniciados e online.
 
+### 2026-10-15 — Botão Sair da Fila no #fila
+- `QUEUE_JOIN_BUTTON_IDS.LEAVE` (`queue:leave`) + botão vermelho "Sair da Fila" no `buildQueueJoinActionRow()`; roteado no `interactionCreate` p/ `handleLeaveCommand` (TESTRE + prod). Painel do `#fila` é reconstruído no boot, então o botão aparece sozinho após restart.
+- Testes atualizados (`queue-buttons`, `queue-feed`: 20/20); ambos bots reiniciados e online.
+
 ### 2026-10-15 — !clubefixar: benefícios detalhados fixados no #clube-vip
 - `buildClubeDetalEmbed()` novo em `utils/lobbyUtils.js` (TESTRE + prod): embed "benefícios detalhados" com preços dinâmicos do config + comandos de cada tier + PIX e renovação -10%.
 - `!clubefixar` (só staff, prefixo + `/clubefixar`): posta no `#🔰clube-vip`, apaga fixada anterior igual e fixa a nova. `!staff` documenta o comando.

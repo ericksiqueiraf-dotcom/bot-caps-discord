@@ -808,6 +808,13 @@ client.on('interactionCreate', async (interaction) => {
       const queueJoin = parseQueueJoinButtonId(interaction.customId);
       if (queueJoin) {
         await interaction.deferReply({ ephemeral: true }).catch(() => null);
+        if (queueJoin.mode === 'leave') {
+          const context = createInteractionContext(interaction, {
+            content: '!sair'
+          });
+          await handlers.handleLeaveCommand(context);
+          return;
+        }
         const context = createInteractionContext(interaction, {
           content: ['!entrar', ...queueJoin.args].join(' ')
         });

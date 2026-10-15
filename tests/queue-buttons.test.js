@@ -24,23 +24,32 @@ describe('painel da fila (botoes)', () => {
     assert.strictEqual(parseQueueJoinButtonId(undefined), null);
   });
 
-  it('action row tem Entrar Queue CAPS + Entrar Queue ARAM', () => {
+  it('parse reconhece sair da fila', () => {
+    assert.deepStrictEqual(parseQueueJoinButtonId('queue:leave'), { mode: 'leave', args: [] });
+    assert.deepStrictEqual(parseQueueJoinButtonId(QUEUE_JOIN_BUTTON_IDS.LEAVE), { mode: 'leave', args: [] });
+  });
+
+  it('action row tem Entrar Queue CAPS + Entrar Queue ARAM + Sair da Fila', () => {
     const row = buildQueueJoinActionRow();
     const json = row.toJSON();
     assert.strictEqual(json.type, 1);
-    assert.strictEqual(json.components.length, 2);
-    const [classic, aram] = json.components;
+    assert.strictEqual(json.components.length, 3);
+    const [classic, aram, leave] = json.components;
     assert.strictEqual(classic.custom_id, QUEUE_JOIN_BUTTON_IDS.CLASSIC);
     assert.strictEqual(classic.label, 'Entrar Queue CAPS');
     assert.strictEqual(classic.style, 3); // Success
     assert.strictEqual(aram.custom_id, QUEUE_JOIN_BUTTON_IDS.ARAM);
     assert.strictEqual(aram.label, 'Entrar Queue ARAM');
     assert.strictEqual(aram.style, 1); // Primary
+    assert.strictEqual(leave.custom_id, QUEUE_JOIN_BUTTON_IDS.LEAVE);
+    assert.strictEqual(leave.label, 'Sair da Fila');
+    assert.strictEqual(leave.style, 4); // Danger
   });
 
   it('ids constantes tem os valores esperados', () => {
     assert.strictEqual(QUEUE_JOIN_BUTTON_IDS.CLASSIC, 'queue:classic:join');
     assert.strictEqual(QUEUE_JOIN_BUTTON_IDS.ARAM, 'queue:aram:join');
+    assert.strictEqual(QUEUE_JOIN_BUTTON_IDS.LEAVE, 'queue:leave');
   });
 
   it('parse diferencia classic de aram', () => {
