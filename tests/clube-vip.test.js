@@ -114,6 +114,14 @@ describe('!live e promo automática', () => {
     assert.equal(parseLiveLink(''), null);
   });
 
+  it('cooldown do !live por tier (Lendario 6h, VIP 12h, Apoiador 24h)', () => {
+    const { LIVE_COOLDOWN_BY_TIER_MS } = require('../commands/legacyCommands');
+    assert.equal(LIVE_COOLDOWN_BY_TIER_MS['👑 Lendário'], 6 * 3600000);
+    assert.equal(LIVE_COOLDOWN_BY_TIER_MS['⭐ VIP'], 12 * 3600000);
+    assert.equal(LIVE_COOLDOWN_BY_TIER_MS['💜 Apoiador'], 24 * 3600000);
+    assert.equal(LIVE_COOLDOWN_BY_TIER_MS['Jogador'], undefined);
+  });
+
   it('cooldown de 6h com formatacao', () => {
     const now = Date.now();
     assert.equal(getLiveCooldownRemainingMs(null, now), 0);

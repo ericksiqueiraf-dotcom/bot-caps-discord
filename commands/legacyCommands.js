@@ -927,11 +927,19 @@ async function handleQueroLiveCommand(message) {
   return await replyToMessage(message, '🔔 Você entrou no 🔴 Ao Vivo e será avisado das lives!');
 }
 
+const LIVE_COOLDOWN_BY_TIER_MS = {
+  '👑 Lendário': 6 * 60 * 60 * 1000,
+  '⭐ VIP': 12 * 60 * 60 * 1000,
+  '💜 Apoiador': 24 * 60 * 60 * 1000
+};
+
 async function handleLiveCommand(message, args = []) {
   const guild = message.guild;
   if (!guild) return;
-  if (getMemberVipTier(message.member) !== '👑 Lendário') {
-    return await replyToMessage(message, '❌ O `!live` é exclusivo do **👑 Lendário**. Veja o `!clube`.');
+  const liveTier = getMemberVipTier(message.member);
+  const tierCooldownMs = LIVE_COOLDOWN_BY_TIER_MS[liveTier] || 0;
+  if (!tierCooldownMs) {
+    return await replyToMessage(message, '❌ O `!live` é do **Clube VIP** (Apoiador 24h, VIP 12h, Lendário 6h). Veja o `!clube`.');
   }
   const parsed = parseLiveLink(args.join(' '));
   if (!parsed) {
@@ -939,7 +947,10 @@ async function handleLiveCommand(message, args = []) {
   }
   const systemMeta = await loadSystemMeta();
   systemMeta.liveCooldowns ||= {};
-  const remaining = getLiveCooldownRemainingMs(systemMeta.liveCooldowns[message.author.id]);
+  const remaining = Math.max(0, Number(systemMeta.liveCooldowns[message.author.id] || 0) + tierCooldownMs - Date.now());
+  if (remaining > 0) {
+    return await replyToMessage(message, `⏳ Aguarde **${formatCooldownRemaining(remaining)}** para divulgar de novo.`);
+  }
   if (remaining > 0) {
     return await replyToMessage(message, `⏳ Aguarde **${formatCooldownRemaining(remaining)}** para divulgar de novo.`);
   }
@@ -1040,7 +1051,7 @@ async function handleHelpCommand(message) {
       { name: '🕹️ Cadastro (1x)', value: '`!cadastrar Nick#TAG` • Vincula sua conta Riot\n`!nick Nick#TAG` • Atualiza seu nick' },
       { name: '🎮 Jogador (1/2) — Fila e voto', value: '`!regras` • Regulamento completo\n`!entrar` • Fila Classic (no canal Lobby Classic ou Lobby TIER S)\n`!entrar aram` • Fila ARAM\n`!entrar aram 2x2` • ARAM formato\n`!fila` • Mostra jogadores em sala\n`!espera` • Entra na espera (🔥 INFERNAL entra na posição 5)\n`!esperatiers` • Espera do Lobby TIER S (só Esmeralda+)\n`!espera ver` • Mostra a ordem\n`!espera sair` • Sai da espera\n`!sair` • Sai da sala\n`!votar 1/2` • Vota no vencedor (abre painel com botões p/ os 10 votarem)\n`!votar` • Reabre o painel de votação' },
       { name: '🎮 Jogador (2/2) — Ranking', value: '`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking geral (CLASSIC = pontos custom)\n`!placar tiers` • Só Esmeralda+\n`!top10` • Top 10 CLASSIC por pontos custom, desempate por winrate\n`!top10 tiers` • Top 10 só Esmeralda+\n`!topstreak` • Ranking Streak 🔥\n`!toprankinfernal` • Quem mais pegou INFERNAL na temporada 🔥\n`!clube` • Clube VIP: tiers, benefícios e membros 💎\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
-      { name: '💎 Clube VIP', value: '`!clube` • Tiers, assinatura PIX e renovação -10%\n`!querolive` • Entrar/sair do ping 🔴 Ao Vivo\n`!live <link>` • Divulgar live Twitch/YouTube/Kick (só 👑 Lendário, 1x a cada 6h)' },
+      { name: '💎 Clube VIP', value: '`!clube` • Tiers, assinatura PIX e renovação -10%\n`!querolive` • Entrar/sair do ping 🔴 Ao Vivo\n`!live <link>` • Divulgar live Twitch/YouTube/Kick (Lendário 6h, VIP 12h, Apoiador 24h)' },
       { name: '🔊 Salas temporárias (dono da sala)', value: 'Entre no ➕・criar-sala para ganhar sua sala\n`!salahub` • Lista as salas ativas\n`!sala` • Mostra sua sala • `!sala <nome>` renomeia\n`!convidar @u` • Chama alguém p/ sua sala\n`!salalock` • Tranca (`!salalock abrir` destranca)\n`!salalimit <0-99>` • Limite de usuários (0 = sem limite)\n`!salaexpulsar @u` • Remove alguém da sala\n`!limparvoz` • Apaga sua sala (dentro dela)' },
       { name: '🛠️ Staff', value: '`!staff` • Guia completo da staff (partida, roleta, limpeza, PDL, elos, temporada, clube)\nComandos de staff ficam só no `!staff` para não poluir esta lista.' }
     )
@@ -2189,6 +2200,7 @@ module.exports = {
   handleRegisterCommand, handleNickUpdateCommand, handleSyncPlayerRankCommand, handleVoteCommand, pendingAutoStarts, triggerAutoStart,
   handleRematchCommand, handleRouletteCommand, handleRoletaSairCommand, handleRulesCommand, handleStaffCommand, handlePdlCommand,
   handleResultVoteButton, handleClubeCommand, handleClubeAdminCommand, handleClubeFixarCommand, handleQueroLiveCommand, handleLiveCommand,
+  LIVE_COOLDOWN_BY_TIER_MS,
   handleSalaHubCommand, handleConvidarCommand, handleLimparVozCommand, handleSalaCommand,
   handleSalaLockCommand, handleSalaLimitCommand, handleSalaExpulsarCommand,
   getSummonerLevelGate,
