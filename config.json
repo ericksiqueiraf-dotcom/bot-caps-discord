@@ -3,16 +3,35 @@
   "region": "br1",
   "roles": {
     "registeredPlayerRoleId": "1558224995451277402",
+    "visitanteRoleId": "1559524311839014933",
     "infernalRoleName": "INFERNAL",
     "mvpPlayerRoleName": "MVP player",
-    "captainRoleId": "1558224992821575792"
+    "captainRoleId": "1559524310295773284"
   },
   "voiceChannels": {
     "classicQueueChannelId": "1558440536447393814",
     "classicTierSQueueChannelId": "1558440538049482833",
     "aramQueueChannelId": "1558440539383267421",
-    "postMatchWaitingChannelId": "1558446935797399623",
-    "postMatchTierSWaitingChannelId": "1558440530579300352"
+    "postMatchWaitingChannelId": "1559524355128430655",
+    "postMatchTierSWaitingChannelId": "1559524356949020783"
+  },
+  "tempVoice": {
+    "userLimit": 10,
+    "deleteDelaySeconds": 60,
+    "allowedRoleNames": [
+      "Capitão",
+      "Staff",
+      "⭐ VIP",
+      "👑 Lendário"
+    ],
+    "allowedRoleIds": [
+      "1558440451650883645",
+      "1559524310295773284",
+      "1559524305489100800",
+      "1558225001566568539",
+      "1558225002929594500"
+    ],
+    "hubChannelId": "1559524762441486357"
   },
   "tierS": {
     "minBaseMmr": 2000,
@@ -29,14 +48,14 @@
     "warnSeconds": 240
   },
   "textChannels": {
-    "rankUpdatesChannelId": "1558440503291154442",
-    "matchHistoryChannelId": "1558440508056018995",
-    "mvpAnnouncementsChannelId": "1558440509914087524",
-    "queueStatusChannelId": "1558440522115326042",
-    "matchOngoingChannelId": "1558440518881382400",
+    "rankUpdatesChannelId": "1559524337357426729",
+    "matchHistoryChannelId": "1559524327823511647",
+    "mvpAnnouncementsChannelId": "1559524330357006358",
+    "queueStatusChannelId": "1559524320974348351",
+    "matchOngoingChannelId": "1559524324069867635",
     "welcomeChannelId": "1558225015063978044",
-    "playerLogChannelId": "1558440511424168017",
-    "seasonLogChannelId": "1558440512913014845",
+    "playerLogChannelId": "1559524332495966222",
+    "seasonLogChannelId": "1559524335449018428",
     "smurfAlertChannelId": ""
   },
   "allowedGuildIds": [
@@ -45,5 +64,26 @@
   "automation": {
     "dailyRankUpdatesHour": 8,
     "dailyRankUpdatesMinute": 0
+  },
+  "cadastro": {
+    "minSummonerLevel": 30
+  },
+  "onboarding": {
+    "requiresRulesAcceptance": true,
+    "rulesVersion": 1
+  },
+  "clubePagamentos": {
+    "apoiador": {
+      "preco": 9.99,
+      "dias": 30
+    },
+    "vip": {
+      "preco": 16.9,
+      "dias": 30
+    },
+    "lendario": {
+      "preco": 21.9,
+      "dias": 30
+    }
   }
 }

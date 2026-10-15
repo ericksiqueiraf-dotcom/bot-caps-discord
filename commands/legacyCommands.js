@@ -1,4 +1,4 @@
-const { ChannelType, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { ChannelType, EmbedBuilder, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const config = require('../config.json');
 const { parseModeAndFormatArgs, shouldMirrorAramGroupedStats } = require('../domain/queue/selection');
 const { enterQueue } = require('../application/use-cases/enterQueue');
@@ -35,7 +35,10 @@ const {
   postMvpAnnouncement, postMatchHistoryLog, buildPlayerCardEmbed,
   buildSeasonHistoryEmbed, formatCustomRecord,
   postPlayerLogs, postMatchSummaryToSeasonLog, postSeasonSummaryToSeasonLog, postSmurfAlerts,
-  getCustomPointsDelta, getCustomDisplayScore, buildTopInfernalEmbed
+  getCustomPointsDelta, getCustomDisplayScore, buildTopInfernalEmbed, buildQueueFeedText, postQueueFeedMessage,
+  buildQueueJoinActionRow, getMemberVipTier, buildVipTierResolver, buildClubeEmbed,
+  parseLiveLink, getLiveCooldownRemainingMs, formatCooldownRemaining,
+  buildLiveEmbed, findPromoChannel, ensureAoVivoRole
 } = require('../utils/lobbyUtils');
 
 const { 
@@ -43,7 +46,7 @@ const {
   savePlayerStats, loadCurrentMatch, saveCurrentMatch, 
   loadSeasonMeta, saveSeasonMeta, loadSeasonHistory, 
   saveSeasonHistory, loadSystemMeta, saveSystemMeta,
-  loadContentTemplates,
+  loadContentTemplates, loadVipSubscriptions,
   withQueueOperationLock 
 } = require('../services/dataService');
 const { getResolvedContentTemplates } = require('../services/contentTextService');
@@ -357,6 +360,8 @@ async function handleEnterCommand(message, args) {
         createEnterQueueDeps,
         replyToMessage,
         updateQueueDashboard,
+        buildQueueFeedText,
+        postQueueFeedMessage,
         triggerAutoStart,
         pendingAutoStarts
       }
@@ -574,21 +579,17 @@ async function handleListCommand(message, args = []) {
     const currentVoiceChannelId = message.member?.voice?.channelId || null;
     const lobbies = Object.values(queueData?.lobbies || {});
     
-    if (lobbies.length === 0) {
-      return await replyToMessage(message, 'Nao ha nenhuma fila ativa no momento.');
-    }
-
     // Tentar encontrar um lobby específico pelo seletor ou pelo canal atual
     const lobby = findLobbyBySelector(queueData, args) || (currentVoiceChannelId ? findLobbyByChannelId(queueData, currentVoiceChannelId) : null);
 
     if (lobby) {
       // Se encontrou um lobby específico, mostra o detalhe dele
       const embed = buildQueueEmbed(lobby);
-      await sendToMessageChannel(message, { embeds: [embed] });
+      await sendToMessageChannel(message, { embeds: [embed], components: [buildQueueJoinActionRow()] });
     } else {
       // Se não especificou e não está em um canal de lobby, mostra um resumo de todos
       const embed = buildQueueEmbed(null, lobbies);
-      await sendToMessageChannel(message, { embeds: [embed] });
+      await sendToMessageChannel(message, { embeds: [embed], components: [buildQueueJoinActionRow()] });
     }
 
     await updateQueueDashboard(message.guild);
@@ -612,6 +613,9 @@ async function handleWaitingListCommand(message, args = [], options = {}) {
     const modeLabel = mode === QUEUE_MODES.ARAM ? `ARAM ${format || '5x5'}` : (tierSOnly ? 'CLASSIC TIER S' : 'CLASSIC 5x5');
     let players = [];
     let response = null;
+    let justJoined = false;
+    let joinPosition = 0;
+    let joinInfernal = false;
 
     await withQueueOperationLock(`${message.guild.id}:global:queue`, async () => {
       const queueData = await loadQueue();
@@ -703,10 +707,13 @@ async function handleWaitingListCommand(message, args = [], options = {}) {
         }
         queueData.waitingLists[listKey] = currentList;
         await saveQueue(queueData);
+        justJoined = true;
+        joinInfernal = Boolean(isInfernal);
       }
 
       players = currentList;
       const position = currentList.findIndex((player) => player.discordId === message.author.id) + 1;
+      if (justJoined) joinPosition = position;
       if (!isViewOnly && position > 0) {
         response = playerIndex === -1
           ? `Voce entrou na fila de espera na posicao **${position}**.`
@@ -716,6 +723,18 @@ async function handleWaitingListCommand(message, args = [], options = {}) {
 
     if (response) {
       await replyToMessage(message, response);
+    }
+
+    // Feed automatico no canal #fila a cada entrada na !espera / !esperatiers
+    if (justJoined && joinPosition > 0) {
+      const feedText = buildQueueFeedText({
+        kind: 'espera-join',
+        discordId: message.author.id,
+        modeLabel,
+        position: joinPosition,
+        isInfernalBoost: joinInfernal
+      });
+      if (feedText) await postQueueFeedMessage(message.guild, feedText);
     }
 
     if (players.length === 0) {
@@ -804,7 +823,7 @@ async function handlePingCommand(message) {
 async function handleLeaderboardCommand(message, args = []) {
   const statsData = await loadPlayerStats();
   const { mode, format, tierSOnly } = parseModeAndFormatArgs(args);
-  const embed = buildLeaderboardEmbed(statsData, mode, format, { tierSOnly });
+  const embed = buildLeaderboardEmbed(statsData, mode, format, { tierSOnly, tierResolver: buildVipTierResolver(message.guild) });
   await sendToMessageChannel(message, { embeds: [embed] });
 }
 
@@ -812,7 +831,7 @@ async function handleTopTenCommand(message, args = []) {
   const statsData = await loadPlayerStats();
   const seasonMeta = await loadSeasonMeta();
   const { mode, format, tierSOnly } = parseModeAndFormatArgs(args);
-  const embed = buildTopTenEmbed(statsData, seasonMeta, mode, format, { tierSOnly });
+  const embed = buildTopTenEmbed(statsData, seasonMeta, mode, format, { tierSOnly, tierResolver: buildVipTierResolver(message.guild) });
   await sendToMessageChannel(message, { embeds: [embed] });
 }
 
@@ -835,7 +854,80 @@ async function handlePlayerCardCommand(message, targetUser = null) {
   const statsData = await loadPlayerStats();
   const playerStats = Object.values(statsData.players || {}).find(p => p.discordId === selectedUser.id);
   if (!playerStats) return await replyToMessage(message, 'Jogador nao registrado no sistema.');
-  await sendToMessageChannel(message, { embeds: [buildPlayerCardEmbed(playerStats, selectedUser)] });
+  const targetMember = message.guild?.members?.cache?.get?.(selectedUser.id) || null;
+  await sendToMessageChannel(message, { embeds: [buildPlayerCardEmbed(playerStats, selectedUser, getMemberVipTier(targetMember))] });
+}
+
+async function handleQueroLiveCommand(message) {
+  const guild = message.guild;
+  if (!guild) return;
+  const role = await ensureAoVivoRole(guild);
+  if (!role) return await replyToMessage(message, 'Não consegui liberar o cargo 🔴 Ao Vivo agora. Tente de novo.');
+  const member = message.member;
+  if (!member) return;
+  if (member.roles.cache.has(role.id)) {
+    await member.roles.remove(role.id, '!quero-live: saiu').catch(() => null);
+    return await replyToMessage(message, '🔕 Você saiu do 🔴 Ao Vivo e não receberá pings de live.');
+  }
+  await member.roles.add(role.id, '!quero-live: entrou').catch(() => null);
+  return await replyToMessage(message, '🔔 Você entrou no 🔴 Ao Vivo e será avisado das lives!');
+}
+
+async function handleLiveCommand(message, args = []) {
+  const guild = message.guild;
+  if (!guild) return;
+  if (getMemberVipTier(message.member) !== '👑 Lendário') {
+    return await replyToMessage(message, '❌ O `!live` é exclusivo do **👑 Lendário**. Veja o `!clube`.');
+  }
+  const parsed = parseLiveLink(args.join(' '));
+  if (!parsed) {
+    return await replyToMessage(message, '❌ Uso: `!live <link da Twitch, YouTube ou Kick>`.');
+  }
+  const systemMeta = await loadSystemMeta();
+  systemMeta.liveCooldowns ||= {};
+  const remaining = getLiveCooldownRemainingMs(systemMeta.liveCooldowns[message.author.id]);
+  if (remaining > 0) {
+    return await replyToMessage(message, `⏳ Aguarde **${formatCooldownRemaining(remaining)}** para divulgar de novo.`);
+  }
+  const role = await ensureAoVivoRole(guild);
+  const embed = buildLiveEmbed({ memberMention: `<@${message.author.id}>`, url: parsed.url, platform: parsed.platform });
+  const target = findPromoChannel(guild) || message.channel;
+  const payload = { embeds: [embed] };
+  if (role) payload.content = `<@&${role.id}> 🔴 **${message.author.username}** está ao vivo!`;
+  await target.send(payload).catch(() => null);
+  systemMeta.liveCooldowns[message.author.id] = Date.now();
+  await saveSystemMeta(systemMeta);
+  return await replyToMessage(message, '🔴 Live divulgada!');
+}
+
+async function handleClubeCommand(message) {
+  const paymentsEnabled = Boolean(process.env.MP_ACCESS_TOKEN);
+  const components = [];
+  if (paymentsEnabled) {
+    const { TIER_KEYS, TIER_ROLE_NAMES, findRenewableSub } = require('../services/clubePaymentsService');
+    let subscriptions = [];
+    try {
+      ({ subscriptions } = await loadVipSubscriptions());
+    } catch { /* sem store, só Assinar */ }
+    const guildId = message.guild?.id;
+    const discordId = message.author?.id;
+    const row = new ActionRowBuilder().addComponents(
+      TIER_KEYS.map((tierKey) => {
+        const renewable = subscriptions.length && guildId && discordId
+          ? findRenewableSub(subscriptions, guildId, discordId, tierKey)
+          : null;
+        return new ButtonBuilder()
+          .setCustomId(renewable ? `clube:buy:${tierKey}:renew` : `clube:buy:${tierKey}`)
+          .setLabel(renewable ? `Renovar ${TIER_ROLE_NAMES[tierKey]} -10%` : `Assinar ${TIER_ROLE_NAMES[tierKey]}`)
+          .setStyle(renewable ? ButtonStyle.Success : ButtonStyle.Primary);
+      })
+    );
+    components.push(row);
+  }
+  const payload = { embeds: [buildClubeEmbed(message.guild)] };
+  if (components.length) payload.components = components;
+  else payload.content = '💳 Assinaturas PIX em configuração — fale com a Staff.';
+  await sendToMessageChannel(message, payload);
 }
 
 async function handleHelpCommand(message) {
@@ -847,7 +939,8 @@ async function handleHelpCommand(message) {
     .addFields(
       { name: '🕹️ Cadastro (1x)', value: '`!cadastrar Nick#TAG` • Vincula sua conta Riot\n`!nick Nick#TAG` • Atualiza seu nick' },
       { name: '🎮 Jogador (1/2) — Fila e voto', value: '`!regras` • Regulamento completo\n`!entrar` • Fila Classic (no canal Lobby Classic ou Lobby TIER S)\n`!entrar aram` • Fila ARAM\n`!entrar aram 2x2` • ARAM formato\n`!fila` • Mostra jogadores em sala\n`!espera` • Entra na espera (🔥 INFERNAL entra na posição 5)\n`!esperatiers` • Espera do Lobby TIER S (só Esmeralda+)\n`!espera ver` • Mostra a ordem\n`!espera sair` • Sai da espera\n`!sair` • Sai da sala\n`!votar 1/2` • Vota no vencedor (abre painel com botões p/ os 10 votarem)\n`!votar` • Reabre o painel de votação' },
-      { name: '🎮 Jogador (2/2) — Ranking', value: '`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking geral (CLASSIC = pontos custom)\n`!placar tiers` • Só Esmeralda+\n`!top10` • Top 10 CLASSIC por pontos custom, desempate por winrate\n`!top10 tiers` • Top 10 só Esmeralda+\n`!topstreak` • Ranking Streak 🔥\n`!toprankinfernal` • Quem mais pegou INFERNAL na temporada 🔥\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
+      { name: '🎮 Jogador (2/2) — Ranking', value: '`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking geral (CLASSIC = pontos custom)\n`!placar tiers` • Só Esmeralda+\n`!top10` • Top 10 CLASSIC por pontos custom, desempate por winrate\n`!top10 tiers` • Top 10 só Esmeralda+\n`!topstreak` • Ranking Streak 🔥\n`!toprankinfernal` • Quem mais pegou INFERNAL na temporada 🔥\n`!clube` • Clube VIP: tiers, benefícios e membros 💎\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
+      { name: '💎 Clube VIP', value: '`!clube` • Tiers, assinatura PIX e renovação -10%\n`!querolive` • Entrar/sair do ping 🔴 Ao Vivo\n`!live <link>` • Divulgar live Twitch/YouTube/Kick (só 👑 Lendário, 1x a cada 6h)' },
       { name: '🛠️ Staff', value: '`!staff` • Guia completo da staff\n`!pdl @u -50 motivo` • Ajuste/punição de PDL Classic (só Admin)\n`!remover @u`, `!limpar [qnt]`, `!limparsalas [sala]` • Limpa sala A/B/C (sem letra = todas)\n`!sincronizarelo @u`, `!sincronizartodos` (ou `!sync todos`), `!sync`, `!onboarding`' },
       { name: '⚙️ Partida (Staff)', value: '`!start [sala]`, `!vitoria [1|2] [sala]`, `!cancelarstart [sala]`\n`!rematch [sala]` • Volta os 10 pra fila, rebalanceia e inicia na hora' },
       { name: '📊 Temporada', value: '`!temporadas`, `!resetgeral` (Admin)' }
@@ -856,7 +949,7 @@ async function handleHelpCommand(message) {
     .setTimestamp();
   const sent = await sendToMessageChannel(message, { embeds: [embed] });
     if (!sent) {
-      await replyToMessage(message, '📚 Comandos: `!cadastrar Nick#TAG` • `!entrar` • `!entrar aram` • `!fila` • `!espera` • `!sair` • `!votar 1/2` • `!perfil` • `!placar` • `!top10` • `!topstreak` • `!staff` • `!start` • `!vitoria` • `!temporadas`');
+      await replyToMessage(message, '📚 Comandos: `!cadastrar Nick#TAG` • `!entrar` • `!entrar aram` • `!fila` • `!espera` • `!sair` • `!votar 1/2` • `!perfil` • `!placar` • `!top10` • `!topstreak` • `!clube` • `!querolive` • `!live` • `!staff` • `!start` • `!vitoria` • `!temporadas`');
     }
   } catch (error) {
     console.error('[ERRO] !ajuda:', error);
@@ -1769,6 +1862,119 @@ async function handleStaffCommand(message) {
   }
 }
 
+// --- Temp Voice Management Commands ---
+
+const {
+  inviteToTempRoom,
+  renameTempRoom,
+  deleteTempRoom,
+  listTempRooms,
+  isTempRoomOwner,
+  getUserTempRoom
+} = require('../services/tempVoiceService');
+
+async function handleSalaHubCommand(message, args = []) {
+  try {
+    const guild = message.guild;
+    const rooms = listTempRooms(guild);
+    
+    if (rooms.length === 0) {
+      return await replyToMessage(message, '📭 Nenhuma sala temporária ativa no momento.');
+    }
+    
+    const lines = rooms.map((r) => 
+      `🔊 **${r.channel.name}** — Dono: ${r.owner} — ${r.memberCount} membro(s)`
+    );
+    
+    await replyToMessage(message, `**Salas temporárias ativas (${rooms.length}):**\n${lines.join('\n')}`);
+  } catch (error) {
+    console.error('[ERRO] !salahub:', error);
+    await replyToMessage(message, `❌ Erro ao listar salas: \`${error.message}\``);
+  } finally {
+    if (message.deletable) await message.delete().catch(() => null);
+  }
+}
+
+async function handleConvidarCommand(message, args = []) {
+  try {
+    const targetUser = message.mentions.users.first();
+    if (!targetUser) {
+      return await replyToMessage(message, '❌ Use: `!convidar @usuario` para convidar alguém para sua sala.');
+    }
+    
+    if (targetUser.bot) {
+      return await replyToMessage(message, '❌ Não é possível convidar bots.');
+    }
+    
+    if (targetUser.id === message.author.id) {
+      return await replyToMessage(message, '❌ Você não pode se convidar.');
+    }
+    
+    const result = await inviteToTempRoom(message.member, targetUser);
+    await replyToMessage(message, result.message);
+  } catch (error) {
+    console.error('[ERRO] !convidar:', error);
+    await replyToMessage(message, `❌ Erro ao convidar: \`${error.message}\``);
+  } finally {
+    if (message.deletable) await message.delete().catch(() => null);
+  }
+}
+
+async function handleLimparVozCommand(message, args = []) {
+  try {
+    // Check if user is in a temp voice channel they own
+    const voiceChannel = message.member.voice.channel;
+    if (!voiceChannel) {
+      return await replyToMessage(message, '❌ Você precisa estar em uma sala temporária para usar este comando.');
+    }
+    
+    const { isManagedTempVoiceChannel } = require('../services/tempVoiceService');
+    if (!isManagedTempVoiceChannel(voiceChannel)) {
+      return await replyToMessage(message, '❌ Este comando só funciona em salas temporárias criadas pelo bot.');
+    }
+    
+    if (!isTempRoomOwner(message.member, voiceChannel.id)) {
+      return await replyToMessage(message, '❌ Apenas o dono da sala ou administradores podem limpar a sala.');
+    }
+    
+    // Delete the channel
+    const result = await deleteTempRoom(message.member);
+    await replyToMessage(message, result.message);
+  } catch (error) {
+    console.error('[ERRO] !limparvoz:', error);
+    await replyToMessage(message, `❌ Erro ao limpar sala: \`${error.message}\``);
+  } finally {
+    if (message.deletable) await message.delete().catch(() => null);
+  }
+}
+
+async function handleSalaCommand(message, args = []) {
+  try {
+    if (args.length === 0) {
+      const roomId = getUserTempRoom(message.author.id, message.guild.id);
+      if (!roomId) {
+        return await replyToMessage(message, '❌ Você não possui uma sala temporária ativa.\nUse `!sala <novo-nome>` para renomear sua sala.');
+      }
+      
+      const channel = message.guild.channels.cache.get(roomId);
+      if (channel) {
+        return await replyToMessage(message, `🔊 Sua sala atual: **${channel.name}** (${channel.members.size} membro(s))`);
+      }
+      return await replyToMessage(message, '❌ Sala não encontrada.');
+    }
+    
+    // Rename command: !sala <novo-nome>
+    const newName = args.join(' ');
+    const result = await renameTempRoom(message.member, newName);
+    await replyToMessage(message, result.message);
+  } catch (error) {
+    console.error('[ERRO] !sala:', error);
+    await replyToMessage(message, `❌ Erro ao gerenciar sala: \`${error.message}\``);
+  } finally {
+    if (message.deletable) await message.delete().catch(() => null);
+  }
+}
+
 async function handleRoletaSairCommand(message, args = []) {
   const { handleRouletteOptOutFlow } = require('./handlers/rouletteCommandHandlers');
   try {
@@ -1834,7 +2040,8 @@ module.exports = {
   handleSyncAllRolesCommand, handleSyncAllPlayersEloCommand, handleVictoryCommand, handleOnboardingCommand, handleClearCommand,
   handleRegisterCommand, handleNickUpdateCommand, handleSyncPlayerRankCommand, handleVoteCommand, pendingAutoStarts, triggerAutoStart,
   handleRematchCommand, handleRouletteCommand, handleRoletaSairCommand, handleRulesCommand, handleStaffCommand, handlePdlCommand,
-  handleResultVoteButton,
+  handleResultVoteButton, handleClubeCommand, handleQueroLiveCommand, handleLiveCommand,
+  handleSalaHubCommand, handleConvidarCommand, handleLimparVozCommand, handleSalaCommand,
   findRecentVictoryByLetter,
   findPendingAutoStartLobby,
   resolveCleanupTargets

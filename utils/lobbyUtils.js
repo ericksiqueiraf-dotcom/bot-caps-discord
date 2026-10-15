@@ -1,4 +1,4 @@
-const { ChannelType, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
+const { ChannelType, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const config = require('../config.json');
 const { QUEUE_MODES } = require('../domain/constants/queueModes');
 const { KNOWN_ARAM_FORMATS, isGroupedAramStreakFormat, normalizeQueueFormat } = require('../domain/constants/queueFormats');
@@ -14,7 +14,7 @@ const {
 const { 
   loadQueue, saveQueue, loadSystemMeta, saveSystemMeta, 
   loadPlayerStats, savePlayerStats, loadSeasonMeta, 
-  loadSeasonHistory, saveSeasonHistory 
+  loadSeasonHistory, saveSeasonHistory, loadVipSubscriptions, saveVipSubscriptions
 } = require('../services/dataService');
 const { calculateSeedRating, calculateHybridMmr, calculateEloDelta, RATING_VERSION, DEFAULT_CUSTOM_POINTS } = require('../services/balanceService');
 
@@ -27,15 +27,6 @@ const THEME = {
 };
 
 const FOOTER_PREFIX = 'Caps Bot';
-
-// Escopo de guilds: `allowedGuildIds` no config restringe onde o bot atua.
-// Vazio/ausente = todas (comportamento da producao). O ambiente de teste
-// fixa só a guild de teste para não cruzar comandos com a principal.
-function isGuildAllowed(guildId) {
-  const allowed = config.allowedGuildIds;
-  if (!Array.isArray(allowed) || allowed.length === 0) return true;
-  return allowed.map(String).includes(String(guildId));
-}
 
 let lastDailyRankPostKey = null;
 
@@ -112,8 +103,20 @@ function getPreferredRankRoleNames(rankTier) {
   return Array.isArray(mapped) ? mapped : [mapped];
 }
 
+function getConfiguredRankRoleId(rankTier) {
+  const id = config.roles?.rankRoleIds?.[rankTier];
+  return id ? String(id) : null;
+}
+
 function findRankRole(guild, rankTier) {
   const roles = guild.roles.cache;
+
+  // 1) ID configurado (a prova de rename/emoji) — ex: Prata pelo ID do Discord
+  const configuredId = getConfiguredRankRoleId(rankTier);
+  if (configuredId && typeof roles.get === 'function') {
+    const byId = roles.get(configuredId);
+    if (byId) return byId;
+  }
 
   for (const preferredName of getPreferredRankRoleNames(rankTier)) {
     const preferredNormalized = normalizeRoleName(preferredName);
@@ -126,6 +129,9 @@ function findRankRole(guild, rankTier) {
 
 function isRankRole(role) {
   if (!role) return false;
+  // Cargo de elo fixado por ID no config tambem conta (limpeza de cargos antigos)
+  const configuredIds = Object.values(config.roles?.rankRoleIds || {}).map(String);
+  if (configuredIds.includes(String(role.id))) return true;
   const normalizedName = role.name.replace(/\s+/g, '').toLowerCase();
   if (ALL_RANK_ROLE_NAMES.some((name) => name.replace(/\s+/g, '').toLowerCase() === normalizedName)) {
     return true;
@@ -133,8 +139,195 @@ function isRankRole(role) {
   return Boolean(getRankTierFromRoleName(role.name));
 }
 
-const MVP_ROLE_NAMES = [config.roles?.mvpPlayerRoleName || 'MVP player', '⭐ MVP'];
-const INFERNAL_ROLE_NAME = config.roles?.infernalRoleName || 'INFERNAL';
+const MVP_ROLE_NAMES = [config.roles?.mvpPlayerRoleName || '⭐ MVP', '⭐ MVP', 'MVP player'];
+const INFERNAL_ROLE_NAME = config.roles?.infernalRoleName || '🔥 INFERNAL';
+
+// ─── Clube VIP (status e comodidade — zero vantagem competitiva) ─────────────
+// Ordem = prioridade (maior tier primeiro). Nomes exatos dos cargos no Discord.
+const VIP_TIERS = [
+  { name: '👑 Lendário', seal: '👑' },
+  { name: '⭐ VIP', seal: '⭐' },
+  { name: '💜 Apoiador', seal: '💜' }
+];
+
+function getMemberVipTier(member) {
+  try {
+    const cache = member?.roles?.cache;
+    const roles = cache?.values ? [...cache.values()] : Array.isArray(cache) ? cache : [];
+    for (const tier of VIP_TIERS) {
+      if (roles.some((role) => String(role?.name || '') === tier.name)) return tier.name;
+    }
+  } catch { /* sem cargos resolviveis */ }
+  return null;
+}
+
+function getVipSeal(tierName) {
+  const tier = VIP_TIERS.find((item) => item.name === tierName);
+  return tier ? ` ${tier.seal}` : '';
+}
+
+// Resolve discordId -> ' ⭐' (selo) ou '' usando o cache de membros da guild.
+// Puro e barato: sem fetch, só leitura do cache.
+function buildVipTierResolver(guild) {
+  return (discordId) => {
+    try {
+      const member = guild?.members?.cache?.get?.(String(discordId));
+      const tier = getMemberVipTier(member);
+      return tier ? getVipSeal(tier) : '';
+    } catch { return ''; }
+  };
+}
+
+// ─── !live + promo automática do clube ──────────────────────────────────────
+const AO_VIVO_ROLE_NAME = '🔴 Ao Vivo';
+const LIVE_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+const LIVE_ALLOWED_HOSTS = new Set([
+  'twitch.tv', 'www.twitch.tv',
+  'youtube.com', 'www.youtube.com', 'youtu.be',
+  'kick.com', 'www.kick.com'
+]);
+const CLUBE_PROMO_HOURS = [12, 19];
+const CLUBE_PROMO_MIN_GAP_MS = 10 * 60 * 60 * 1000;
+
+function parseLiveLink(raw) {
+  const text = String(raw || '').trim();
+  if (!/^https?:\/\//i.test(text)) return null;
+  let url = null;
+  try {
+    url = new URL(text);
+  } catch { return null; }
+  if (!LIVE_ALLOWED_HOSTS.has(url.hostname.toLowerCase())) return null;
+  if (url.pathname.replace(/\//g, '').length === 0) return null;
+  const host = url.hostname.toLowerCase();
+  const platform = host.includes('twitch') ? 'Twitch' : host.includes('youtu') ? 'YouTube' : 'Kick';
+  return { url: url.toString(), platform };
+}
+
+function getLiveCooldownRemainingMs(lastTs, nowMs = Date.now()) {
+  if (!lastTs) return 0;
+  return Math.max(0, Number(lastTs) + LIVE_COOLDOWN_MS - nowMs);
+}
+
+function formatCooldownRemaining(ms) {
+  const totalMinutes = Math.ceil(ms / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours <= 0) return `${minutes}min`;
+  return `${hours}h${minutes ? ` ${minutes}min` : ''}`;
+}
+
+function buildLiveEmbed({ memberMention, url, platform }) {
+  return new EmbedBuilder()
+    .setColor('#FF0000')
+    .setTitle('🔴 AO VIVO')
+    .setDescription(`${memberMention} está ao vivo na **${platform}**!\n${url}`)
+    .setFooter({ text: `${FOOTER_PREFIX} • !live` })
+    .setTimestamp();
+}
+
+function buildClubePromoEmbed(config) {
+  const price = (key) => {
+    const value = Number(config?.clubePagamentos?.[key]?.preco);
+    return Number.isFinite(value) && value > 0 ? value : null;
+  };
+  const line = (emoji, name, key) => {
+    const value = price(key);
+    return `${emoji} **${name}**${value ? ` — R$ ${value.toFixed(2).replace('.', ',')}/30 dias` : ''}`;
+  };
+  return new EmbedBuilder()
+    .setColor(THEME.RANK)
+    .setTitle('💎 Já conhece o Clube VIP?')
+    .setDescription(
+      [line('💜', 'Apoiador', 'apoiador'), line('⭐', 'VIP', 'vip'), line('👑', 'Lendário', 'lendario')].join('\n')
+      + '\n\nStatus e comodidades **sem vantagem no jogo**. Use `!clube` para assinar via PIX.'
+    )
+    .setFooter({ text: `${FOOTER_PREFIX} • Clube VIP` })
+    .setTimestamp();
+}
+
+// Anti-duplicação da promo: só posta se passou o intervalo mínimo.
+function shouldPostClubePromo(lastPromoTs, nowMs = Date.now()) {
+  if (!lastPromoTs) return true;
+  const last = new Date(lastPromoTs).getTime();
+  if (!Number.isFinite(last)) return true;
+  return nowMs - last >= CLUBE_PROMO_MIN_GAP_MS;
+}
+
+function findPromoChannel(guild) {
+  try {
+    const channels = [...(guild?.channels?.cache?.values?.() || [])];
+    return channels.find((c) => c?.isTextBased?.() && String(c?.name || '') === '💬・geral-leagueoflegends')
+      || channels.find((c) => c?.isTextBased?.() && String(c?.name || '').includes('geral-leagueoflegends'))
+      || null;
+  } catch { return null; }
+}
+
+async function ensureAoVivoRole(guild) {
+  try {
+    const existing = guild?.roles?.cache?.find?.((r) => String(r?.name || '') === AO_VIVO_ROLE_NAME);
+    if (existing) {
+      if (!existing.mentionable) await existing.edit({ mentionable: true }).catch(() => null);
+      return existing;
+    }
+    return await guild?.roles?.create?.({ name: AO_VIVO_ROLE_NAME, color: '#FF0000', mentionable: true, reason: 'Clube VIP: cargo opt-in de !live' }).catch(() => null);
+  } catch { return null; }
+}
+
+function countVipTierMembers(guild, tierName) {  try {
+    const role = guild?.roles?.cache?.find?.((item) => String(item?.name || '') === tierName);
+    return Number(role?.members?.size || 0);
+  } catch { return 0; }
+}
+
+// true se existe assinatura ativa criada há menos de `windowMs` (o webhook
+// já anunciou nesses casos — o listener não deve duplicar).
+function isRecentVipSubscription(subscriptions, guildId, discordId, nowMs = Date.now(), windowMs = 10 * 60 * 1000) {
+  try {
+    return (Array.isArray(subscriptions) ? subscriptions : []).some((sub) => {
+      if (sub?.status !== 'active') return false;
+      if (String(sub?.guildId || '') !== String(guildId || '')) return false;
+      if (String(sub?.discordId || '') !== String(discordId || '')) return false;
+      const startedAt = new Date(sub?.startedAt || 0).getTime();
+      return Number.isFinite(startedAt) && nowMs - startedAt < windowMs;
+    });
+  } catch { return false; }
+}
+
+function buildClubeEmbed(guild) {
+  const tierPrice = (key) => {
+    const value = Number(config?.clubePagamentos?.[key]?.preco);
+    return Number.isFinite(value) && value > 0 ? `R$ ${value.toFixed(2).replace('.', ',')}/30 dias` : null;
+  };
+  const tierName = (emoji, roleName, key) => {
+    const price = tierPrice(key);
+    return `${emoji} ${roleName.split(' ').slice(1).join(' ')}${price ? ` — ${price}` : ''} — ${countVipTierMembers(guild, roleName)} membro(s)`;
+  };
+  const embed = new EmbedBuilder()
+    .setColor(THEME.RANK)
+    .setTitle('💎 Clube VIP — CAPS Arena')
+    .setDescription('Status e comodidade para quem apoia a Arena. **O clube NÃO dá vantagem em fila, sorteio, PDL ou vitória.**')
+    .addFields(
+      {
+        name: tierName('💜', '💜 Apoiador', 'apoiador'),
+        value: 'Acesso ao lounge 💎・CLUBE VIP • selo 💜 no perfil (`!perfil`) e no ranking • anúncio de boas-vindas ao entrar no clube.'
+      },
+      {
+        name: tierName('⭐', '⭐ VIP', 'vip'),
+        value: 'Tudo do Apoiador • criar sala temporária no ➕・criar-sala • `!sala <nome>` para renomear • `!convidar @usuário` para chamar gente • `!limparvoz` para apagar a sala.'
+      },
+      {
+        name: tierName('👑', '👑 Lendário', 'lendario'),
+        value: 'Tudo do VIP • `!live <link>` (divulgue sua stream Twitch/YouTube/Kick com ping 🔴 Ao Vivo, 1x a cada 6h) • anúncio de destaque • nome no topo da lista de membros.'
+      },
+      {
+        name: 'Como aderir',
+        value: 'Clique em **Assinar** no tier desejado e pague via PIX — ativação automática. Sem botões abaixo? Fale com a Staff.'
+      }
+    )
+    .setFooter({ text: `${FOOTER_PREFIX} • Clube VIP` })
+    .setTimestamp();
+  return embed;
+}
 const INFERNAL_STREAK = 5;
 const MVP_VOTE_DURATION_MS = 2 * 60 * 1000;
 const pendingMvpVotes = new Map();
@@ -488,7 +681,7 @@ function findMvpRole(guild) {
 }
 
 async function ensureMvpRole(guild) {
-  return findMvpRole(guild) || ensureNamedRole(guild, config.roles?.mvpPlayerRoleName || 'MVP player');
+  return findMvpRole(guild) || ensureNamedRole(guild, config.roles?.mvpPlayerRoleName || '⭐ MVP');
 }
 
 function findInfernalRole(guild) {
@@ -871,6 +1064,26 @@ async function syncInfernalRolesAfterMatch(guild, winners = [], losers = []) {
         failed.push({ discordId: winner.discordId, action: 'add_role', error: err.message });
       }
     }
+
+    // Degustação do clube: nova conquista INFERNAL ganha 💜 Apoiador até o
+    // INFERNAL vencer — exceto quem já tem qualquer tier (pago ou degustação).
+    if (!stillValid) {
+      try {
+        const memberRoles = [...member.roles.cache.values()].map((r) => String(r?.name || ''));
+        const hasVipTier = VIP_TIERS.some((tier) => memberRoles.includes(tier.name));
+        if (!hasVipTier) {
+          const apoiadorRole = guild.roles.cache.find((r) => String(r?.name || '') === '💜 Apoiador');
+          if (apoiadorRole) {
+            await member.roles.add(apoiadorRole, 'Degustação INFERNAL: Apoiador').catch(() => null);
+            const entry = newlyAwarded.find((a) => String(a.discordId) === String(winner.discordId));
+            if (entry) entry.trialVip = true;
+            const trialStats = await loadPlayerStats();
+            upsertPlayerStats(trialStats, winner, { trialVip: true });
+            await savePlayerStats(trialStats);
+          }
+        }
+      } catch { /* degustação é opcional, nunca quebra o fluxo */ }
+    }
   }
 
   if (failed.length > 0) {
@@ -880,20 +1093,26 @@ async function syncInfernalRolesAfterMatch(guild, winners = [], losers = []) {
 }
 
 async function reconcileInfernalRoles(guild) {
-  // Limpa órfãos: membro com role no Discord mas sem infernalExpiresAt válida no banco
-  if (!guild) return { removedOrphans: 0, failed: [] };
+  // Duas vias: remove órfãos (tem cargo sem validade no banco) E concede
+  // faltantes (banco válido mas sem cargo — ex. falha de hierarquia anterior).
+  if (!guild) return { removedOrphans: 0, grantedMissing: [], failed: [] };
   const infernalRole = findInfernalRole(guild);
-  if (!infernalRole) return { removedOrphans: 0, failed: [] };
+  if (!infernalRole) return { removedOrphans: 0, grantedMissing: [], failed: [] };
   // role.members depende de cache: busca geral p/ enxergar todos (servidor pequeno, 1 chamada)
   await guild.members.fetch().catch(() => null);
   const statsData = await loadPlayerStats();
+  const now = Date.now();
+  const failed = [];
+  const grantedMissing = [];
   let removedOrphans = 0;
+  const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
+  const hierarchyOk = !botMember || infernalRole.position < botMember.roles.highest.position;
+
   for (const [, member] of infernalRole.members) {
     const stored = Object.values(statsData.players || {}).find((entry) => entry.discordId === member.id) || null;
-    const valid = stored?.infernalExpiresAt && new Date(stored.infernalExpiresAt).getTime() > Date.now();
+    const valid = stored?.infernalExpiresAt && new Date(stored.infernalExpiresAt).getTime() > now;
     if (!valid) {
-      const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
-      if (botMember && infernalRole.position >= botMember.roles.highest.position) {
+      if (!hierarchyOk) {
         failed.push({ discordId: member.id, action: 'remove_orphan', error: 'hierarchy_bot_below_infernal' });
         continue;
       }
@@ -901,10 +1120,27 @@ async function reconcileInfernalRoles(guild) {
       removedOrphans += 1;
     }
   }
+
+  for (const player of Object.values(statsData.players || {})) {
+    const valid = player?.infernalExpiresAt && new Date(player.infernalExpiresAt).getTime() > now;
+    if (!valid || !player.discordId) continue;
+    const member = guild.members.cache.get(String(player.discordId));
+    if (!member || member.roles.cache.has(infernalRole.id)) continue;
+    if (!hierarchyOk) {
+      failed.push({ discordId: player.discordId, action: 'grant_missing', error: 'hierarchy_bot_below_infernal' });
+      continue;
+    }
+    const done = await member.roles.add(infernalRole, 'Reconciliação INFERNAL').then(() => true).catch((err) => {
+      failed.push({ discordId: player.discordId, action: 'grant_missing', error: err.message });
+      return false;
+    });
+    if (done) grantedMissing.push({ discordId: player.discordId, nickname: player.registeredNickname || player.nickname });
+  }
+
   if (failed.length > 0) {
     console.warn('[INFERNAL] Reconciliacao com falhas (verifique a hierarquia: cargo do bot precisa ficar ACIMA do INFERNAL):', failed.map((f) => `${f.discordId}:${f.error}`).join(' | '));
   }
-  return { removedOrphans, failed };
+  return { removedOrphans, grantedMissing, failed };
 }
 
 async function postInfernalAnnouncement(guild, awarded = []) {
@@ -919,7 +1155,7 @@ async function postInfernalAnnouncement(guild, awarded = []) {
 
   const mentions = awarded.map((p) => `<@${p.discordId}>`).join(' ');
   const lines = awarded
-    .map((p) => `• **${p.nickname || p.discordId}** — \`${p.winStreak}\` vitorias seguidas (vale ate ${formatDateTimeForHistory(p.infernalExpiresAt)})`)
+    .map((p) => `• **${p.nickname || p.discordId}** — \`${p.winStreak}\` vitorias seguidas (vale ate ${formatDateTimeForHistory(p.infernalExpiresAt)})${p.trialVip ? '\n  💜 Degustação **Apoiador** até o INFERNAL vencer!' : ''}`)
     .join('\n');
 
   const embed = new EmbedBuilder()
@@ -956,6 +1192,76 @@ async function postRouletteAnnouncement(guild, { letter, leaving = [], staying =
   await channel.send({ embeds: [embed] }).catch(() => null);
 }
 
+function getQueueFeedChannelId() {
+  return config.textChannels?.queueStatusChannelId || null;
+}
+
+const QUEUE_JOIN_BUTTON_IDS = {
+  CLASSIC: 'queue:classic:join',
+  ARAM: 'queue:aram:join'
+};
+
+function parseQueueJoinButtonId(customId) {
+  if (customId === QUEUE_JOIN_BUTTON_IDS.CLASSIC) {
+    return { mode: QUEUE_MODES.CLASSIC, args: [] };
+  }
+  if (customId === QUEUE_JOIN_BUTTON_IDS.ARAM) {
+    return { mode: QUEUE_MODES.ARAM, args: [QUEUE_MODES.ARAM] };
+  }
+  return null;
+}
+
+function buildQueueJoinActionRow() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(QUEUE_JOIN_BUTTON_IDS.CLASSIC)
+      .setLabel('Entrar Queue CAPS')
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId(QUEUE_JOIN_BUTTON_IDS.ARAM)
+      .setLabel('Entrar Queue ARAM')
+      .setStyle(ButtonStyle.Primary)
+  );
+}
+
+// Texto puro do feed da fila (testavel): novidades de !entrar / !espera no canal #fila.
+function buildQueueFeedText(event = {}) {
+  if (event.kind === 'espera-join') {
+    const label = event.modeLabel || 'CLASSIC 5x5';
+    const fire = event.isInfernalBoost ? ' 🔥' : '';
+    return `⏳ <@${event.discordId}> entrou na espera **${label}** — posição **${event.position}**${fire}`;
+  }
+  if (event.kind === 'entrar-join') {
+    const label = event.modeLabel || 'Classic';
+    const count = Number(event.playersCount || 0);
+    const required = Number(event.requiredPlayers || 10);
+    const letter = event.letter || '?';
+    let text = `🎮 <@${event.discordId}> entrou na **Sala ${letter} (${label})** — **${count}/${required}**`;
+    if (count === required - 1 && count > 0) {
+      text += `\n⚡ Falta **1** para fechar a sala!`;
+    } else if (count === required - 2 && count > 0) {
+      text += `\n🔥 Faltam **2** para fechar a sala!`;
+    } else if (required % 2 === 0 && count === required / 2) {
+      text += `\n💪 Metade da sala! (**${count}/${required}**)`;
+    }
+    return text;
+  }
+  return null;
+}
+
+async function postQueueFeedMessage(guild, text) {
+  if (!guild || !text) return;
+  try {
+    const channelId = getQueueFeedChannelId();
+    if (!channelId) return;
+    const channel = await guild.channels.fetch(channelId).catch(() => null);
+    if (!channel?.isTextBased()) return;
+    await channel.send(text).catch(() => null);
+  } catch {
+    // feed nao e critico, nunca quebra o comando
+  }
+}
+
 async function expireInfernalRolesIfDue(guild) {
   if (!guild) return;
 
@@ -983,6 +1289,24 @@ async function expireInfernalRolesIfDue(guild) {
     const member = await guild.members.fetch(player.discordId).catch(() => null);
     if (member?.roles.cache.has(infernalRole.id)) {
       await member.roles.remove(infernalRole).catch(() => null);
+    }
+
+    // Fim da degustação: tira o Apoiador de teste, exceto de quem pagou.
+    if (player.trialVip) {
+      try {
+        const { subscriptions } = await loadVipSubscriptions();
+        const hasPaid = subscriptions.some((s) => s?.status === 'active'
+          && String(s?.discordId) === String(player.discordId)
+          && String(s?.guildId) === String(guild.id));
+        if (!hasPaid) {
+          const apoiadorRole = guild.roles.cache.find((r) => String(r?.name || '') === '💜 Apoiador');
+          if (apoiadorRole && member?.roles.cache.has(apoiadorRole.id)) {
+            await member.roles.remove(apoiadorRole, 'Fim da degustação INFERNAL').catch(() => null);
+          }
+        }
+        upsertPlayerStats(statsData, player, { trialVip: false });
+        changed = true;
+      } catch { /* segue */ }
     }
   }
 
@@ -1487,18 +1811,19 @@ function buildRulesEmbed() {
   return embed;
 }
 
-function buildTeamsEmbed(teams) {
+function buildTeamsEmbed(teams, tierResolver = null) {
+  const resolve = typeof tierResolver === 'function' ? tierResolver : () => '';
   const teamOneText = teams.teamOne
     .map(
       (player) =>
-        `- <@${player.discordId}> | ${player.nickname} | ${formatRank(player)} | ${formatCustomRecord(player)} | Pontos: ${player.mmr}`
+        `- <@${player.discordId}> | ${player.nickname}${resolve(player.discordId)} | ${formatRank(player)} | ${formatCustomRecord(player)} | Pontos: ${player.mmr}`
     )
     .join('\n');
 
   const teamTwoText = teams.teamTwo
     .map(
       (player) =>
-        `- <@${player.discordId}> | ${player.nickname} | ${formatRank(player)} | ${formatCustomRecord(player)} | Pontos: ${player.mmr}`
+        `- <@${player.discordId}> | ${player.nickname}${resolve(player.discordId)} | ${formatRank(player)} | ${formatCustomRecord(player)} | Pontos: ${player.mmr}`
     )
     .join('\n');
 
@@ -1550,6 +1875,7 @@ function buildLeaderboardEmbed(statsData, mode = QUEUE_MODES.CLASSIC, format = n
   }
 
   const isClassicRank = mode === QUEUE_MODES.CLASSIC;
+  const resolve = typeof options?.tierResolver === 'function' ? options.tierResolver : () => '';
   const rawEntries = rankedPlayers
     .slice(0, 15)
     .map((player, index) => {
@@ -1560,7 +1886,7 @@ function buildLeaderboardEmbed(statsData, mode = QUEUE_MODES.CLASSIC, format = n
         ? (Number.isFinite(Number(player.customScore)) ? Number(player.customScore) : player.adjustedMmr)
         : player.adjustedMmr;
 
-      return `${medal} ${label}\n**${rankName} (${displayScore} pts)** • ${player.customWins}V / ${player.customLosses}D`;
+      return `${medal}${resolve(player.discordId)} ${label}\n**${rankName} (${displayScore} pts)** • ${player.customWins}V / ${player.customLosses}D`;
     });
 
   const { decoratedEntries, streakFooter } = decorateWithLeaderIcons(rawEntries, rankedPlayers.slice(0, 15));
@@ -1604,6 +1930,7 @@ function buildTopTenEmbed(statsData, seasonMeta, mode, format = null, options = 
   }
 
   const isClassicTop = mode === QUEUE_MODES.CLASSIC;
+  const resolve = typeof options?.tierResolver === 'function' ? options.tierResolver : () => '';
   const rawEntries = rankedPlayers
     .map(
       (player, index) => {
@@ -1615,7 +1942,7 @@ function buildTopTenEmbed(statsData, seasonMeta, mode, format = null, options = 
           ? (Number.isFinite(Number(player.customScore)) ? Number(player.customScore) : player.adjustedMmr)
           : player.adjustedMmr;
 
-        return `${medal} <@${player.discordId}>\n**${rankName} (${displayScore} pts)** • ${player.customWins}V / ${player.customLosses}D • ${winRate}% WR`;
+        return `${medal}${resolve(player.discordId)} <@${player.discordId}>\n**${rankName} (${displayScore} pts)** • ${player.customWins}V / ${player.customLosses}D • ${winRate}% WR`;
       }
     );
 
@@ -1821,7 +2148,7 @@ function getCustomDisplayScore(modeStats) {
   return DEFAULT_CUSTOM_POINTS + getCustomPointsDelta(modeStats);
 }
 
-function buildPlayerCardEmbed(playerStats, targetUser) {
+function buildPlayerCardEmbed(playerStats, targetUser, vipTierName = null) {
   const modes = normalizePlayerModes(playerStats);
   const classicStats = modes.classic;
   const lolMmr = Number(classicStats.baseMmr || playerStats.baseMmr || 0);
@@ -1838,6 +2165,10 @@ function buildPlayerCardEmbed(playerStats, targetUser) {
       { name: 'Elo LoL', value: `**${lolRankLabel}**\n\`${lolMmr} pts\``, inline: true },
       { name: 'Pontos Custom', value: `\`${getCustomDisplayScore(classicStats)}\``, inline: true }
     );
+
+  if (vipTierName) {
+    embed.addFields({ name: '💎 Clube VIP', value: `**${vipTierName}**`, inline: true });
+  }
 
   for (const [key, stats] of Object.entries(modes)) {
     const totalGames = Number(stats.customWins || 0) + Number(stats.customLosses || 0);
@@ -1905,8 +2236,9 @@ async function postDailyRankUpdates() {
     content: `Atualizacao diaria de rankings | ${getSeasonDisplayLabel(seasonMeta)}`,
     embeds: [
       buildTopTenEmbed(statsData, seasonMeta, QUEUE_MODES.CLASSIC),
-      buildTopTenEmbed(statsData, seasonMeta, QUEUE_MODES.ARAM),
-      buildTopTenEmbed(statsData, seasonMeta, QUEUE_MODES.ARAM, '1x1')
+      buildTopTenEmbed(statsData, seasonMeta, QUEUE_MODES.CLASSIC, null, { tierSOnly: true }),
+      buildTopTenEmbed(statsData, seasonMeta, QUEUE_MODES.ARAM, '1x1'),
+      buildTopInfernalEmbed(statsData, seasonMeta)
     ]
   });
 }
@@ -1939,19 +2271,84 @@ async function updateQueueDashboard(guild) {
 
   const queueData = await loadQueue();
   const systemMeta = await loadSystemMeta();
-  const embed = buildQueueEmbed(null, Object.values(queueData.lobbies || {}));
+  const components = [buildQueueJoinActionRow()];
+  const waitingLobbies = Object.values(queueData.lobbies || {})
+    .filter((lobby) => lobby && lobby.status === 'waiting')
+    .sort((a, b) => String(a.letter || '').localeCompare(String(b.letter || '')));
+  const dashboardIds = systemMeta.queueDashboardMessageIds && typeof systemMeta.queueDashboardMessageIds === 'object'
+    ? { ...systemMeta.queueDashboardMessageIds }
+    : {};
+  const nextDashboardIds = {};
 
-  try {
-    if (systemMeta.lastQueueMessageId) {
-      const lastMessage = await channel.messages.fetch(systemMeta.lastQueueMessageId).catch(() => null);
-      if (lastMessage) {
-        await lastMessage.edit({ embeds: [embed] });
-        return;
+  async function editOrSendPanel(panelKey, embed, preferredMessageId = null) {
+    const messageId = dashboardIds[panelKey] || preferredMessageId || null;
+    if (messageId) {
+      const message = await channel.messages.fetch(messageId).catch(() => null);
+      if (message) {
+        await message.edit({ content: '', embeds: [embed], components });
+        return message.id;
       }
     }
 
-    const newMessage = await channel.send({ embeds: [embed] });
-    systemMeta.lastQueueMessageId = newMessage.id;
+    const message = await channel.send({ content: '', embeds: [embed], components });
+    return message.id;
+  }
+
+  async function deletePanel(messageId) {
+    if (!messageId) return;
+    const message = await channel.messages.fetch(messageId).catch(() => null);
+    if (message) await message.delete().catch(() => null);
+  }
+
+  async function clearLegacyQueueButtons(activeMessageIds) {
+    const botId = guild.client?.user?.id;
+    if (!botId) return;
+
+    const messages = await channel.messages.fetch({ limit: 100 }).catch(() => null);
+    if (!messages) return;
+
+    for (const message of messages.values()) {
+      if (activeMessageIds.has(message.id)) continue;
+      if (message.author?.id !== botId) continue;
+
+      const hasQueueButton = message.components?.some((row) =>
+        row.components?.some((component) => String(component.customId || '').startsWith('queue:'))
+      );
+
+      if (hasQueueButton) {
+        await message.edit({ components: [] }).catch(() => null);
+      }
+    }
+  }
+
+  try {
+    if (waitingLobbies.length === 0) {
+      const idleKey = 'idle';
+      const idleEmbed = buildQueueEmbed(null, []);
+      nextDashboardIds[idleKey] = await editOrSendPanel(idleKey, idleEmbed, systemMeta.lastQueueMessageId);
+      systemMeta.lastQueueMessageId = nextDashboardIds[idleKey];
+    } else {
+      for (let index = 0; index < waitingLobbies.length; index += 1) {
+        const lobby = waitingLobbies[index];
+        const panelKey = lobby.id || `${lobby.mode || 'queue'}:${lobby.format || '5x5'}:${lobby.letter || index}`;
+        nextDashboardIds[panelKey] = await editOrSendPanel(panelKey, buildQueueEmbed(lobby));
+      }
+      systemMeta.lastQueueMessageId = nextDashboardIds[Object.keys(nextDashboardIds)[0]] || null;
+    }
+
+    const activeMessageIds = new Set(Object.values(nextDashboardIds));
+    for (const [panelKey, messageId] of Object.entries(dashboardIds)) {
+      if (!activeMessageIds.has(messageId)) {
+        await deletePanel(messageId);
+      }
+    }
+
+    if (systemMeta.lastQueueMessageId && !activeMessageIds.has(systemMeta.lastQueueMessageId)) {
+      await deletePanel(systemMeta.lastQueueMessageId);
+    }
+
+    systemMeta.queueDashboardMessageIds = nextDashboardIds;
+    await clearLegacyQueueButtons(activeMessageIds);
     await saveSystemMeta(systemMeta);
   } catch (err) {
     console.error('[DASHBOARD] Erro ao atualizar painel de fila:', err.message);
@@ -1963,7 +2360,7 @@ async function sendMatchStartAnnouncement(guild, teams) {
   const channel = await guild.channels.fetch(channelId).catch(() => null);
   if (!channel || !channel.isTextBased()) return;
 
-  const embed = buildTeamsEmbed(teams);
+  const embed = buildTeamsEmbed(teams, buildVipTierResolver(guild));
   await channel.send({ 
     content: '⚔️ **Nova partida iniciada!** Preparem-se para a batalha.',
     embeds: [embed] 
@@ -2040,8 +2437,37 @@ async function postMatchHistoryLog(guild, payload) {
   await channel.send({ embeds: [summaryEmbed, detailEmbed] }).catch(() => null);
 }
 
-function startDailyRankScheduler() {
-  setInterval(async () => {
+// Promo automática do clube 2x/dia (12h e 19h SP) no geral, sem duplicar.
+async function runClubePromoTick(now = new Date()) {
+  const parts = getSaoPauloDateParts(now);
+  if (!CLUBE_PROMO_HOURS.includes(parts.hour) || parts.minute !== 0) return { posted: 0, reason: 'fora de horário' };
+  const { loadSystemMeta, saveSystemMeta } = require('../services/dataService');
+  const systemMeta = await loadSystemMeta();
+  const lastTs = systemMeta?.clubePromoLastAt || null;
+  if (!shouldPostClubePromo(lastTs, now.getTime())) return { posted: 0, reason: 'intervalo mínimo' };
+  let posted = 0;
+  for (const guild of global.discordClient?.guilds?.cache?.values?.() || []) {
+    try {
+      const channel = findPromoChannel(guild);
+      if (!channel) continue;
+      await channel.send({ embeds: [buildClubePromoEmbed(config)] });
+      posted += 1;
+    } catch { /* próxima guild */ }
+  }
+  if (posted > 0) {
+    systemMeta.clubePromoLastAt = now.toISOString();
+    await saveSystemMeta(systemMeta);
+  }
+  return { posted };
+}
+
+function startClubePromoScheduler() {
+  setInterval(() => {
+    runClubePromoTick(new Date()).catch((err) => console.error('[CLUBE] Erro na promo automática:', err.message));
+  }, 30000).unref?.();
+}
+
+function startDailyRankScheduler() {  setInterval(async () => {
     try {
       const now = getSaoPauloDateParts(new Date());
       const targetHour = Number(config.automation?.dailyRankUpdatesHour ?? 9);
@@ -2058,9 +2484,17 @@ function startDailyRankScheduler() {
       lastDailyRankPostKey = now.key;
       await postDailyRankUpdates();
       for (const guild of global.discordClient?.guilds.cache.values() || []) {
-        if (!isGuildAllowed(guild.id)) continue;
         await expireInfernalRolesIfDue(guild);
         await reconcileInfernalRoles(guild).catch(() => null);
+        try {
+          const { expireVipSubscriptionsForGuild, sendVipExpiryReminders } = require('../services/clubePaymentsService');
+          const expired = await expireVipSubscriptionsForGuild(guild);
+          if (expired.length) console.log(`[CLUBE] ${expired.length} assinatura(s) expirada(s) em ${guild.id}.`);
+          const reminded = await sendVipExpiryReminders(guild);
+          if (reminded.length) console.log(`[CLUBE] ${reminded.length} lembrete(s) de vencimento em ${guild.id}.`);
+        } catch (err) {
+          console.error('[CLUBE] Erro ao expirar assinaturas:', err.message);
+        }
       }
     } catch (error) {
       console.error('Erro ao publicar ranking diario:', error);
@@ -2691,7 +3125,6 @@ async function postSeasonSummaryToSeasonLog(guild, archivedSeason) {
 }
 
 module.exports = {
-  isGuildAllowed,
   getSeasonDisplayLabel,
   formatDateTimeForHistory,
   getArchivedSeasonLabel,
@@ -2740,6 +3173,12 @@ module.exports = {
   reconcileInfernalRoles,
   postInfernalAnnouncement,
   postRouletteAnnouncement,
+  getQueueFeedChannelId,
+  QUEUE_JOIN_BUTTON_IDS,
+  parseQueueJoinButtonId,
+  buildQueueJoinActionRow,
+  buildQueueFeedText,
+  postQueueFeedMessage,
   expireInfernalRolesIfDue,
   isTierSEligibleByStats,
   isTierSEligibleMember,
@@ -2766,6 +3205,25 @@ module.exports = {
   buildTopTenEmbed,
   buildTopStreakEmbed,
   buildTopInfernalEmbed,
+  VIP_TIERS,
+  getMemberVipTier,
+  getVipSeal,
+  buildVipTierResolver,
+  buildClubeEmbed,
+  isRecentVipSubscription,
+  AO_VIVO_ROLE_NAME,
+  LIVE_COOLDOWN_MS,
+  parseLiveLink,
+  getLiveCooldownRemainingMs,
+  formatCooldownRemaining,
+  buildLiveEmbed,
+  buildClubePromoEmbed,
+  shouldPostClubePromo,
+  findPromoChannel,
+  ensureAoVivoRole,
+  CLUBE_PROMO_HOURS,
+  runClubePromoTick,
+  startClubePromoScheduler,
   buildRulesEmbed,
   RULES_SECTIONS,
   buildStaffEmbed,
@@ -2808,6 +3266,10 @@ module.exports = {
   createInteractionContext,
   RANK_ROLES_MAP,
   ALL_RANK_ROLE_NAMES,
+  getConfiguredRankRoleId,
+  findRankRole,
+  isRankRole,
+  getRankTierFromRoleName,
   MVP_ROLE_NAMES,
   THEME,
   FOOTER_PREFIX
