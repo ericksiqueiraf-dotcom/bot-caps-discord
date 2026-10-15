@@ -349,6 +349,7 @@ const {
   getQueueChannel,
   isGuildAllowed,
   isMemberInQueueVoiceChannel,
+  isMemberInTierSVoiceChannel,
   formatRank,
   formatQueueMode,
   getStatsBucketKey,
@@ -813,6 +814,13 @@ client.on('interactionCreate', async (interaction) => {
             content: '!sair'
           });
           await handlers.handleLeaveCommand(context);
+          return;
+        }
+        if (queueJoin.mode === 'tiers' && !isMemberInTierSVoiceChannel(interaction.member)) {
+          const context = createInteractionContext(interaction, {
+            content: '!entrar'
+          });
+          await replyToMessage(context, 'Voce precisa estar no canal de voz `Lobby TIER S` para entrar nessa fila (só Esmeralda IV+).');
           return;
         }
         const context = createInteractionContext(interaction, {

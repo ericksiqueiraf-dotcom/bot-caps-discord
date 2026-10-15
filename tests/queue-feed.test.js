@@ -104,15 +104,17 @@ describe('feed automatico do canal #fila', () => {
     assert.equal(parseQueueJoinButtonId('queue:x:join'), null);
   });
 
-  it('linha de botoes da fila tem Queue CAPS, ARAM e Sair da Fila', () => {
+  it('linha de botoes da fila tem Queue CAPS, ARAM, TIERS e Sair da Fila', () => {
     const row = buildQueueJoinActionRow();
     const json = row.toJSON();
-    assert.equal(json.components.length, 3);
+    assert.equal(json.components.length, 4);
     assert.equal(json.components[0].custom_id, QUEUE_JOIN_BUTTON_IDS.CLASSIC);
     assert.equal(json.components[0].label, 'Entrar Queue CAPS');
     assert.equal(json.components[1].custom_id, QUEUE_JOIN_BUTTON_IDS.ARAM);
     assert.equal(json.components[1].label, 'Entrar Queue ARAM');
-    assert.equal(json.components[2].custom_id, QUEUE_JOIN_BUTTON_IDS.LEAVE);
-    assert.equal(json.components[2].label, 'Sair da Fila');
+    assert.equal(json.components[2].custom_id, QUEUE_JOIN_BUTTON_IDS.TIERS);
+    assert.equal(json.components[2].label, 'Entrar Queue TIERS');
+    assert.equal(json.components[3].custom_id, QUEUE_JOIN_BUTTON_IDS.LEAVE);
+    assert.equal(json.components[3].label, 'Sair da Fila');
   });
 });

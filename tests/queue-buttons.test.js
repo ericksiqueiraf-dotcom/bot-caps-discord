@@ -24,23 +24,26 @@ describe('painel da fila (botoes)', () => {
     assert.strictEqual(parseQueueJoinButtonId(undefined), null);
   });
 
-  it('parse reconhece sair da fila', () => {
-    assert.deepStrictEqual(parseQueueJoinButtonId('queue:leave'), { mode: 'leave', args: [] });
-    assert.deepStrictEqual(parseQueueJoinButtonId(QUEUE_JOIN_BUTTON_IDS.LEAVE), { mode: 'leave', args: [] });
+  it('parse reconhece entrar tiers (resolve pelo canal de voz)', () => {
+    assert.deepStrictEqual(parseQueueJoinButtonId('queue:tiers:join'), { mode: 'tiers', args: [] });
+    assert.deepStrictEqual(parseQueueJoinButtonId(QUEUE_JOIN_BUTTON_IDS.TIERS), { mode: 'tiers', args: [] });
   });
 
-  it('action row tem Entrar Queue CAPS + Entrar Queue ARAM + Sair da Fila', () => {
+  it('action row tem CAPS + ARAM + TIERS + Sair da Fila', () => {
     const row = buildQueueJoinActionRow();
     const json = row.toJSON();
     assert.strictEqual(json.type, 1);
-    assert.strictEqual(json.components.length, 3);
-    const [classic, aram, leave] = json.components;
+    assert.strictEqual(json.components.length, 4);
+    const [classic, aram, tiers, leave] = json.components;
     assert.strictEqual(classic.custom_id, QUEUE_JOIN_BUTTON_IDS.CLASSIC);
     assert.strictEqual(classic.label, 'Entrar Queue CAPS');
     assert.strictEqual(classic.style, 3); // Success
     assert.strictEqual(aram.custom_id, QUEUE_JOIN_BUTTON_IDS.ARAM);
     assert.strictEqual(aram.label, 'Entrar Queue ARAM');
     assert.strictEqual(aram.style, 1); // Primary
+    assert.strictEqual(tiers.custom_id, QUEUE_JOIN_BUTTON_IDS.TIERS);
+    assert.strictEqual(tiers.label, 'Entrar Queue TIERS');
+    assert.strictEqual(tiers.style, 2); // Secondary
     assert.strictEqual(leave.custom_id, QUEUE_JOIN_BUTTON_IDS.LEAVE);
     assert.strictEqual(leave.label, 'Sair da Fila');
     assert.strictEqual(leave.style, 4); // Danger
@@ -49,6 +52,7 @@ describe('painel da fila (botoes)', () => {
   it('ids constantes tem os valores esperados', () => {
     assert.strictEqual(QUEUE_JOIN_BUTTON_IDS.CLASSIC, 'queue:classic:join');
     assert.strictEqual(QUEUE_JOIN_BUTTON_IDS.ARAM, 'queue:aram:join');
+    assert.strictEqual(QUEUE_JOIN_BUTTON_IDS.TIERS, 'queue:tiers:join');
     assert.strictEqual(QUEUE_JOIN_BUTTON_IDS.LEAVE, 'queue:leave');
   });
 
