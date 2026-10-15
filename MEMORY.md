@@ -271,12 +271,22 @@ database/                    ← fallback JSON local
 - **Layout ARENA replicado no TESTRE (2026-10-10):** modelo em `docs/SERVER_LAYOUT_CAPS_ARENA.md`; `setup-servidor.js` com planta ARENA (6 cats, 19 TXT, 11 VOZ, 11 cargos); aplicado em `CAPS BOT TESTE (1558217291123138561)`; `config.json` remapeado (fila/partidas/resultados/destaques/logs/ranking/cadastro + 3 lobbies com limite 10/10/30)
 - Validação: `npm test` 49/49, 13 suites
 
+### 2026-10-15 — Texto do !clube mais atrativo
+- `buildClubeEmbed` com copy de divulgação (TESTRE + prod): chamada "Apoie a Arena, suba de nível...", tiers como "primeiro passo" / "queridinho da galera" / "topo da Arena", `!live` como "divulgar sua stream", renovação -10% no "Como aderir". Preços continuam dinâmicos do config.
+- Testes do clube/regras/embeds verdes (17/17); ambos bots reiniciados e online.
+- Nota: mensagem antiga fixada no `#clube-vip` não atualiza sozinha — rodar `!clube`, apagar a antiga e fixar a nova.
+
 ### 2026-10-15 — Bugs reais corrigidos + sala 2.0 (ordem 1→3→2→4)
 - **1) Gate `allowedGuildIds`:** `isGuildAllowed()` novo em `utils/lobbyUtils.js` (exportado); `messageCreate` + `interactionCreate` ignoram guilds fora da lista (lista vazia = libera tudo, como antes). `tests/guild-filter.test.js` reescrito p/ a função real (4/4).
 - **3) Trava level 30:** `riotService.getPlayerRankProfile` agora expõe `summonerLevel`; `getSummonerLevelGate()` (exportado) bloqueia `< config.cadastro.minSummonerLevel` no `!cadastrar` e `!nick`, com fail-open p/ level desconhecido. `tests/cadastro-main.test.js` atualizado (2/2). TESTRE + prod.
 - **2) Embed do `#como-jogar`:** `buildOnboardingGuideEmbed()` + `ONBOARDING_SECTIONS` criados e exportados (TESTRE + prod); setup passa a postar o embed fixo em vez de pular. Teste restaurado p/ intenção original (título + campos + limites + nome do servidor).
 - **4) Sala 2.0 (dono):** `!salalock [abrir]` (tranca Connect dos cargos, dono sempre entra; flag `locked` no registro + 🔒 no `!salahub`), `!salalimit <0-99>`, `!salaexpulsar @u` (só quem está na sala; não expulsa a si/bots). Prefixo + slash (`/salalock`, `/salalimit`, `/salaexpulsar`) + `!ajuda`. TESTRE + prod.
 - Validação: suíte **146/146**; `node --check` nos 8 arquivos; ambos bots reiniciados e online.
+
+### 2026-10-15 — !clubefixar: benefícios detalhados fixados no #clube-vip
+- `buildClubeDetalEmbed()` novo em `utils/lobbyUtils.js` (TESTRE + prod): embed "benefícios detalhados" com preços dinâmicos do config + comandos de cada tier + PIX e renovação -10%.
+- `!clubefixar` (só staff, prefixo + `/clubefixar`): posta no `#🔰clube-vip`, apaga fixada anterior igual e fixa a nova. `!staff` documenta o comando.
+- Testes: caso novo no `clube-vip.test.js` (título, 4 campos, preços, limites); ambos bots reiniciados e online.
 
 ### 2026-10-15 — !ajuda enxuto, !staff completo
 - **`!ajuda` agora é só jogador:** seções `🛠️ Staff`, `⚙️ Partida (Staff)` e `📊 Temporada` viraram 1 linha apontando p/ `!staff`. Mantidas: cadastro, fila/voto, ranking, clube VIP, salas temporárias.

@@ -880,6 +880,38 @@ async function handlePlayerCardCommand(message, targetUser = null) {
   await sendToMessageChannel(message, { embeds: [buildPlayerCardEmbed(playerStats, selectedUser, getMemberVipTier(targetMember))] });
 }
 
+async function handleClubeFixarCommand(message) {
+  try {
+    if (!isStaffViewer(message.member)) {
+      return await replyToMessage(message, '❌ Restrito à staff.');
+    }
+    const { buildClubeDetalEmbed } = require('../utils/lobbyUtils');
+    const guild = message.guild;
+    const target = guild.channels.cache.find((c) => c.name === '🔰clube-vip' && c.isTextBased?.())
+      || (message.channel?.isTextBased?.() ? message.channel : null);
+    if (!target) {
+      return await replyToMessage(message, '❌ Canal #clube-vip não encontrado.');
+    }
+    const embed = buildClubeDetalEmbed();
+    const title = embed.data?.title;
+    const botId = guild.members.me?.id;
+    const pinned = await target.messages.fetchPinned().catch(() => null);
+    const olds = [...(pinned?.values?.() || [])].filter(
+      (m) => m.author?.id === botId && (m.embeds || []).some((e) => e.title === title)
+    );
+    for (const old of olds) {
+      await old.unpin().catch(() => null);
+      await old.delete().catch(() => null);
+    }
+    const sent = await target.send({ embeds: [embed] });
+    await sent.pin().catch(() => null);
+    await replyToMessage(message, `✅ Benefícios detalhados postados e fixados em ${target}. Apague a mensagem antiga manualmente se ainda estiver lá.`);
+  } catch (error) {
+    console.error('[ERRO] !clubefixar:', error);
+    await replyToMessage(message, `❌ Erro ao fixar benefícios: \`${error.message}\``);
+  }
+}
+
 async function handleQueroLiveCommand(message) {
   const guild = message.guild;
   if (!guild) return;
@@ -2156,7 +2188,7 @@ module.exports = {
   handleSyncAllRolesCommand, handleSyncAllPlayersEloCommand, handleVictoryCommand, handleOnboardingCommand, handleClearCommand,
   handleRegisterCommand, handleNickUpdateCommand, handleSyncPlayerRankCommand, handleVoteCommand, pendingAutoStarts, triggerAutoStart,
   handleRematchCommand, handleRouletteCommand, handleRoletaSairCommand, handleRulesCommand, handleStaffCommand, handlePdlCommand,
-  handleResultVoteButton, handleClubeCommand, handleClubeAdminCommand, handleQueroLiveCommand, handleLiveCommand,
+  handleResultVoteButton, handleClubeCommand, handleClubeAdminCommand, handleClubeFixarCommand, handleQueroLiveCommand, handleLiveCommand,
   handleSalaHubCommand, handleConvidarCommand, handleLimparVozCommand, handleSalaCommand,
   handleSalaLockCommand, handleSalaLimitCommand, handleSalaExpulsarCommand,
   getSummonerLevelGate,

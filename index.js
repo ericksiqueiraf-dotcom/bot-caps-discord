@@ -318,6 +318,7 @@ function buildSlashCommands() {
       .setDescription('Quem mais conquistou o INFERNAL na temporada.'),
     new SlashCommandBuilder().setName('clube').setDescription('Mostra o clube VIP: tiers, benefícios e membros.'),
     new SlashCommandBuilder().setName('clubeadmin').setDescription('Lista assinaturas ativas do clube (staff).'),
+    new SlashCommandBuilder().setName('clubefixar').setDescription('Posta e fixa os benefícios no #clube-vip (staff).'),
     new SlashCommandBuilder().setName('querolive').setDescription('Entra/sai do ping 🔴 Ao Vivo.'),
     new SlashCommandBuilder()
       .setName('live')
@@ -553,6 +554,9 @@ async function processCommand(message, rawContent) {
         break;
       case 'clubeadmin':
         await handlers.handleClubeAdminCommand(message);
+        break;
+      case 'clubefixar':
+        await handlers.handleClubeFixarCommand(message);
         break;
       case 'querolive':
       case 'quero-live':
@@ -995,6 +999,9 @@ client.on('interactionCreate', async (interaction) => {
         break;
       case 'clubeadmin':
         await handlers.handleClubeAdminCommand(context);
+        break;
+      case 'clubefixar':
+        await handlers.handleClubeFixarCommand(context);
         break;
       case 'querolive':
         await handlers.handleQueroLiveCommand(context);

@@ -293,6 +293,43 @@ function isRecentVipSubscription(subscriptions, guildId, discordId, nowMs = Date
   } catch { return false; }
 }
 
+function clubeTierPriceLabel(key) {
+  const value = Number(config?.clubePagamentos?.[key]?.preco);
+  return Number.isFinite(value) && value > 0 ? `R$ ${value.toFixed(2).replace('.', ',')}/30 dias` : null;
+}
+
+function buildClubeDetalEmbed() {
+  const tierName = (emoji, roleName, key) => {
+    const price = clubeTierPriceLabel(key);
+    return `${emoji} ${roleName.split(' ').slice(1).join(' ')}${price ? ` — ${price}` : ''}`;
+  };
+  const embed = new EmbedBuilder()
+    .setColor(THEME.RANK)
+    .setTitle('💎 Clube VIP — benefícios detalhados')
+    .setDescription('Tudo o que cada cargo libera. **O clube NÃO dá vantagem em fila, sorteio, PDL ou vitória** — é status, comodidade e apoio à Arena. 💜')
+    .addFields(
+      {
+        name: tierName('💜', '💜 Apoiador', 'apoiador'),
+        value: 'Para quem quer apoiar a Arena e ser reconhecido:\n• Acesso ao lounge 💎・CLUBE VIP\n• Selo 💜 no perfil (`!perfil`) e no ranking\n• Anúncio de boas-vindas ao entrar no clube'
+      },
+      {
+        name: tierName('⭐', '⭐ VIP', 'vip'),
+        value: 'O queridinho da galera — tudo do Apoiador, mais:\n• **Sua própria sala de voz**: entre no ➕・criar-sala e o bot cria uma sala sua\n• `!sala <nome>` para personalizar • `!convidar @usuário` para chamar os amigos\n• `!salalock` / `!salalimit <0-99>` / `!salaexpulsar @u` para gerenciar\n• `!limparvoz` para encerrar a sala'
+      },
+      {
+        name: tierName('👑', '👑 Lendário', 'lendario'),
+        value: 'O topo da Arena — tudo do VIP, mais:\n• `!live <link>` para **divulgar sua stream** (Twitch/YouTube/Kick) com ping 🔴 Ao Vivo para a comunidade (1x a cada 6h)\n• Anúncio de destaque ao entrar no clube\n• Nome no topo da lista de membros'
+      },
+      {
+        name: 'Como aderir',
+        value: 'Digite `!clube` e clique em **Assinar** no tier desejado — pagamento via PIX com ativação automática na hora. Renovação com **-10% de desconto**.'
+      }
+    )
+    .setFooter({ text: `${FOOTER_PREFIX} • Clube VIP` })
+    .setTimestamp();
+  return embed;
+}
+
 function buildClubeEmbed(guild) {
   const tierPrice = (key) => {
     const value = Number(config?.clubePagamentos?.[key]?.preco);
@@ -305,23 +342,23 @@ function buildClubeEmbed(guild) {
   const embed = new EmbedBuilder()
     .setColor(THEME.RANK)
     .setTitle('💎 Clube VIP — CAPS Arena')
-    .setDescription('Status e comodidade para quem apoia a Arena. **O clube NÃO dá vantagem em fila, sorteio, PDL ou vitória.**')
+    .setDescription('Apoie a Arena, suba de nível e desbloqueie comodidades exclusivas. **O clube NÃO dá vantagem em fila, sorteio, PDL ou vitória** — é status, comodidade e apoio à comunidade. 💜')
     .addFields(
       {
         name: tierName('💜', '💜 Apoiador', 'apoiador'),
-        value: 'Acesso ao lounge 💎・CLUBE VIP • selo 💜 no perfil (`!perfil`) e no ranking • anúncio de boas-vindas ao entrar no clube.'
+        value: 'O primeiro passo para apoiar a Arena e ser reconhecido: acesso ao lounge 💎・CLUBE VIP • selo 💜 no perfil (`!perfil`) e no ranking • anúncio de boas-vindas ao entrar no clube.'
       },
       {
         name: tierName('⭐', '⭐ VIP', 'vip'),
-        value: 'Tudo do Apoiador • criar sala temporária no ➕・criar-sala • `!sala <nome>` para renomear • `!convidar @usuário` para chamar gente • `!limparvoz` para apagar a sala.'
+        value: 'O queridinho da galera: tudo do Apoiador + **sua própria sala de voz** no ➕・criar-sala para jogar com os amigos • `!sala <nome>` para personalizar • `!convidar @usuário` para chamar gente • `!limparvoz` para encerrar.'
       },
       {
         name: tierName('👑', '👑 Lendário', 'lendario'),
-        value: 'Tudo do VIP • `!live <link>` (divulgue sua stream Twitch/YouTube/Kick com ping 🔴 Ao Vivo, 1x a cada 6h) • anúncio de destaque • nome no topo da lista de membros.'
+        value: 'O topo da Arena: tudo do VIP + `!live <link>` para **divulgar sua stream** (Twitch/YouTube/Kick) com ping 🔴 Ao Vivo para a comunidade (1x a cada 6h) • anúncio de destaque • nome no topo da lista de membros.'
       },
       {
         name: 'Como aderir',
-        value: 'Clique em **Assinar** no tier desejado e pague via PIX — ativação automática. Sem botões abaixo? Fale com a Staff.'
+        value: 'Clique em **Assinar** no tier desejado e pague via PIX — ativação automática na hora. Renovação com **-10% de desconto**. Sem botões abaixo? Fale com a Staff.'
       }
     )
     .setFooter({ text: `${FOOTER_PREFIX} • Clube VIP` })
@@ -1785,7 +1822,7 @@ const STAFF_SECTIONS = [
   },
   {
     name: '💎 Clube VIP — assinaturas',
-    value: '`!clubeadmin` • Assinaturas ativas por tier, com vencimento de cada uma.\n`!clube` • O que o jogador vê (tiers, preços, botões de assinar).'
+    value: '`!clubeadmin` • Assinaturas ativas por tier, com vencimento de cada uma.\n`!clubefixar` • Posta e fixa os benefícios detalhados no #clube-vip.\n`!clube` • O que o jogador vê (tiers, preços, botões de assinar).'
   },
   {
     name: '📊 Temporada — só Admin, com fila vazia',
@@ -3263,6 +3300,7 @@ module.exports = {
   formatCooldownRemaining,
   buildLiveEmbed,
   buildClubePromoEmbed,
+  buildClubeDetalEmbed,
   shouldPostClubePromo,
   findPromoChannel,
   ensureAoVivoRole,
