@@ -930,6 +930,52 @@ async function handleClubeCommand(message) {
   await sendToMessageChannel(message, payload);
 }
 
+async function handleClubeAdminCommand(message) {
+  try {
+    if (!isStaffViewer(message.member)) {
+      return await replyToMessage(message, '❌ Restrito à staff.');
+    }
+    const { TIER_KEYS, TIER_ROLE_NAMES } = require('../services/clubePaymentsService');
+    const { subscriptions } = await loadVipSubscriptions();
+    const guildId = String(message.guild?.id || '');
+    const now = Date.now();
+    const active = (subscriptions || []).filter(
+      (s) => s?.status === 'active' && String(s?.guildId || '') === guildId
+    );
+
+    if (active.length === 0) {
+      return await replyToMessage(message, '💎 Nenhuma assinatura ativa do clube neste servidor.');
+    }
+
+    const dayMs = 24 * 60 * 60 * 1000;
+    const lines = [];
+    for (const tierKey of [...TIER_KEYS].reverse()) {
+      const subs = active
+        .filter((s) => s.tierKey === tierKey)
+        .sort((a, b) => new Date(a.expiresAt).getTime() - new Date(b.expiresAt).getTime());
+      if (subs.length === 0) continue;
+      const rows = subs.map((s) => {
+        const diffDays = Math.ceil((new Date(s.expiresAt).getTime() - now) / dayMs);
+        const when = diffDays <= 0 ? 'vence hoje' : diffDays === 1 ? 'vence amanhã' : `vence em ${diffDays} dias`;
+        return `• <@${s.discordId}> — ${when}`;
+      });
+      lines.push(`**${TIER_ROLE_NAMES[tierKey]} (${subs.length})**\n${rows.join('\n')}`);
+    }
+
+    const { EmbedBuilder } = require('discord.js');
+    const embed = new EmbedBuilder()
+      .setColor(THEME?.INFO ?? '#0099ff')
+      .setTitle('💎 Assinaturas ativas do clube')
+      .setDescription(lines.join('\n\n'))
+      .setFooter({ text: `${FOOTER_PREFIX} • visível só aqui (comando de staff)` })
+      .setTimestamp();
+    await replyToMessage(message, { embeds: [embed] });
+  } catch (error) {
+    console.error('[ERRO] !clubeadmin:', error);
+    await replyToMessage(message, `❌ Erro ao listar assinaturas: \`${error.message}\``);
+  }
+}
+
 async function handleHelpCommand(message) {
   try {
     const embed = new EmbedBuilder()
@@ -941,7 +987,8 @@ async function handleHelpCommand(message) {
       { name: '🎮 Jogador (1/2) — Fila e voto', value: '`!regras` • Regulamento completo\n`!entrar` • Fila Classic (no canal Lobby Classic ou Lobby TIER S)\n`!entrar aram` • Fila ARAM\n`!entrar aram 2x2` • ARAM formato\n`!fila` • Mostra jogadores em sala\n`!espera` • Entra na espera (🔥 INFERNAL entra na posição 5)\n`!esperatiers` • Espera do Lobby TIER S (só Esmeralda+)\n`!espera ver` • Mostra a ordem\n`!espera sair` • Sai da espera\n`!sair` • Sai da sala\n`!votar 1/2` • Vota no vencedor (abre painel com botões p/ os 10 votarem)\n`!votar` • Reabre o painel de votação' },
       { name: '🎮 Jogador (2/2) — Ranking', value: '`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking geral (CLASSIC = pontos custom)\n`!placar tiers` • Só Esmeralda+\n`!top10` • Top 10 CLASSIC por pontos custom, desempate por winrate\n`!top10 tiers` • Top 10 só Esmeralda+\n`!topstreak` • Ranking Streak 🔥\n`!toprankinfernal` • Quem mais pegou INFERNAL na temporada 🔥\n`!clube` • Clube VIP: tiers, benefícios e membros 💎\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
       { name: '💎 Clube VIP', value: '`!clube` • Tiers, assinatura PIX e renovação -10%\n`!querolive` • Entrar/sair do ping 🔴 Ao Vivo\n`!live <link>` • Divulgar live Twitch/YouTube/Kick (só 👑 Lendário, 1x a cada 6h)' },
-      { name: '🛠️ Staff', value: '`!staff` • Guia completo da staff\n`!pdl @u -50 motivo` • Ajuste/punição de PDL Classic (só Admin)\n`!remover @u`, `!limpar [qnt]`, `!limparsalas [sala]` • Limpa sala A/B/C (sem letra = todas)\n`!sincronizarelo @u`, `!sincronizartodos` (ou `!sync todos`), `!sync`, `!onboarding`' },
+      { name: '🔊 Salas temporárias (dono da sala)', value: 'Entre no ➕・criar-sala para ganhar sua sala\n`!salahub` • Lista as salas ativas\n`!sala` • Mostra sua sala • `!sala <nome>` renomeia\n`!convidar @u` • Chama alguém p/ sua sala\n`!limparvoz` • Apaga sua sala (dentro dela)' },
+      { name: '🛠️ Staff', value: '`!staff` • Guia completo da staff\n`!pdl @u -50 motivo` • Ajuste/punição de PDL Classic (só Admin)\n`!remover @u`, `!limpar [qnt]`, `!limparsalas [sala]` • Limpa sala A/B/C (sem letra = todas)\n`!clubeadmin` • Assinaturas ativas do clube (vencimentos)\n`!sincronizarelo @u`, `!sincronizartodos` (ou `!sync todos`), `!sync`, `!onboarding`' },
       { name: '⚙️ Partida (Staff)', value: '`!start [sala]`, `!vitoria [1|2] [sala]`, `!cancelarstart [sala]`\n`!rematch [sala]` • Volta os 10 pra fila, rebalanceia e inicia na hora' },
       { name: '📊 Temporada', value: '`!temporadas`, `!resetgeral` (Admin)' }
     )
@@ -1895,9 +1942,9 @@ async function handleSalaHubCommand(message, args = []) {
   }
 }
 
-async function handleConvidarCommand(message, args = []) {
+async function handleConvidarCommand(message, args = [], targetUserOverride = null) {
   try {
-    const targetUser = message.mentions.users.first();
+    const targetUser = targetUserOverride || message.mentions.users.first();
     if (!targetUser) {
       return await replyToMessage(message, '❌ Use: `!convidar @usuario` para convidar alguém para sua sala.');
     }
@@ -2040,7 +2087,7 @@ module.exports = {
   handleSyncAllRolesCommand, handleSyncAllPlayersEloCommand, handleVictoryCommand, handleOnboardingCommand, handleClearCommand,
   handleRegisterCommand, handleNickUpdateCommand, handleSyncPlayerRankCommand, handleVoteCommand, pendingAutoStarts, triggerAutoStart,
   handleRematchCommand, handleRouletteCommand, handleRoletaSairCommand, handleRulesCommand, handleStaffCommand, handlePdlCommand,
-  handleResultVoteButton, handleClubeCommand, handleQueroLiveCommand, handleLiveCommand,
+  handleResultVoteButton, handleClubeCommand, handleClubeAdminCommand, handleQueroLiveCommand, handleLiveCommand,
   handleSalaHubCommand, handleConvidarCommand, handleLimparVozCommand, handleSalaCommand,
   findRecentVictoryByLetter,
   findPendingAutoStartLobby,

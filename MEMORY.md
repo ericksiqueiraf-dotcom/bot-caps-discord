@@ -271,6 +271,15 @@ database/                    ← fallback JSON local
 - **Layout ARENA replicado no TESTRE (2026-10-10):** modelo em `docs/SERVER_LAYOUT_CAPS_ARENA.md`; `setup-servidor.js` com planta ARENA (6 cats, 19 TXT, 11 VOZ, 11 cargos); aplicado em `CAPS BOT TESTE (1558217291123138561)`; `config.json` remapeado (fila/partidas/resultados/destaques/logs/ranking/cadastro + 3 lobbies com limite 10/10/30)
 - Validação: `npm test` 49/49, 13 suites
 
+### 2026-10-15 — Sugestões aplicadas (ordem 1→4)
+- **1) `!ajuda`:** nova seção `🔊 Salas temporárias` (`!salahub`/`!sala`/`!convidar`/`!limparvoz`) + `!clubeadmin` na seção Staff. TESTRE + prod.
+- **2) Registro sem lixo:** auto-delete agora dá `unregisterTempRoom` (apagou ou sumiu); listener novo `channelDelete` limpa o registro quando a sala é apagada manualmente. TESTRE + prod.
+- **3) Slash da sala:** `/salahub`, `/sala [nome]`, `/convidar @usuário` (obrigatório), `/limparvoz` + `/clubeadmin` registrados no `buildSlashCommands` e no `interactionCreate` (TESTRE + prod). `handleConvidarCommand` aceita `targetUserOverride` (padrão do `/remover`).
+- **4) Suíte verde 140/140** (era 110/138): `temp-voice.test.js` reescrito p/ API real (hub, prefixo, permissões, registro, rename/delete/invite/list, auto-delete com unregister); outras 6 suites adaptadas à API real via subagentes (`queue-buttons`→`parseQueueJoinButtonId`, `guild-filter`, `cadastro-main`, `onboarding`, `info-embeds`→`buildStaffEmbed`, `rank-roles` com ID fake injetado).
+- **Bugs reais achados pelos testes (NÃO corrigidos, fora do escopo):** `allowedGuildIds` do config não é aplicado em lugar nenhum (bot responde em qualquer guild); `cadastro.minSummonerLevel=30` é dead config (`riotService` descarta `summonerLevel`); `setup-servidor.js` importa `buildOnboardingGuideEmbed` inexistente (protegido por `typeof`, só pula o embed do `#como-jogar`).
+- **5) `!clubeadmin` (só staff, prefixo + slash):** embed com assinaturas ativas por tier (`Lendário/VIP/Apoiador`), cada linha `<@user> — vence em N dias / amanhã / hoje`, ordenado por vencimento. TESTRE + prod.
+- Validação: suíte 140/140; `node --check` nos 6 arquivos; ambos bots reiniciados e online.
+
 ### 2026-10-15 — Comandos de sala temporária + hub no VIP + preços do clube + anti-duplicação
 - **Comandos novos (`!salahub`, `!sala`, `!convidar`, `!limparvoz`):** `services/tempVoiceService.js` ganhou registro persistente (`database/tempVoiceRooms.json`: dono por sala, sobrevive restart) + `inviteToTempRoom`/`renameTempRoom`/`deleteTempRoom`/`listTempRooms`; handlers em `commands/legacyCommands.js`, cases no `index.js`. Portado p/ produção (`BOT CAPS DISCORD`) + restart `caps-bot`/`caps-bot-teste`.
 - **Bug que travava tudo:** export `handleRoletaSairCommand` vs definição `handleRouletteSairCommand` — ReferenceError em loop (92 restarts no teste, "Comando desconhecido" p/ tudo). Renomeado p/ `handleRoletaSairCommand`; boot limpo nos 2 bots.

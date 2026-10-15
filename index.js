@@ -232,6 +232,12 @@ function buildSlashCommands() {
       .setDescription('Remove um usuario da fila.')
       .addUserOption((option) => option.setName('usuario').setDescription('Usuario a remover').setRequired(true)),
     addModeAndLobbyOptions(new SlashCommandBuilder().setName('limparsalas').setDescription('Limpa salas automaticas ou uma sala especifica.')),
+    new SlashCommandBuilder().setName('salahub').setDescription('Lista as salas temporárias ativas.'),
+    new SlashCommandBuilder().setName('sala').setDescription('Mostra ou renomeia sua sala temporária.')
+      .addStringOption((option) => option.setName('nome').setDescription('Novo nome da sala').setRequired(false)),
+    new SlashCommandBuilder().setName('convidar').setDescription('Convida alguém para sua sala temporária.')
+      .addUserOption((option) => option.setName('usuario').setDescription('Usuário a convidar').setRequired(true)),
+    new SlashCommandBuilder().setName('limparvoz').setDescription('Apaga sua sala temporária (use dentro dela).'),
     new SlashCommandBuilder().setName('roleta').setDescription('Participa da roleta de quem sai (losers).')
       .addIntegerOption((option) => option.setName('quantidade').setDescription('Quantos saem (1-5)').setRequired(false))
       .addStringOption((option) => option.setName('sala').setDescription('Letra da sala, ex.: A').setRequired(false))
@@ -304,6 +310,7 @@ function buildSlashCommands() {
       .setName('toprankinfernal')
       .setDescription('Quem mais conquistou o INFERNAL na temporada.'),
     new SlashCommandBuilder().setName('clube').setDescription('Mostra o clube VIP: tiers, benefícios e membros.'),
+    new SlashCommandBuilder().setName('clubeadmin').setDescription('Lista assinaturas ativas do clube (staff).'),
     new SlashCommandBuilder().setName('querolive').setDescription('Entra/sai do ping 🔴 Ao Vivo.'),
     new SlashCommandBuilder()
       .setName('live')
@@ -478,6 +485,15 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
   });
 });
 
+client.on('channelDelete', async (channel) => {
+  try {
+    const { unregisterTempRoom } = require('./services/tempVoiceService');
+    if (channel?.id && channel?.guild?.id) unregisterTempRoom(channel.id, channel.guild.id);
+  } catch (error) {
+    console.error('[TEMP VOICE] Erro ao limpar registro da sala apagada:', error.message);
+  }
+});
+
 async function processCommand(message, rawContent) {
   const [commandName, ...args] = rawContent.slice(config.prefix.length).trim().split(/\s+/);
   const command = commandName?.toLowerCase();
@@ -526,6 +542,9 @@ async function processCommand(message, rawContent) {
         break;
       case 'clube':
         await handlers.handleClubeCommand(message);
+        break;
+      case 'clubeadmin':
+        await handlers.handleClubeAdminCommand(message);
         break;
       case 'querolive':
       case 'quero-live':
@@ -949,6 +968,9 @@ client.on('interactionCreate', async (interaction) => {
       case 'clube':
         await handlers.handleClubeCommand(context);
         break;
+      case 'clubeadmin':
+        await handlers.handleClubeAdminCommand(context);
+        break;
       case 'querolive':
         await handlers.handleQueroLiveCommand(context);
         break;
@@ -963,6 +985,20 @@ client.on('interactionCreate', async (interaction) => {
         break;
       case 'remover':
         await handlers.handleRemoveCommand(context, targetUser);
+        break;
+      case 'salahub':
+        await handlers.handleSalaHubCommand(context);
+        break;
+      case 'sala': {
+        const salaNome = interaction.options.getString('nome');
+        await handlers.handleSalaCommand(context, salaNome ? [salaNome] : []);
+        break;
+      }
+      case 'convidar':
+        await handlers.handleConvidarCommand(context, [], targetUser);
+        break;
+      case 'limparvoz':
+        await handlers.handleLimparVozCommand(context);
         break;
       case 'regras':
         await handlers.handleRulesCommand(context);

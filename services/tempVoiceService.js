@@ -226,10 +226,15 @@ async function scheduleTempVoiceDeletion(channel) {
   const timeout = setTimeout(async () => {
     deleteTimers.delete(channel.id);
     const freshChannel = await channel.guild.channels.fetch(channel.id).catch(() => null);
+    if (!freshChannel) {
+      unregisterTempRoom(channel.id, channel.guild.id);
+      return;
+    }
     if (isManagedTempVoiceChannel(freshChannel) && freshChannel.members.size === 0) {
       await freshChannel.delete('Sala temporaria vazia').catch((error) => {
         console.error('[TEMP VOICE] Erro ao apagar sala temporaria:', error.message);
       });
+      unregisterTempRoom(channel.id, channel.guild.id);
     }
   }, delayMs);
 
