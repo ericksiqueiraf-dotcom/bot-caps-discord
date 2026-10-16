@@ -135,6 +135,15 @@ function buildSlashCommands() {
       .addUserOption((option) => option.setName('jogador').setDescription('Jogador').setRequired(true))
       .addIntegerOption((option) => option.setName('valor').setDescription('Ex: -50').setRequired(true).setMinValue(-500).setMaxValue(500))
       .addStringOption((option) => option.setName('motivo').setDescription('Motivo').setRequired(false)),
+    new SlashCommandBuilder().setName('presentear').setDescription('Dá dias de clube de presente (só Admin).')
+      .addUserOption((option) => option.setName('usuario').setDescription('Quem recebe').setRequired(true))
+      .addStringOption((option) => option.setName('tier').setDescription('Tier').setRequired(true)
+        .addChoices(
+          { name: 'Apoiador', value: 'apoiador' },
+          { name: 'VIP', value: 'vip' },
+          { name: 'Lendário', value: 'lendario' }
+        ))
+      .addIntegerOption((option) => option.setName('dias').setDescription('Dias (padrão do tier)').setRequired(false).setMinValue(1).setMaxValue(365)),
     new SlashCommandBuilder()
       .setName('entrar')
       .setDescription('Entra na fila CLASSIC ou ARAM.')
@@ -843,6 +852,9 @@ async function processCommand(message, rawContent) {
       case 'pdl':
         await handlers.handlePdlCommand(message, args);
         break;
+      case 'presentear':
+        await handlers.handlePresentearCommand(message, args);
+        break;
       case 'regras':
       case 'regra':
       case 'rules':
@@ -1286,6 +1298,13 @@ client.on('interactionCreate', async (interaction) => {
         const pdlValor = interaction.options.getInteger('valor');
         const pdlMotivo = interaction.options.getString('motivo');
         await handlers.handlePdlCommand(context, [String(pdlValor), ...(pdlMotivo ? [pdlMotivo] : [])], pdlUser || null);
+        break;
+      }
+      case 'presentear': {
+        const presenteUser = interaction.options.getUser('usuario');
+        const presenteTier = interaction.options.getString('tier');
+        const presenteDias = interaction.options.getInteger('dias');
+        await handlers.handlePresentearCommand(context, [presenteTier, ...(presenteDias != null ? [String(presenteDias)] : [])], presenteUser || null);
         break;
       }
       case 'roleta': {

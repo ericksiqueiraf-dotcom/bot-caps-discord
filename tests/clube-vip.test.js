@@ -114,6 +114,19 @@ describe('!live e promo automática', () => {
     assert.equal(parseLiveLink(''), null);
   });
 
+  it('normalizePresentearTier entende nomes, emojis e abreviacoes', () => {
+    const legacy = require('../commands/legacyCommands');
+    assert.equal(legacy.normalizePresentearTier('vip'), 'vip');
+    assert.equal(legacy.normalizePresentearTier('VIP'), 'vip');
+    assert.equal(legacy.normalizePresentearTier('⭐ VIP'), 'vip');
+    assert.equal(legacy.normalizePresentearTier('apoiador'), 'apoiador');
+    assert.equal(legacy.normalizePresentearTier('💜 Apoiador'), 'apoiador');
+    assert.equal(legacy.normalizePresentearTier('lendario'), 'lendario');
+    assert.equal(legacy.normalizePresentearTier('Lendário'), 'lendario');
+    assert.equal(legacy.normalizePresentearTier('👑 Lendário'), 'lendario');
+    assert.equal(legacy.normalizePresentearTier('gold'), null);
+    assert.equal(legacy.normalizePresentearTier(null), null);
+  });
   it('cooldown do !live por tier (Lendario 6h, VIP 12h, Apoiador 24h)', () => {
     const { LIVE_COOLDOWN_BY_TIER_MS } = require('../commands/legacyCommands');
     assert.equal(LIVE_COOLDOWN_BY_TIER_MS['👑 Lendário'], 6 * 3600000);

@@ -337,6 +337,10 @@ database/                    ← fallback JSON local
 - Sessões reabertas no boot (sem retroativo); mutar/desmutar alterna a contagem.
 - Validação: `voice-time.test.js` 6/6, suíte 174/174; ambos bots online.
 
+### 2026-10-16 — !presentear (só Admin)
+- `!presentear @usuário <apoiador|vip|lendario> [dias]` (+ `/presentear`): dá cargo + assinatura (expira sozinha, entra no `!clubeadmin`). Dias padrão do tier, 1–365. DM avisa o presenteado. Documentado no `!staff`.
+- TESTRE + prod; ambos bots online.
+
 ### 2026-10-16 — Estado atual + bug !votar corrigido
 - **Bug crítico:** `!votar` por texto crashava (`ReferenceError: VOTE_THRESHOLD is not defined` 3x no log) — `handleVoteCommand` referenciava const inexistente nas deps. Removido nas 2 bases (o `getVoteThreshold` real continua); botões de voto nunca foram afetados. Bots reiniciados.
 - **Falso alarme schedulers:** flags `sextaAbertaEm/lclAbertoEm` vazias porque são **02h31 de sexta** — janelas abrem às 08h. Ticks rodando, sem erro. Verificar posts às 08h (primeira Sexta + LCL reais).

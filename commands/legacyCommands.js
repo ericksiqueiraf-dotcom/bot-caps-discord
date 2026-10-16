@@ -953,6 +953,70 @@ async function handleAjudaFixarCommand(message) {
   }
 }
 
+function normalizePresentearTier(raw) {
+  const v = String(raw || '').toLowerCase();
+  if (v.includes('apoiador') || v.includes('💜')) return 'apoiador';
+  if (v === 'vip' || v.includes('⭐')) return 'vip';
+  if (v.includes('lendario') || v.includes('lendário') || v.includes('👑')) return 'lendario';
+  return null;
+}
+
+async function handlePresentearCommand(message, args = [], targetUserOverride = null) {
+  try {
+    if (!message.member?.permissions?.has(PermissionFlagsBits.Administrator)) {
+      return await replyToMessage(message, '❌ Restrito a administradores.');
+    }
+    const { getClubeTierConfig } = require('../services/clubePaymentsService');
+    const targetUser = targetUserOverride || message.mentions.users.first();
+    const tierKey = normalizePresentearTier(args.find((a) => normalizePresentearTier(a)));
+    const diasArg = args.map(Number).find((n) => Number.isInteger(n));
+    if (!targetUser) {
+      return await replyToMessage(message, '❌ Use: `!presentear @usuário <apoiador|vip|lendario> [dias]`.');
+    }
+    if (!tierKey) {
+      return await replyToMessage(message, '❌ Tier inválido. Use: `apoiador`, `vip` ou `lendario`.');
+    }
+    const tier = getClubeTierConfig(config, tierKey);
+    if (!tier) {
+      return await replyToMessage(message, '❌ Tier inválido.');
+    }
+    const dias = diasArg && diasArg >= 1 && diasArg <= 365 ? diasArg : tier.dias;
+    const guild = message.guild;
+    const member = await guild.members.fetch(targetUser.id).catch(() => null);
+    if (!member) {
+      return await replyToMessage(message, '❌ Usuário não está no servidor.');
+    }
+    const role = guild.roles.cache.find((r) => r.name === tier.roleName);
+    if (!role) {
+      return await replyToMessage(message, `❌ Cargo ${tier.roleName} não encontrado no servidor.`);
+    }
+    await member.roles.add(role, `Presente de ${message.author?.tag || message.author?.id}`).catch(() => null);
+    const { loadVipSubscriptions, saveVipSubscriptions } = require('../services/dataService');
+    const { subscriptions } = await loadVipSubscriptions();
+    const now = Date.now();
+    subscriptions.push({
+      paymentId: `presente:${message.author.id}:${now}`,
+      guildId: guild.id,
+      discordId: targetUser.id,
+      tierKey,
+      status: 'active',
+      startedAt: new Date(now).toISOString(),
+      expiresAt: new Date(now + dias * 24 * 3600 * 1000).toISOString(),
+      gift: true,
+      grantedBy: message.author.id
+    });
+    await saveVipSubscriptions({ subscriptions });
+    try {
+      const dm = await member.createDM();
+      await dm.send(`🎁 Você ganhou **${dias} dias de ${tier.roleName}** na CAPS Arena! Aproveite!`).catch(() => null);
+    } catch { /* DM fechada: segue o jogo */ }
+    await replyToMessage(message, `✅ ${targetUser} ganhou **${dias} dias de ${tier.roleName}**! 🎁`);
+  } catch (error) {
+    console.error('[ERRO] !presentear:', error);
+    await replyToMessage(message, `❌ Erro ao presentear: \`${error.message}\``);
+  }
+}
+
 async function handleQueroLiveCommand(message) {
   const guild = message.guild;
   if (!guild) return;
@@ -2557,7 +2621,7 @@ module.exports = {
   handleRematchCommand, handleRouletteCommand, handleRoletaSairCommand, handleRulesCommand, handleStaffCommand, handlePdlCommand,
   handleResultVoteButton, handleClubeCommand, handleClubeAdminCommand, handleClubeFixarCommand, handleQueroLiveCommand, handleLiveCommand,
   handleConviteCommand, handleTopConvitesCommand, handleTorneioCommand, handleTempoCommand, handleTopVozCommand,
-  handleAjudaFixarCommand, buildAjudaEmbed, buildTempoEmbed,
+  handleAjudaFixarCommand, buildAjudaEmbed, buildTempoEmbed, normalizePresentearTier, handlePresentearCommand,
   LIVE_COOLDOWN_BY_TIER_MS,
   handleSalaHubCommand, handleConvidarCommand, handleLimparVozCommand, handleSalaCommand,
   handleSalaLockCommand, handleSalaLimitCommand, handleSalaExpulsarCommand,

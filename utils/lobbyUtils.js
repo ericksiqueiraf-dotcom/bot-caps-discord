@@ -1846,7 +1846,7 @@ const STAFF_SECTIONS = [
   },
   {
     name: '💎 Clube VIP — assinaturas',
-    value: '`!clubeadmin` • Assinaturas ativas por tier, com vencimento de cada uma.\n`!clubefixar` • Posta e fixa os benefícios detalhados no #clube-vip.\n`!clube` • O que o jogador vê (tiers, preços, botões de assinar).'
+    value: '`!clubeadmin` • Assinaturas ativas por tier, com vencimento de cada uma.\n`!clubefixar` • Posta e fixa os benefícios detalhados no #clube-vip.\n`!presentear @u <tier> [dias]` • Dá dias de clube de presente (só Admin).\n`!clube` • O que o jogador vê (tiers, preços, botões de assinar).'
   },
   {
     name: '📌 Fixar guias (staff)',
