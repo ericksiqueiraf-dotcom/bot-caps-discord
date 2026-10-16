@@ -319,6 +319,8 @@ function buildSlashCommands() {
       .setDescription('Quem mais conquistou o INFERNAL na temporada.'),
     new SlashCommandBuilder().setName('clube').setDescription('Mostra o clube VIP: tiers, benefícios e membros.'),
     new SlashCommandBuilder().setName('clubeadmin').setDescription('Lista assinaturas ativas do clube (staff).'),
+    new SlashCommandBuilder().setName('convite').setDescription('Seu link pessoal de convite + recompensas.'),
+    new SlashCommandBuilder().setName('topconvites').setDescription('Ranking de quem mais trouxe gente.'),
     new SlashCommandBuilder().setName('clubefixar').setDescription('Posta e fixa os benefícios no #clube-vip (staff).'),
     new SlashCommandBuilder().setName('querolive').setDescription('Entra/sai do ping 🔴 Ao Vivo.'),
     new SlashCommandBuilder()
@@ -440,6 +442,15 @@ client.once('ready', async () => {
   startVipPaymentPoller({ config });
   startClubePromoScheduler();
 
+  // Snapshot de convites p/ atribuir quem convidou cada novo membro.
+  try {
+    for (const guild of client.guilds.cache.values()) {
+      await snapshotGuildInvites(guild);
+    }
+  } catch (err) {
+    console.error('[RESTART] Erro ao fotografar convites:', err);
+  }
+
   // Retoma votacoes de MVP pendentes (se o bot reiniciou no meio de uma votacao)
   try {
     await resumePendingMvpVotes();
@@ -556,6 +567,12 @@ async function processCommand(message, rawContent) {
         break;
       case 'clubeadmin':
         await handlers.handleClubeAdminCommand(message);
+        break;
+      case 'convite':
+        await handlers.handleConviteCommand(message);
+        break;
+      case 'topconvites':
+        await handlers.handleTopConvitesCommand(message);
         break;
       case 'clubefixar':
         await handlers.handleClubeFixarCommand(message);
@@ -1023,6 +1040,12 @@ client.on('interactionCreate', async (interaction) => {
       case 'clubeadmin':
         await handlers.handleClubeAdminCommand(context);
         break;
+      case 'convite':
+        await handlers.handleConviteCommand(context);
+        break;
+      case 'topconvites':
+        await handlers.handleTopConvitesCommand(context);
+        break;
       case 'clubefixar':
         await handlers.handleClubeFixarCommand(context);
         break;
@@ -1229,6 +1252,136 @@ client.on('guildMemberAdd', async (member) => {
     embeds: [welcomeEmbed],
     components: [onboardingActions]
   }).catch((err) => console.error('[BOAS-VINDAS] Erro ao enviar mensagem:', err));
+});
+
+// ─── Convites com recompensa: snapshot de usos p/ atribuir quem convidou ─────
+const inviteUseCache = new Map(); // guildId -> Map(code, uses)
+
+async function snapshotGuildInvites(guild) {
+  try {
+    const invites = await guild.invites.fetch().catch(() => null);
+    if (!invites) return;
+    const map = new Map();
+    for (const inv of invites.values()) map.set(inv.code, inv.uses || 0);
+    inviteUseCache.set(guild.id, map);
+  } catch (error) {
+    console.error('[CONVITE] Erro ao fotografar convites:', error.message);
+  }
+}
+
+client.on('inviteCreate', (invite) => {
+  const map = inviteUseCache.get(invite.guild?.id) || new Map();
+  map.set(invite.code, invite.uses || 0);
+  if (invite.guild?.id) inviteUseCache.set(invite.guild.id, map);
+});
+
+client.on('inviteDelete', (invite) => {
+  inviteUseCache.get(invite.guild?.id)?.delete(invite.code);
+});
+
+async function grantRecruitRewards(guild, inviterId, lifetime, unlocked) {
+  try {
+    const inviter = await guild.members.fetch(inviterId).catch(() => null);
+    if (!inviter) return;
+    const findOrCreateRole = async (name) => {
+      let role = guild.roles.cache.find((r) => r.name === name);
+      if (!role) role = await guild.roles.create({ name, reason: 'Recompensa de convites' }).catch(() => null);
+      return role;
+    };
+    if (unlocked.includes(3)) {
+      const role = await findOrCreateRole('🌱 Recrutador');
+      if (role) await inviter.roles.add(role, 'Meta de 3 convites').catch(() => null);
+    }
+    if (unlocked.includes(5)) {
+      const channelId = config.textChannels?.welcomeChannelId;
+      const channel = channelId ? await guild.channels.fetch(channelId).catch(() => null) : null;
+      if (channel?.isTextBased?.()) {
+        await channel.send(`🌟 ${inviter} virou **destaque de recrutamento** com **${lifetime} convites**! Use \`!convite\` e participe.`).catch(() => null);
+      }
+    }
+    if (unlocked.includes(10)) {
+      const vipRole = guild.roles.cache.find((r) => r.name === '⭐ VIP');
+      if (vipRole) await inviter.roles.add(vipRole, 'Meta de 10 convites: 7 dias de VIP').catch(() => null);
+      const { loadVipSubscriptions, saveVipSubscriptions } = require('./services/dataService');
+      const { subscriptions } = await loadVipSubscriptions();
+      const now = Date.now();
+      subscriptions.push({
+        paymentId: `free-recruta:${guild.id}:${inviterId}:${now}`,
+        guildId: guild.id,
+        discordId: inviterId,
+        tierKey: 'vip',
+        status: 'active',
+        startedAt: new Date(now).toISOString(),
+        expiresAt: new Date(now + 7 * 24 * 3600 * 1000).toISOString(),
+        free: true
+      });
+      await saveVipSubscriptions({ subscriptions });
+    }
+    await inviter.send(
+      `🔗 **Recrutamento CAPS Arena**\nVocê já trouxe **${lifetime} pessoa(s)**! Metas: 3 = 🌱 Recrutador • 5 = destaque • 10 = 7 dias de ⭐ VIP grátis.`
+    ).catch(() => null);
+  } catch (error) {
+    console.error('[CONVITE] Erro nas recompensas:', error.message);
+  }
+}
+
+client.on('guildMemberAdd', async (member) => {
+  try {
+    const { ensureInvitesStore, recordInviteUse, checkThresholdRewards } = require('./services/convitesService');
+    const { loadSystemMeta, saveSystemMeta } = require('./services/dataService');
+    const guild = member.guild;
+    let before = inviteUseCache.get(guild.id);
+    if (!before) {
+      await snapshotGuildInvites(guild);
+      before = inviteUseCache.get(guild.id) || new Map();
+    }
+    const after = await guild.invites.fetch().catch(() => null);
+    let usedCode = null;
+    let inviterId = null;
+    if (after) {
+      const afterMap = new Map();
+      for (const inv of after.values()) {
+        afterMap.set(inv.code, inv.uses || 0);
+        if ((inv.uses || 0) > (before.get(inv.code) || 0) && !usedCode) {
+          usedCode = inv.code;
+          inviterId = inv.inviterId || inv.inviter?.id || null;
+        }
+      }
+      inviteUseCache.set(guild.id, afterMap);
+    }
+    if (!inviterId) return;
+    const systemMeta = await loadSystemMeta();
+    const store = ensureInvitesStore(systemMeta);
+    const result = recordInviteUse(store, {
+      code: usedCode,
+      inviterId,
+      newMemberId: member.id,
+      memberCreatedAtMs: member.user?.createdAt,
+      nowMs: Date.now()
+    });
+    if (!result.counted) {
+      await saveSystemMeta(systemMeta).catch(() => null);
+      return;
+    }
+    const { lifetime, unlocked } = checkThresholdRewards(store, inviterId);
+    await saveSystemMeta(systemMeta);
+    await grantRecruitRewards(guild, inviterId, lifetime, unlocked);
+  } catch (error) {
+    console.error('[CONVITE] Erro ao atribuir convite:', error.message);
+  }
+});
+
+client.on('guildMemberRemove', async (member) => {
+  try {
+    const { ensureInvitesStore, handleMemberLeave } = require('./services/convitesService');
+    const { loadSystemMeta, saveSystemMeta } = require('./services/dataService');
+    const systemMeta = await loadSystemMeta();
+    const store = ensureInvitesStore(systemMeta);
+    const { reverted } = handleMemberLeave(store, { newMemberId: member.id, nowMs: Date.now() });
+    if (reverted.length > 0) await saveSystemMeta(systemMeta);
+  } catch (error) {
+    console.error('[CONVITE] Erro ao estornar convite:', error.message);
+  }
 });
 
 // Anti-duplicação do anúncio de entrada no clube: o Discord pode emitir

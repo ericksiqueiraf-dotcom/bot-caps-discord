@@ -1041,6 +1041,67 @@ async function handleClubeAdminCommand(message) {
   }
 }
 
+async function handleConviteCommand(message) {
+  try {
+    const { ensureInvitesStore, getRecruiterStats } = require('../services/convitesService');
+    const systemMeta = await loadSystemMeta();
+    const store = ensureInvitesStore(systemMeta);
+
+    let invite = null;
+    try {
+      const invites = await message.guild.invites.fetch();
+      invite = [...invites.values()].find((inv) => inv.inviterId === message.author.id && !inv.expiresAt) || null;
+    } catch { /* sem permissao de ver convites: cria direto */ }
+    if (!invite) {
+      const welcome = message.guild.channels.cache.find((c) => c.name === '👋-boas-vindas' && c.isTextBased?.());
+      const target = welcome || (message.channel?.isTextBased?.() ? message.channel : null);
+      if (target?.createInvite) {
+        invite = await target.createInvite({ maxAge: 0, maxUses: 0, reason: `Convite pessoal de ${message.author.tag}` }).catch(() => null);
+      }
+    }
+    if (!invite) {
+      return await replyToMessage(message, '❌ Não consegui criar seu link agora. Fale com a Staff.');
+    }
+
+    store.links[message.author.id] = { code: invite.code, channelId: invite.channelId, createdAt: new Date().toISOString() };
+    await saveSystemMeta(systemMeta);
+    const stats = getRecruiterStats(store, message.author.id);
+    await replyToMessage(message,
+      `🔗 Seu link pessoal: ${invite.url}\n` +
+      `Traga gente e ganhe: **3** = cargo 🌱 Recrutador • **5** = destaque na Arena • **10** = **7 dias de ⭐ VIP grátis**\n` +
+      `Você já trouxe **${stats.lifetime}** (${stats.month} este mês). Use \`!topconvites\` para ver o ranking.`
+    );
+  } catch (error) {
+    console.error('[ERRO] !convite:', error);
+    await replyToMessage(message, `❌ Erro ao gerar convite: \`${error.message}\``);
+  }
+}
+
+async function handleTopConvitesCommand(message) {
+  try {
+    const { ensureInvitesStore, getMonthlyTop, monthKey } = require('../services/convitesService');
+    const systemMeta = await loadSystemMeta();
+    const store = ensureInvitesStore(systemMeta);
+    const month = monthKey();
+    const top = getMonthlyTop(store, month, 10);
+    if (top.length === 0) {
+      return await replyToMessage(message, '📭 Ninguém trouxe gente nova este mês ainda. Use `!convite` e seja o primeiro!');
+    }
+    const lines = top.map((t) => `**${t.position}º** <@${t.userId}> — ${t.count} convite(s)`);
+    const { EmbedBuilder } = require('discord.js');
+    const embed = new EmbedBuilder()
+      .setColor(THEME?.RANK ?? '#FFD700')
+      .setTitle(`🔗 Top convites — ${month.slice(5)}/${month.slice(0, 4)}`)
+      .setDescription(lines.join('\n') + '\n\nMetas: 3 = 🌱 Recrutador • 5 = destaque • 10 = 7 dias de ⭐ VIP grátis')
+      .setFooter({ text: `${FOOTER_PREFIX} • zera todo dia 1º` })
+      .setTimestamp();
+    await replyToMessage(message, { embeds: [embed] });
+  } catch (error) {
+    console.error('[ERRO] !topconvites:', error);
+    await replyToMessage(message, `❌ Erro ao listar ranking: \`${error.message}\``);
+  }
+}
+
 async function handleHelpCommand(message) {
   try {
     const embed = new EmbedBuilder()
@@ -1049,7 +1110,7 @@ async function handleHelpCommand(message) {
     .setDescription('Aqui estao os comandos para gerenciar a CAPS Arena.')
     .addFields(
       { name: '🕹️ Cadastro (1x)', value: '`!cadastrar Nick#TAG` • Vincula sua conta Riot\n`!nick Nick#TAG` • Atualiza seu nick' },
-      { name: '🎮 Jogador (1/2) — Fila e voto', value: '`!regras` • Regulamento completo\n`!entrar` • Fila Classic (no canal Lobby Classic ou Lobby TIER S)\n`!entrar aram` • Fila ARAM\n`!entrar aram 2x2` • ARAM formato\n`!fila` • Mostra jogadores em sala\n`!espera` • Entra na espera (🔥 INFERNAL entra na posição 5)\n`!esperatiers` • Espera do Lobby TIER S (só Esmeralda+)\n`!espera ver` • Mostra a ordem\n`!espera sair` • Sai da espera\n`!sair` • Sai da sala\n`!votar 1/2` • Vota no vencedor (abre painel com botões p/ os 10 votarem)\n`!votar` • Reabre o painel de votação' },
+      { name: '🎮 Jogador (1/2) — Fila e voto', value: '`!regras` • Regulamento completo\n`!convite` • Seu link pessoal (traga gente e ganhe recompensas)\n`!topconvites` • Ranking de quem mais trouxe gente\n`!entrar` • Fila Classic (no canal Lobby Classic ou Lobby TIER S)\n`!entrar aram` • Fila ARAM\n`!entrar aram 2x2` • ARAM formato\n`!fila` • Mostra jogadores em sala\n`!espera` • Entra na espera (🔥 INFERNAL entra na posição 5)\n`!esperatiers` • Espera do Lobby TIER S (só Esmeralda+)\n`!espera ver` • Mostra a ordem\n`!espera sair` • Sai da espera\n`!sair` • Sai da sala\n`!votar 1/2` • Vota no vencedor (abre painel com botões p/ os 10 votarem)\n`!votar` • Reabre o painel de votação' },
       { name: '🎮 Jogador (2/2) — Ranking', value: '`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking geral (CLASSIC = pontos custom)\n`!placar tiers` • Só Esmeralda+\n`!top10` • Top 10 CLASSIC por pontos custom, desempate por winrate\n`!top10 tiers` • Top 10 só Esmeralda+\n`!topstreak` • Ranking Streak 🔥\n`!toprankinfernal` • Quem mais pegou INFERNAL na temporada 🔥\n`!clube` • Clube VIP: tiers, benefícios e membros 💎\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
       { name: '💎 Clube VIP', value: '`!clube` • Tiers, assinatura PIX e renovação -10%\n`!querolive` • Entrar/sair do ping 🔴 Ao Vivo\n`!live <link>` • Divulgar live Twitch/YouTube/Kick (Lendário 6h, VIP 12h, Apoiador 24h)' },
       { name: '🔊 Salas temporárias (dono da sala)', value: 'Entre no ➕・criar-sala para ganhar sua sala\n`!salahub` • Lista as salas ativas\n`!sala` • Mostra sua sala • `!sala <nome>` renomeia\n`!convidar @u` • Chama alguém p/ sua sala\n`!salalock` • Tranca (`!salalock abrir` destranca)\n`!salalimit <0-99>` • Limite de usuários (0 = sem limite)\n`!salaexpulsar @u` • Remove alguém da sala\n`!limparvoz` • Apaga sua sala (dentro dela)' },
@@ -2200,6 +2261,7 @@ module.exports = {
   handleRegisterCommand, handleNickUpdateCommand, handleSyncPlayerRankCommand, handleVoteCommand, pendingAutoStarts, triggerAutoStart,
   handleRematchCommand, handleRouletteCommand, handleRoletaSairCommand, handleRulesCommand, handleStaffCommand, handlePdlCommand,
   handleResultVoteButton, handleClubeCommand, handleClubeAdminCommand, handleClubeFixarCommand, handleQueroLiveCommand, handleLiveCommand,
+  handleConviteCommand, handleTopConvitesCommand,
   LIVE_COOLDOWN_BY_TIER_MS,
   handleSalaHubCommand, handleConvidarCommand, handleLimparVozCommand, handleSalaCommand,
   handleSalaLockCommand, handleSalaLimitCommand, handleSalaExpulsarCommand,
