@@ -317,6 +317,11 @@ database/                    ← fallback JSON local
 - `QUEUE_JOIN_BUTTON_IDS.LEAVE` (`queue:leave`) + botão vermelho "Sair da Fila" no `buildQueueJoinActionRow()`; roteado no `interactionCreate` p/ `handleLeaveCommand` (TESTRE + prod). Painel do `#fila` é reconstruído no boot, então o botão aparece sozinho após restart.
 - Testes atualizados (`queue-buttons`, `queue-feed`: 20/20); ambos bots reiniciados e online.
 
+### 2026-10-16 — !ajudafixar: ajuda 1+2 fixadas no #infos-lol
+- `!ajudafixar` (só staff, +`/ajudafixar`): posta os 2 embeds no `#💡┃infos-lol`, apaga fixadas antigas iguais e fixa as novas. `buildAjudaEmbed(page)` extraído e exportado (testado: títulos 1/2, ida-e-volta, limites).
+- `!staff` ganhou seção 📌 Fixar guias (`!ajudafixar` + `!clubefixar`).
+- TESTRE + prod (com 2 reparos de port na prod); ambos bots online.
+
 ### 2026-10-16 — !ajuda em 2 páginas
 - `!ajuda` (1/2, o essencial): cadastro + fila/voto. `!ajuda2` (2/2): ranking, clube, salas, extras (convite, torneio, tempo) + volta p/ página 1. Slash `/ajuda` e `/ajuda2`.
 - TESTRE + prod; suíte 174/174; ambos bots online.

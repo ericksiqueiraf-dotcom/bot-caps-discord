@@ -922,6 +922,38 @@ async function handleClubeFixarCommand(message) {
   }
 }
 
+async function handleAjudaFixarCommand(message) {
+  try {
+    if (!isStaffViewer(message.member)) {
+      return await replyToMessage(message, '❌ Restrito à staff.');
+    }
+    const guild = message.guild;
+    const target = guild.channels.cache.find((c) => c.name === '💡┃infos-lol' && c.isTextBased?.())
+      || (message.channel?.isTextBased?.() ? message.channel : null);
+    if (!target) {
+      return await replyToMessage(message, '❌ Canal #infos-lol não encontrado.');
+    }
+    const titles = ['📚 Guia de Comandos (1/2) — O essencial', '📚 Guia de Comandos (2/2) — Ranking e extras'];
+    const botId = guild.members.me?.id;
+    const pinned = await target.messages.fetchPinned().catch(() => null);
+    const olds = [...(pinned?.values?.() || [])].filter(
+      (m) => m.author?.id === botId && (m.embeds || []).some((e) => titles.includes(e.title))
+    );
+    for (const old of olds) {
+      await old.unpin().catch(() => null);
+      await old.delete().catch(() => null);
+    }
+    for (const page of [1, 2]) {
+      const sent = await target.send({ embeds: [buildAjudaEmbed(page)] });
+      await sent.pin().catch(() => null);
+    }
+    await replyToMessage(message, `✅ Guias postados e fixados em ${target}. Apague as mensagens antigas manualmente se ainda estiverem lá.`);
+  } catch (error) {
+    console.error('[ERRO] !ajudafixar:', error);
+    await replyToMessage(message, `❌ Erro ao fixar ajuda: \`${error.message}\``);
+  }
+}
+
 async function handleQueroLiveCommand(message) {
   const guild = message.guild;
   if (!guild) return;
@@ -1319,11 +1351,10 @@ async function handleTopVozCommand(message) {
   }
 }
 
-async function handleHelpCommand(message, page = 1) {
-  try {
-    const embed = new EmbedBuilder()
-    .setColor(THEME.INFO);
-    if (Number(page) === 2) {
+function buildAjudaEmbed(page = 1) {
+  const embed = new EmbedBuilder()
+  .setColor(THEME.INFO);
+  if (Number(page) === 2) {
       embed
       .setTitle('📚 Guia de Comandos (2/2) — Ranking e extras')
       .setDescription('Ranking, clube VIP, salas temporárias e extras. Página 1 no `!ajuda`.')
@@ -1347,6 +1378,12 @@ async function handleHelpCommand(message, page = 1) {
     embed
     .setFooter({ text: `${FOOTER_PREFIX} • Ajuda Atualizada` })
     .setTimestamp();
+  return embed;
+}
+
+async function handleHelpCommand(message, page = 1) {
+  try {
+    const embed = buildAjudaEmbed(page);
   const sent = await sendToMessageChannel(message, { embeds: [embed] });
     if (!sent) {
       await replyToMessage(message, '📚 Comandos: `!cadastrar Nick#TAG` • `!entrar` • `!entrar aram` • `!fila` • `!espera` • `!sair` • `!votar 1/2` • `!perfil` • `!placar` • `!top10` • `!topstreak` • `!clube` • `!querolive` • `!live` • `!staff` • `!start` • `!vitoria` • `!temporadas`');
@@ -2491,6 +2528,7 @@ module.exports = {
   handleRematchCommand, handleRouletteCommand, handleRoletaSairCommand, handleRulesCommand, handleStaffCommand, handlePdlCommand,
   handleResultVoteButton, handleClubeCommand, handleClubeAdminCommand, handleClubeFixarCommand, handleQueroLiveCommand, handleLiveCommand,
   handleConviteCommand, handleTopConvitesCommand, handleTorneioCommand, handleTempoCommand, handleTopVozCommand,
+  handleAjudaFixarCommand, buildAjudaEmbed,
   LIVE_COOLDOWN_BY_TIER_MS,
   handleSalaHubCommand, handleConvidarCommand, handleLimparVozCommand, handleSalaCommand,
   handleSalaLockCommand, handleSalaLimitCommand, handleSalaExpulsarCommand,

@@ -1849,6 +1849,10 @@ const STAFF_SECTIONS = [
     value: '`!clubeadmin` • Assinaturas ativas por tier, com vencimento de cada uma.\n`!clubefixar` • Posta e fixa os benefícios detalhados no #clube-vip.\n`!clube` • O que o jogador vê (tiers, preços, botões de assinar).'
   },
   {
+    name: '📌 Fixar guias (staff)',
+    value: '`!ajudafixar` • Posta e fixa `!ajuda` + `!ajuda2` no #infos-lol.\n`!clubefixar` • Posta e fixa os benefícios no #clube-vip.'
+  },
+  {
     name: '📊 Temporada — só Admin, com fila vazia',
     value: '`!temporadas` • Ver períodos arquivados.\n`!resetgeral` • Arquiva o período e ZERA os pontos (sem volta!).\n`!iniciartemporada` (ou `!iniciarseason`) • Liga a fase oficial.\nAbertura: `!resetgeral` e depois `!iniciartemporada`, antes dos primeiros jogos.'
   }

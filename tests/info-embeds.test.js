@@ -34,6 +34,18 @@ describe('embeds informativos por sala', () => {
     assert.ok(embed.data.description.includes('Servidor X'));
   });
 
+  it('buildAjudaEmbed tem 2 paginas com ida e volta', () => {
+    const legacy = require('../commands/legacyCommands');
+    const p1 = legacy.buildAjudaEmbed(1).toJSON();
+    const p2 = legacy.buildAjudaEmbed(2).toJSON();
+    assert.match(p1.title, /\(1\/2\)/);
+    assert.match(p2.title, /\(2\/2\)/);
+    assert.ok(p1.fields.some((f) => f.value.includes('!ajuda2')));
+    assert.ok(p2.fields.some((f) => f.value.includes('`!ajuda`')));
+    assert.ok(JSON.stringify(p1).length < 6000);
+    assert.ok(JSON.stringify(p2).length < 6000);
+  });
+
   it('staff: titulo fixo + campos STAFF_SECTIONS + dentro dos limites (sem guild)', () => {
     const embed = buildStaffEmbed();
     assert.strictEqual(embed.data.title, '🛠️ Guia da Staff — CAPS Arena');
