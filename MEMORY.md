@@ -317,6 +317,11 @@ database/                    ← fallback JSON local
 - `QUEUE_JOIN_BUTTON_IDS.LEAVE` (`queue:leave`) + botão vermelho "Sair da Fila" no `buildQueueJoinActionRow()`; roteado no `interactionCreate` p/ `handleLeaveCommand` (TESTRE + prod). Painel do `#fila` é reconstruído no boot, então o botão aparece sozinho após restart.
 - Testes atualizados (`queue-buttons`, `queue-feed`: 20/20); ambos bots reiniciados e online.
 
+### 2026-10-16 — Destaque de recrutamento turbinado
+- Meta 5 agora: cargo rotativo **⭐ Destaque** (tira do anterior, passa ao novo) + post no `#📢┃comunicados` desafiando a tomar o lugar.
+- DM comemorativa por meta (3: cargo garantido; 5: destaque + faltam p/ VIP; 10: VIP ativo).
+- `!topconvites` marca o 1º do mês com 👑.
+
 ### 2026-10-15 — !clubefixar: benefícios detalhados fixados no #clube-vip
 - `buildClubeDetalEmbed()` novo em `utils/lobbyUtils.js` (TESTRE + prod): embed "benefícios detalhados" com preços dinâmicos do config + comandos de cada tier + PIX e renovação -10%.
 - `!clubefixar` (só staff, prefixo + `/clubefixar`): posta no `#🔰clube-vip`, apaga fixada anterior igual e fixa a nova. `!staff` documenta o comando.

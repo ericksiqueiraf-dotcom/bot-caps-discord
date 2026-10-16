@@ -1313,10 +1313,15 @@ async function grantRecruitRewards(guild, inviterId, lifetime, unlocked) {
       if (role) await inviter.roles.add(role, 'Meta de 3 convites').catch(() => null);
     }
     if (unlocked.includes(5)) {
-      const channelId = config.textChannels?.welcomeChannelId;
-      const channel = channelId ? await guild.channels.fetch(channelId).catch(() => null) : null;
-      if (channel?.isTextBased?.()) {
-        await channel.send(`🌟 ${inviter} virou **destaque de recrutamento** com **${lifetime} convites**! Use \`!convite\` e participe.`).catch(() => null);
+      const destaque = await findOrCreateRole('⭐ Destaque');
+      if (destaque) {
+        for (const [, m] of destaque.members) await m.roles.remove(destaque, 'Novo destaque de recrutamento').catch(() => null);
+        await inviter.roles.add(destaque, 'Meta de 5 convites').catch(() => null);
+      }
+      const news = guild.channels.cache.find((c) => c.name === '📢┃comunicados' && c.isTextBased?.())
+        || (config.textChannels?.welcomeChannelId ? await guild.channels.fetch(config.textChannels.welcomeChannelId).catch(() => null) : null);
+      if (news?.isTextBased?.()) {
+        await news.send(`🌟 ${inviter} é o novo **destaque de recrutamento** com **${lifetime} convites**! Traga gente com \`!convite\` e tome o lugar.`).catch(() => null);
       }
     }
     if (unlocked.includes(10)) {
@@ -1337,8 +1342,15 @@ async function grantRecruitRewards(guild, inviterId, lifetime, unlocked) {
       });
       await saveVipSubscriptions({ subscriptions });
     }
+    const festa = unlocked.includes(10)
+      ? '\n🏆 **7 dias de ⭐ VIP ativos!** Aproveite!'
+      : unlocked.includes(5)
+        ? `\n🌟 Você é o **DESTAQUE** da Arena! Faltam **${10 - lifetime}** para os 7 dias de VIP.`
+        : unlocked.includes(3)
+          ? `\n🌱 Cargo **Recrutador** garantido! Faltam **${5 - lifetime}** para o destaque.`
+          : '';
     await inviter.send(
-      `🔗 **Recrutamento CAPS Arena**\nVocê já trouxe **${lifetime} pessoa(s)**! Metas: 3 = 🌱 Recrutador • 5 = destaque • 10 = 7 dias de ⭐ VIP grátis.`
+      `🔗 **Recrutamento CAPS Arena**\nVocê já trouxe **${lifetime} pessoa(s)**! Metas: 3 = 🌱 Recrutador • 5 = destaque • 10 = 7 dias de ⭐ VIP grátis.${festa}`
     ).catch(() => null);
   } catch (error) {
     console.error('[CONVITE] Erro nas recompensas:', error.message);

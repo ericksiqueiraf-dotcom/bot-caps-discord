@@ -1097,7 +1097,7 @@ async function handleTopConvitesCommand(message) {
     if (top.length === 0) {
       return await replyToMessage(message, '📭 Ninguém trouxe gente nova este mês ainda. Use `!convite` e seja o primeiro!');
     }
-    const lines = top.map((t) => `**${t.position}º** <@${t.userId}> — ${t.count} convite(s)`);
+    const lines = top.map((t) => `${t.position === 1 ? '👑 ' : ''}**${t.position}º** <@${t.userId}> — ${t.count} convite(s)`);
     const { EmbedBuilder } = require('discord.js');
     const embed = new EmbedBuilder()
       .setColor(THEME?.RANK ?? '#FFD700')
