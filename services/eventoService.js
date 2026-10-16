@@ -105,9 +105,11 @@ async function runSextaTick(nowMs = Date.now(), deps = {}) {
   const {
     loadSystemMeta = require('./dataService').loadSystemMeta,
     saveSystemMeta = require('./dataService').saveSystemMeta,
+    withQueueOperationLock = require('./dataService').withQueueOperationLock,
     postOpen = defaultPostOpen,
     postClose = defaultPostClose
   } = deps;
+  return withQueueOperationLock('evento:sexta', async () => {
   const { minutes, key } = getSPParts(nowMs);
   const friday = isFridaySP(nowMs);
   const meta = await loadSystemMeta();
@@ -123,6 +125,7 @@ async function runSextaTick(nowMs = Date.now(), deps = {}) {
     await saveSystemMeta(meta);
   }
   return meta;
+  });
 }
 
 function startSextaScheduler() {
@@ -255,11 +258,13 @@ async function runLclTick(nowMs = Date.now(), deps = {}) {
   const {
     loadSystemMeta = require('./dataService').loadSystemMeta,
     saveSystemMeta = require('./dataService').saveSystemMeta,
+    withQueueOperationLock = require('./dataService').withQueueOperationLock,
     loadInterMatches = defaultLoadInterMatches,
     postOpen = defaultPostLclOpen,
     postClose = defaultPostLclClose,
     setLclBot = defaultSetLclBot
   } = deps;
+  return withQueueOperationLock('evento:lcl', async () => {
   const { startMs, endMs } = lclWeekendRange(nowMs);
   const fridayKey = spDateKey(startMs);
   const inWindow = isLclWeekendWindow(nowMs);
@@ -281,6 +286,7 @@ async function runLclTick(nowMs = Date.now(), deps = {}) {
     await saveSystemMeta(meta);
   }
   return meta;
+  });
 }
 
 function startLclScheduler() {

@@ -33,6 +33,24 @@ describe('balanceamento de times', () => {
     assert.equal(B.getBalanceWeight({}), 0);
   });
 
+  it('PDL por time: equilibrado divide igual', () => {
+    const win = B.calculateTeamPdlDelta({ teamTotal: 9612, oppTotal: 9613, games: 20, won: true });
+    const lose = B.calculateTeamPdlDelta({ teamTotal: 9613, oppTotal: 9612, games: 20, won: false });
+    assert.equal(win, 12);
+    assert.equal(lose, -12);
+  });
+
+  it('PDL por time: piso +8 e teto -15', () => {
+    // Favorito (9840 x 9385) ganhando: piso.
+    assert.equal(B.calculateTeamPdlDelta({ teamTotal: 9840, oppTotal: 9385, games: 20, won: true }), 8);
+    // Favorito perdendo (zebra contra): teto.
+    assert.equal(B.calculateTeamPdlDelta({ teamTotal: 9840, oppTotal: 9385, games: 20, won: false }), -15);
+    // Zebra vencendo: prêmio cheio.
+    assert.equal(B.calculateTeamPdlDelta({ teamTotal: 9385, oppTotal: 9840, games: 20, won: true }), 22);
+    // Zebra perdendo: mixaria.
+    assert.equal(B.calculateTeamPdlDelta({ teamTotal: 9385, oppTotal: 9840, games: 20, won: false }), -2);
+  });
+
   it('exige quantidade par de jogadores', () => {
     assert.throws(() => B.createBalancedTeams([{ baseMmr: 1 }]), /quantidade par/);
   });

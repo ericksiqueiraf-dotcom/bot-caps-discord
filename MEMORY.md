@@ -337,6 +337,13 @@ database/                    ← fallback JSON local
 - Sessões reabertas no boot (sem retroativo); mutar/desmutar alterna a contagem.
 - Validação: `voice-time.test.js` 6/6, suíte 174/174; ambos bots online.
 
+### 2026-10-16 — PDL por time + Tier S fora do Classic + anti-duplo eventos
+- **PDL por time** (`calculateTeamPdlDelta`): expectativa pela soma dos elos, igual p/ os 10; piso **+8** vitória, teto **−15** derrota; K individual por jogos mantido. Validado: 9389x9371 → +11/−13; favorito → +8; zebra → +22/−2.
+- **Filtro `excludeTierS`**: `!placar`, `!top10` e post diário excluem Tier S do Classic (só no ranking Tier S). Sem migração de dados.
+- **Anti-duplicação dos schedulers**: `runSextaTick`/`runLclTick` com `withQueueOperationLock` (era corrida entre ticks que duplicou o anúncio das 08h).
+- **Palpite 5min**: aposta só nos 5 primeiros minutos após formar os times (`match.createdAt`); `betAt` gravado.
+- Suíte **190/190**; ambos bots online.
+
 ### 2026-10-16 — Bolão, first-win, missões, duelo e backup
 - **🎯 Bolão (`!palpite <1|2> <10-100>` + `/palpite`)**: aposta com pontos custom (só da partida, 1 por jogo, debita na hora); liquidação no `registerVictory` (vencedores dividem o bolo proporcional). **Bug pego em teste:** upsert só com `discordId` trocava a chave e apagava a entrada — corrigido usando o objeto completo (handler e liquidação).
 - **🌅 First-win +50%**: primeira vitória do dia ganha metade a mais e carimba `ultimaVitoriaEm`; anunciado no resultado.

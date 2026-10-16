@@ -21,6 +21,8 @@ async function registerVictory({
     calculateEloDelta,
     getAramWeightByTeamSize,
     formatCustomRecord,
+    calculateTeamMmr,
+    calculateTeamPdlDelta,
     getPdlMultiplier,
     onVictoryPdlApplied
   } = deps;
@@ -49,14 +51,20 @@ async function registerVictory({
     const losers = [];
     const pdlMultiplier = typeof getPdlMultiplier === 'function' ? Number(getPdlMultiplier()) || 1 : 1;
     const hojeSP = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    // Expectativa por TIME (soma dos elos, igual p/ os 10): time equilibrado = ±parelho.
+    const teamOneTotal = calculateTeamMmr(match.teamOne || []);
+    const teamTwoTotal = calculateTeamMmr(match.teamTwo || []);
 
     for (const player of winningPlayers) {
       const storedStats = getStoredPlayerStats(statsData, player);
       const modeStats = getModeStats(storedStats, match.mode, match.format);
       const beforeRank = modeStats.internalRating || 0;
       const beforeRecord = formatCustomRecord(modeStats);
+      const gamesPlayed = (modeStats.customWins || 0) + (modeStats.customLosses || 0);
+      const myTotal = winningTeam === '1' ? teamOneTotal : teamTwoTotal;
+      const oppTotal = winningTeam === '1' ? teamTwoTotal : teamOneTotal;
       const delta = Math.round(
-        calculateEloDelta(beforeRank, avgWinnerOppMmr, 1, (modeStats.customWins || 0) + (modeStats.customLosses || 0)) * mmrWeight * pdlMultiplier
+        calculateTeamPdlDelta({ teamTotal: myTotal, oppTotal, games: gamesPlayed, won: true, weight: mmrWeight }) * pdlMultiplier
       );
       // Bônus primeira vitória do dia (+50%).
       let firstWinBonus = 0;
@@ -103,8 +111,11 @@ async function registerVictory({
       const modeStats = getModeStats(storedStats, match.mode, match.format);
       const beforeRank = modeStats.internalRating || 0;
       const beforeRecord = formatCustomRecord(modeStats);
+      const gamesPlayed = (modeStats.customWins || 0) + (modeStats.customLosses || 0);
+      const myTotal = winningTeam === '1' ? teamTwoTotal : teamOneTotal;
+      const oppTotal = winningTeam === '1' ? teamOneTotal : teamTwoTotal;
       const delta = Math.round(
-        calculateEloDelta(beforeRank, avgLoserOppMmr, 0, (modeStats.customWins || 0) + (modeStats.customLosses || 0)) * mmrWeight
+        calculateTeamPdlDelta({ teamTotal: myTotal, oppTotal, games: gamesPlayed, won: false, weight: mmrWeight })
       );
       const afterRank = Math.max(0, beforeRank + delta);
       const bucketKey = getStatsBucketKey(match.mode, match.format);

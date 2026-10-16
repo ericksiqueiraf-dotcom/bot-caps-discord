@@ -147,10 +147,15 @@ function getRankedPlayersByMode(statsData, mode, format = null, seasonMeta = nul
     .map((player) => mapPlayerRankingEntry(player, getModeStats(player, mode, format)))
     .filter((player) => player.totalGames >= minGames)
     .filter((player) => {
+      const raw = (options?.tierSOnly || options?.excludeTierS) && mode === QUEUE_MODES.CLASSIC
+        ? Object.values(statsData.players || {}).find((entry) =>
+          (entry.discordId && entry.discordId === player.discordId) || entry.nickname === player.nickname)
+        : null;
       if (options?.tierSOnly && mode === QUEUE_MODES.CLASSIC) {
-        const raw = Object.values(statsData.players || {}).find((entry) =>
-          (entry.discordId && entry.discordId === player.discordId) || entry.nickname === player.nickname);
         return isTierSRankedEntry(raw || player);
+      }
+      if (options?.excludeTierS && mode === QUEUE_MODES.CLASSIC) {
+        return !isTierSRankedEntry(raw || player);
       }
       return true;
     });

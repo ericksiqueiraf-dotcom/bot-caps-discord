@@ -113,6 +113,20 @@ function calculateEloDelta(currentRating, opponentRating, actualScore, totalGame
   return Math.round(kFactor * (actualScore - expectedScore));
 }
 
+// PDL por TIME (igual para os 10 da partida): expectativa pela soma dos elos,
+// piso +8 na vitória e teto -15 na derrota. K individual por jogos (50/35/24).
+const PDL_WIN_FLOOR = 8;
+const PDL_LOSS_CAP = -15;
+
+function calculateTeamPdlDelta({ teamTotal, oppTotal, games = 0, won = true, weight = 1 } = {}) {
+  const expected = calculateExpectedScore(Number(teamTotal) || 0, Number(oppTotal) || 0);
+  const kFactor = getKFactor(games);
+  if (won) {
+    return Math.max(PDL_WIN_FLOOR, Math.round(kFactor * (1 - expected) * weight));
+  }
+  return Math.max(PDL_LOSS_CAP, Math.round(-kFactor * expected * weight));
+}
+
 function createBalancedTeams(players) {
   if (!Array.isArray(players) || players.length < 2 || players.length % 2 !== 0) {
     throw new Error('O balanceamento exige uma quantidade par de jogadores.');
@@ -233,6 +247,11 @@ module.exports = {
   calculateHybridMmr,
   calculateSeedRating,
   calculateEloDelta,
+  calculateExpectedScore,
+  getKFactor,
+  calculateTeamPdlDelta,
+  PDL_WIN_FLOOR,
+  PDL_LOSS_CAP,
   getExperienceWeight,
   migrateInternalRating,
   applyLeagueMmrChange

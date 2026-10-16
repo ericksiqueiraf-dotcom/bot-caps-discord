@@ -2344,7 +2344,7 @@ async function postDailyRankUpdates() {
   await channel.send({
     content: `Atualizacao diaria de rankings | ${getSeasonDisplayLabel(seasonMeta)}`,
     embeds: [
-      buildTopTenEmbed(statsData, seasonMeta, QUEUE_MODES.CLASSIC),
+      buildTopTenEmbed(statsData, seasonMeta, QUEUE_MODES.CLASSIC, null, { excludeTierS: true }),
       buildTopTenEmbed(statsData, seasonMeta, QUEUE_MODES.CLASSIC, null, { tierSOnly: true }),
       buildTopTenEmbed(statsData, seasonMeta, QUEUE_MODES.ARAM, '1x1'),
       buildTopInfernalEmbed(statsData, seasonMeta)

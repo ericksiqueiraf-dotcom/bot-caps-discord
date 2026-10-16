@@ -51,9 +51,10 @@ const {
 } = require('../services/dataService');
 const { getResolvedContentTemplates } = require('../services/contentTextService');
 
-const { 
-  calculateSeedRating, calculateHybridMmr, calculateEloDelta, 
-  createBalancedTeams, applyLeagueMmrChange, migrateInternalRating
+const {
+  calculateSeedRating, calculateHybridMmr, calculateEloDelta,
+  createBalancedTeams, applyLeagueMmrChange, migrateInternalRating,
+  calculateTeamMmr, calculateTeamPdlDelta
 } = require('../services/balanceService');
 
 const getRiotService = () => global.riotService;
@@ -181,6 +182,8 @@ function createRegisterVictoryDeps() {
     calculateEloDelta,
     getAramWeightByTeamSize,
     formatCustomRecord,
+    calculateTeamMmr,
+    calculateTeamPdlDelta,
     getPdlMultiplier: () => require('../services/eventoService').getPdlMultiplier(),
     onVictoryPdlApplied: async ({ winners, match, winningTeam }) => {
       try {
@@ -893,7 +896,7 @@ async function handlePingCommand(message) {
 async function handleLeaderboardCommand(message, args = []) {
   const statsData = await loadPlayerStats();
   const { mode, format, tierSOnly } = parseModeAndFormatArgs(args);
-  const embed = buildLeaderboardEmbed(statsData, mode, format, { tierSOnly, tierResolver: buildVipTierResolver(message.guild) });
+  const embed = buildLeaderboardEmbed(statsData, mode, format, { tierSOnly, tierResolver: buildVipTierResolver(message.guild), excludeTierS: !tierSOnly && mode === QUEUE_MODES.CLASSIC });
   await sendToMessageChannel(message, { embeds: [embed] });
 }
 
@@ -901,7 +904,7 @@ async function handleTopTenCommand(message, args = []) {
   const statsData = await loadPlayerStats();
   const seasonMeta = await loadSeasonMeta();
   const { mode, format, tierSOnly } = parseModeAndFormatArgs(args);
-  const embed = buildTopTenEmbed(statsData, seasonMeta, mode, format, { tierSOnly, tierResolver: buildVipTierResolver(message.guild) });
+  const embed = buildTopTenEmbed(statsData, seasonMeta, mode, format, { tierSOnly, tierResolver: buildVipTierResolver(message.guild), excludeTierS: !tierSOnly && mode === QUEUE_MODES.CLASSIC });
   await sendToMessageChannel(message, { embeds: [embed] });
 }
 
@@ -1534,6 +1537,12 @@ async function handlePalpiteCommand(message, args = []) {
     if (matchEntry.palpites[message.author.id]) {
       return await replyToMessage(message, '❌ Você já apostou nesta partida.');
     }
+    // Janela de aposta: 5 minutos após a formação dos times.
+    const PALPITE_WINDOW_MS = 5 * 60 * 1000;
+    const matchAgeMs = Date.now() - new Date(matchEntry.match.createdAt || 0).getTime();
+    if (!Number.isFinite(matchAgeMs) || matchAgeMs > PALPITE_WINDOW_MS) {
+      return await replyToMessage(message, '❌ Apostas encerradas para essa partida (vale nos primeiros 5 minutos após formar os times).');
+    }
     const playerStats = await loadPlayerStats();
     const bettor = [...(matchEntry.match.teamOne || []), ...(matchEntry.match.teamTwo || [])]
       .find((p) => p.discordId === message.author.id) || { discordId: message.author.id };
@@ -1549,7 +1558,7 @@ async function handlePalpiteCommand(message, args = []) {
     };
     upsertPlayerStats(playerStats, bettor, { modes: updatedModes });
     await savePlayerStats(playerStats);
-    matchEntry.palpites[message.author.id] = { time, pontos };
+    matchEntry.palpites[message.author.id] = { time, pontos, betAt: new Date().toISOString() };
     await saveCurrentMatch(currentMatchData);
     await replyToMessage(message, `🎯 Aposta registrada: **${pontos} pontos no time ${time}**! Boa sorte!`);
   } catch (error) {
