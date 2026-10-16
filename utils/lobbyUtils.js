@@ -1830,7 +1830,7 @@ const RULES_SECTIONS = [
 const STAFF_SECTIONS = [
   {
     name: '⚔️ Partida — conduzir o jogo',
-    value: '`!start A` • Inicia a sala A manualmente (quando não iniciou sozinha).\n`!cancelarstart A` • Cancela a contagem de início (jogadores ficam na fila).\n`!vitoria 1 A` • Registra o time 1 como vencedor da sala A (pós-jogo).\n`!rematch A` • Volta os 10 da sala A para novo lobby, com times reequilibrados.'
+    value: '`!start A` • Inicia a sala A manualmente (quando não iniciou sozinha).\n`!cancelarstart A` • Cancela a contagem de início (jogadores ficam na fila).\n`!vitoria 1 A` • Registra o time 1 como vencedor da sala A (pós-jogo). Na **SEXTA CAPS ARENA** (sex 08h–23h59) vale **PDL em dobro**.\n`!rematch A` • Volta os 10 da sala A para novo lobby, com times reequilibrados.'
   },
   {
     name: '🎯 Roleta — vagas da próxima (Sala de Espera)',

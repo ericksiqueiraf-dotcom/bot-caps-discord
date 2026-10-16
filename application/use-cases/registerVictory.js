@@ -20,7 +20,9 @@ async function registerVictory({
     shouldMirrorAramGroupedStats,
     calculateEloDelta,
     getAramWeightByTeamSize,
-    formatCustomRecord
+    formatCustomRecord,
+    getPdlMultiplier,
+    onVictoryPdlApplied
   } = deps;
 
   const winningPlayers = winningTeam === '1' ? match.teamOne : match.teamTwo;
@@ -45,6 +47,7 @@ async function registerVictory({
     const statsData = await loadPlayerStats();
     const winners = [];
     const losers = [];
+    const pdlMultiplier = typeof getPdlMultiplier === 'function' ? Number(getPdlMultiplier()) || 1 : 1;
 
     for (const player of winningPlayers) {
       const storedStats = getStoredPlayerStats(statsData, player);
@@ -52,7 +55,7 @@ async function registerVictory({
       const beforeRank = modeStats.internalRating || 0;
       const beforeRecord = formatCustomRecord(modeStats);
       const delta = Math.round(
-        calculateEloDelta(beforeRank, avgWinnerOppMmr, 1, (modeStats.customWins || 0) + (modeStats.customLosses || 0)) * mmrWeight
+        calculateEloDelta(beforeRank, avgWinnerOppMmr, 1, (modeStats.customWins || 0) + (modeStats.customLosses || 0)) * mmrWeight * pdlMultiplier
       );
       const afterRank = beforeRank + delta;
       const bucketKey = getStatsBucketKey(match.mode, match.format);
@@ -133,12 +136,17 @@ async function registerVictory({
     delete currentMatchData.matches[matchId];
     await saveCurrentMatch(currentMatchData);
 
+    if (typeof onVictoryPdlApplied === 'function') {
+      await onVictoryPdlApplied({ guildId, matchId, match, winners, pdlMultiplier }).catch(() => null);
+    }
+
     return {
       winners,
       losers,
       winningPlayers,
       losingPlayers,
       mmrWeight,
+      pdlMultiplier,
       avgWinnerOppMmr,
       avgLoserOppMmr
     };

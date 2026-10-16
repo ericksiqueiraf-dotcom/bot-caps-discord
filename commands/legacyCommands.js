@@ -180,7 +180,17 @@ function createRegisterVictoryDeps() {
     shouldMirrorAramGroupedStats,
     calculateEloDelta,
     getAramWeightByTeamSize,
-    formatCustomRecord
+    formatCustomRecord,
+    getPdlMultiplier: () => require('../services/eventoService').getPdlMultiplier(),
+    onVictoryPdlApplied: async ({ winners }) => {
+      try {
+        const evento = require('../services/eventoService');
+        if (!evento.isSextaRankedWindow()) return;
+        const systemMeta = await loadSystemMeta();
+        evento.accumulateSextaGains(systemMeta, winners);
+        await saveSystemMeta(systemMeta);
+      } catch { /* nao quebra o registro da vitoria */ }
+    }
   };
 }
 

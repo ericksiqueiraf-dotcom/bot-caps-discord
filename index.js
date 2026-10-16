@@ -21,6 +21,7 @@ const {
 const config = require('./config.json');
 const { createVipPixPayment, getClubeTierConfig, recordPendingPayment, startVipPaymentPoller } = require('./services/clubePaymentsService');
 const { createRiotService } = require('./services/riotService');
+const { startSextaScheduler } = require('./services/eventoService');
 const { handleTempVoiceStateUpdate } = require('./services/tempVoiceService');
 const {
   createBalancedTeams,
@@ -441,6 +442,7 @@ client.once('ready', async () => {
   startDailyRankScheduler();
   startVipPaymentPoller({ config });
   startClubePromoScheduler();
+  startSextaScheduler();
 
   // Snapshot de convites p/ atribuir quem convidou cada novo membro.
   try {
