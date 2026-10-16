@@ -125,6 +125,7 @@ function buildSlashCommands() {
   return [
     new SlashCommandBuilder().setName('ping').setDescription('Verifica se o bot esta online.'),
     new SlashCommandBuilder().setName('ajuda').setDescription('Mostra a lista de comandos.'),
+    new SlashCommandBuilder().setName('ajuda2').setDescription('Ranking, clube, salas e extras.'),
     new SlashCommandBuilder().setName('regras').setDescription('Mostra o regulamento da CAPS Arena.'),
     new SlashCommandBuilder().setName('staff').setDescription('Guia de comandos da staff.'),
     new SlashCommandBuilder().setName('roletasair').setDescription('Fica fora da próxima partida (sem sorteio nem subida).')
@@ -677,6 +678,9 @@ async function processCommand(message, rawContent) {
       case 'ajuda':
         await handlers.handleHelpCommand(message);
         break;
+      case 'ajuda2':
+        await handlers.handleHelpCommand(message, 2);
+        break;
       case 'entrar':
       case 'entra':
         await handlers.handleEnterCommand(message, args);
@@ -1136,6 +1140,9 @@ client.on('interactionCreate', async (interaction) => {
         break;
       case 'ajuda':
         await handlers.handleHelpCommand(context);
+        break;
+      case 'ajuda2':
+        await handlers.handleHelpCommand(context, 2);
         break;
       case 'entrar': {
         const selectedMode = interaction.options.getString('modo') || QUEUE_MODES.CLASSIC;

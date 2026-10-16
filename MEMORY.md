@@ -317,6 +317,10 @@ database/                    ← fallback JSON local
 - `QUEUE_JOIN_BUTTON_IDS.LEAVE` (`queue:leave`) + botão vermelho "Sair da Fila" no `buildQueueJoinActionRow()`; roteado no `interactionCreate` p/ `handleLeaveCommand` (TESTRE + prod). Painel do `#fila` é reconstruído no boot, então o botão aparece sozinho após restart.
 - Testes atualizados (`queue-buttons`, `queue-feed`: 20/20); ambos bots reiniciados e online.
 
+### 2026-10-16 — !ajuda em 2 páginas
+- `!ajuda` (1/2, o essencial): cadastro + fila/voto. `!ajuda2` (2/2): ranking, clube, salas, extras (convite, torneio, tempo) + volta p/ página 1. Slash `/ajuda` e `/ajuda2`.
+- TESTRE + prod; suíte 174/174; ambos bots online.
+
 ### 2026-10-16 — Tempo em call + cargos mensais
 - `services/voiceTimeService.js`: conta tempo em voz (mesmo sozinho; pausa mudo/ensurdecido/AFK) em janelas geral/semana/mês (`systemMeta.voiceTime`).
 - `!tempo` (+`/tempo`): embed Geral/Semana/Mês + cargo atual + próximo + barra de progresso. `!topvoz` (+`/topvoz`): ranking do mês.

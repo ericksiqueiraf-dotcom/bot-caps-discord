@@ -1319,20 +1319,32 @@ async function handleTopVozCommand(message) {
   }
 }
 
-async function handleHelpCommand(message) {
+async function handleHelpCommand(message, page = 1) {
   try {
     const embed = new EmbedBuilder()
-    .setColor(THEME.INFO)
-    .setTitle('📚 Guia Completo de Comandos')
-    .setDescription('Aqui estao os comandos para gerenciar a CAPS Arena.')
+    .setColor(THEME.INFO);
+    if (Number(page) === 2) {
+      embed
+      .setTitle('📚 Guia de Comandos (2/2) — Ranking e extras')
+      .setDescription('Ranking, clube VIP, salas temporárias e extras. Página 1 no `!ajuda`.')
+      .addFields(
+        { name: '🏆 Ranking e pós-jogo', value: '`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking geral (CLASSIC = pontos custom)\n`!placar tiers` • Só Esmeralda+\n`!top10` • Top 10 CLASSIC por pontos custom, desempate por winrate\n`!top10 tiers` • Top 10 só Esmeralda+\n`!topstreak` • Ranking Streak 🔥\n`!toprankinfernal` • Quem mais pegou INFERNAL na temporada 🔥\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
+        { name: '💎 Clube VIP', value: '`!clube` • Tiers, assinatura PIX e renovação -10%\n`!querolive` • Entrar/sair do ping 🔴 Ao Vivo\n`!live <link>` • Divulgar live Twitch/YouTube/Kick (Lendário 6h, VIP 12h, Apoiador 24h)' },
+        { name: '🔊 Salas temporárias (dono da sala)', value: 'Entre no ➕・criar-sala para ganhar sua sala\n`!salahub` • Lista as salas ativas\n`!sala` • Mostra sua sala • `!sala <nome>` renomeia\n`!convidar @u` • Chama alguém p/ sua sala\n`!salalock` • Tranca (`!salalock abrir` destranca)\n`!salalimit <0-99>` • Limite de usuários (0 = sem limite)\n`!salaexpulsar @u` • Remove alguém da sala\n`!limparvoz` • Apaga sua sala (dentro dela)' },
+        { name: '🎁 Extras', value: '`!convite` • Seu link pessoal (traga gente e ganhe recompensas)\n`!topconvites` • Ranking de quem mais trouxe gente\n`!torneio` • Torneio mata-mata (entrar, lista, status)\n`!tempo` • Seu tempo em call • `!topvoz` • Ranking de call\n`!regras` • Regulamento completo' },
+        { name: '⬅️ Página 1', value: '`!ajuda` • Cadastro, fila e voto\n`!staff` • Guia da staff (restrito)' }
+      );
+    } else {
+    embed
+    .setTitle('📚 Guia de Comandos (1/2) — O essencial')
+    .setDescription('O básico para jogar na CAPS Arena. O resto está no `!ajuda2`.')
     .addFields(
       { name: '🕹️ Cadastro (1x)', value: '`!cadastrar Nick#TAG` • Vincula sua conta Riot\n`!nick Nick#TAG` • Atualiza seu nick' },
-      { name: '🎮 Jogador (1/2) — Fila e voto', value: '`!regras` • Regulamento completo\n`!convite` • Seu link pessoal (traga gente e ganhe recompensas)\n`!topconvites` • Ranking de quem mais trouxe gente\n`!entrar` • Fila Classic (no canal Lobby Classic ou Lobby TIER S)\n`!entrar aram` • Fila ARAM\n`!entrar aram 2x2` • ARAM formato\n`!fila` • Mostra jogadores em sala\n`!espera` • Entra na espera (🔥 INFERNAL entra na posição 5)\n`!esperatiers` • Espera do Lobby TIER S (só Esmeralda+)\n`!espera ver` • Mostra a ordem\n`!espera sair` • Sai da espera\n`!sair` • Sai da sala\n`!votar 1/2` • Vota no vencedor (abre painel com botões p/ os 10 votarem)\n`!votar` • Reabre o painel de votação' },
-      { name: '🎮 Jogador (2/2) — Ranking', value: '`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking geral (CLASSIC = pontos custom)\n`!placar tiers` • Só Esmeralda+\n`!top10` • Top 10 CLASSIC por pontos custom, desempate por winrate\n`!top10 tiers` • Top 10 só Esmeralda+\n`!topstreak` • Ranking Streak 🔥\n`!toprankinfernal` • Quem mais pegou INFERNAL na temporada 🔥\n`!clube` • Clube VIP: tiers, benefícios e membros 💎\n`!torneio` • Torneio mata-mata (entrar, lista, status)\n`!tempo` • Seu tempo em call • `!topvoz` • Ranking de call\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
-      { name: '💎 Clube VIP', value: '`!clube` • Tiers, assinatura PIX e renovação -10%\n`!querolive` • Entrar/sair do ping 🔴 Ao Vivo\n`!live <link>` • Divulgar live Twitch/YouTube/Kick (Lendário 6h, VIP 12h, Apoiador 24h)' },
-      { name: '🔊 Salas temporárias (dono da sala)', value: 'Entre no ➕・criar-sala para ganhar sua sala\n`!salahub` • Lista as salas ativas\n`!sala` • Mostra sua sala • `!sala <nome>` renomeia\n`!convidar @u` • Chama alguém p/ sua sala\n`!salalock` • Tranca (`!salalock abrir` destranca)\n`!salalimit <0-99>` • Limite de usuários (0 = sem limite)\n`!salaexpulsar @u` • Remove alguém da sala\n`!limparvoz` • Apaga sua sala (dentro dela)' },
-      { name: '🛠️ Staff', value: '`!staff` • Guia completo da staff (partida, roleta, limpeza, PDL, elos, temporada, clube)\nComandos de staff ficam só no `!staff` para não poluir esta lista.' }
-    )
+      { name: '🎮 Fila e voto', value: '`!entrar` • Fila Classic (no canal Lobby Classic ou Lobby TIER S)\n`!entrar aram` • Fila ARAM\n`!entrar aram 2x2` • ARAM formato (1x1 até 5x5)\n`!fila` • Mostra jogadores em sala\n`!espera` • Entra na espera (🔥 INFERNAL entra na posição 5)\n`!esperatiers` • Espera do Lobby TIER S (só Esmeralda+)\n`!espera ver` • Mostra a ordem • `!espera sair` • Sai da espera\n`!sair` • Sai da sala\n`!votar 1/2` • Vota no vencedor (abre painel com botões p/ os 10 votarem)\n`!votar` • Reabre o painel de votação' },
+      { name: '➡️ Página 2', value: '`!ajuda2` • Ranking, clube VIP, salas temporárias, torneio, convites e tempo em call\n`!staff` • Guia da staff (restrito)' }
+    );
+    }
+    embed
     .setFooter({ text: `${FOOTER_PREFIX} • Ajuda Atualizada` })
     .setTimestamp();
   const sent = await sendToMessageChannel(message, { embeds: [embed] });
