@@ -317,6 +317,13 @@ database/                    ← fallback JSON local
 - `QUEUE_JOIN_BUTTON_IDS.LEAVE` (`queue:leave`) + botão vermelho "Sair da Fila" no `buildQueueJoinActionRow()`; roteado no `interactionCreate` p/ `handleLeaveCommand` (TESTRE + prod). Painel do `#fila` é reconstruído no boot, então o botão aparece sozinho após restart.
 - Testes atualizados (`queue-buttons`, `queue-feed`: 20/20); ambos bots reiniciados e online.
 
+### 2026-10-16 — Tempo em call + cargos mensais
+- `services/voiceTimeService.js`: conta tempo em voz (mesmo sozinho; pausa mudo/ensurdecido/AFK) em janelas geral/semana/mês (`systemMeta.voiceTime`).
+- `!tempo` (+`/tempo`): embed Geral/Semana/Mês + cargo atual + próximo + barra de progresso. `!topvoz` (+`/topvoz`): ranking do mês.
+- Apuração dia 1º: escada permanente (5h Ativo, 15h Frequente, 30h Viciado — garante o maior, tira menores), acesso ao Lounge VIP do mês p/ 15h+ (overwrite individual, expira), cargo rotativo 👑 Voz do Mês p/ top1 (mín 5h) + anúncio no `#comunicados`.
+- Sessões reabertas no boot (sem retroativo); mutar/desmutar alterna a contagem.
+- Validação: `voice-time.test.js` 6/6, suíte 174/174; ambos bots online.
+
 ### 2026-10-16 — Destaque de recrutamento turbinado
 - Meta 5 agora: cargo rotativo **⭐ Destaque** (tira do anterior, passa ao novo) + post no `#📢┃comunicados` desafiando a tomar o lugar.
 - DM comemorativa por meta (3: cargo garantido; 5: destaque + faltam p/ VIP; 10: VIP ativo).

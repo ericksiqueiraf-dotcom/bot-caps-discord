@@ -1267,6 +1267,58 @@ async function handleTorneioCommand(message, args = []) {
   }
 }
 
+async function handleTempoCommand(message) {
+  try {
+    const vt = require('../services/voiceTimeService');
+    const systemMeta = await loadSystemMeta();
+    const store = vt.ensureVoiceStore(systemMeta);
+    const t = vt.getUserTime(store, message.author.id);
+    const { current, next } = vt.rankForMonth(t.monthMs);
+    const falta = next ? vt.formatTempo(next.hours * 3600000 - t.monthMs) : null;
+    const { EmbedBuilder } = require('discord.js');
+    const embed = new EmbedBuilder()
+      .setColor(THEME?.INFO ?? '#0099ff')
+      .setTitle('Seu tempo em call')
+      .addFields(
+        { name: 'Geral', value: vt.formatTempo(t.totalMs), inline: true },
+        { name: 'Semana', value: vt.formatTempo(t.weekMs), inline: true },
+        { name: 'Mês', value: vt.formatTempo(t.monthMs), inline: true },
+        { name: 'Cargo atual', value: current ? current.name : 'Cinzas', inline: true },
+        { name: 'Próximo cargo', value: next ? `${next.name.split(' ').slice(1).join(' ')}: faltam ${falta}` : 'Máximo alcançado 🎉', inline: true },
+        { name: 'Progresso', value: vt.progressBar(t.monthMs, next), inline: false }
+      )
+      .setFooter({ text: 'Conta o tempo em call, mesmo sozinho, exceto mudo, ensurdecido ou no canal AFK.' });
+    await replyToMessage(message, { embeds: [embed] });
+  } catch (error) {
+    console.error('[ERRO] !tempo:', error);
+    await replyToMessage(message, `❌ Erro ao ver tempo: \`${error.message}\``);
+  }
+}
+
+async function handleTopVozCommand(message) {
+  try {
+    const vt = require('../services/voiceTimeService');
+    const systemMeta = await loadSystemMeta();
+    const store = vt.ensureVoiceStore(systemMeta);
+    const top = vt.getMonthlyTop(store, vt.monthKey(), 10);
+    if (top.length === 0) {
+      return await replyToMessage(message, '📭 Ninguém pontuou tempo em call este mês ainda. Entre em voz!');
+    }
+    const lines = top.map((t) => `**${t.position}º** <@${t.userId}> — ${vt.formatTempo(t.ms)}`);
+    const { EmbedBuilder } = require('discord.js');
+    const embed = new EmbedBuilder()
+      .setColor(THEME?.RANK ?? '#FFD700')
+      .setTitle('🎙️ Top tempo em call do mês')
+      .setDescription(lines.join('\n'))
+      .setFooter({ text: `${FOOTER_PREFIX} • 5h Ativo • 15h Frequente (+Lounge) • 30h Viciado` })
+      .setTimestamp();
+    await replyToMessage(message, { embeds: [embed] });
+  } catch (error) {
+    console.error('[ERRO] !topvoz:', error);
+    await replyToMessage(message, `❌ Erro no ranking: \`${error.message}\``);
+  }
+}
+
 async function handleHelpCommand(message) {
   try {
     const embed = new EmbedBuilder()
@@ -1276,7 +1328,7 @@ async function handleHelpCommand(message) {
     .addFields(
       { name: '🕹️ Cadastro (1x)', value: '`!cadastrar Nick#TAG` • Vincula sua conta Riot\n`!nick Nick#TAG` • Atualiza seu nick' },
       { name: '🎮 Jogador (1/2) — Fila e voto', value: '`!regras` • Regulamento completo\n`!convite` • Seu link pessoal (traga gente e ganhe recompensas)\n`!topconvites` • Ranking de quem mais trouxe gente\n`!entrar` • Fila Classic (no canal Lobby Classic ou Lobby TIER S)\n`!entrar aram` • Fila ARAM\n`!entrar aram 2x2` • ARAM formato\n`!fila` • Mostra jogadores em sala\n`!espera` • Entra na espera (🔥 INFERNAL entra na posição 5)\n`!esperatiers` • Espera do Lobby TIER S (só Esmeralda+)\n`!espera ver` • Mostra a ordem\n`!espera sair` • Sai da espera\n`!sair` • Sai da sala\n`!votar 1/2` • Vota no vencedor (abre painel com botões p/ os 10 votarem)\n`!votar` • Reabre o painel de votação' },
-      { name: '🎮 Jogador (2/2) — Ranking', value: '`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking geral (CLASSIC = pontos custom)\n`!placar tiers` • Só Esmeralda+\n`!top10` • Top 10 CLASSIC por pontos custom, desempate por winrate\n`!top10 tiers` • Top 10 só Esmeralda+\n`!topstreak` • Ranking Streak 🔥\n`!toprankinfernal` • Quem mais pegou INFERNAL na temporada 🔥\n`!clube` • Clube VIP: tiers, benefícios e membros 💎\n`!torneio` • Torneio mata-mata (entrar, lista, status)\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
+      { name: '🎮 Jogador (2/2) — Ranking', value: '`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking geral (CLASSIC = pontos custom)\n`!placar tiers` • Só Esmeralda+\n`!top10` • Top 10 CLASSIC por pontos custom, desempate por winrate\n`!top10 tiers` • Top 10 só Esmeralda+\n`!topstreak` • Ranking Streak 🔥\n`!toprankinfernal` • Quem mais pegou INFERNAL na temporada 🔥\n`!clube` • Clube VIP: tiers, benefícios e membros 💎\n`!torneio` • Torneio mata-mata (entrar, lista, status)\n`!tempo` • Seu tempo em call • `!topvoz` • Ranking de call\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
       { name: '💎 Clube VIP', value: '`!clube` • Tiers, assinatura PIX e renovação -10%\n`!querolive` • Entrar/sair do ping 🔴 Ao Vivo\n`!live <link>` • Divulgar live Twitch/YouTube/Kick (Lendário 6h, VIP 12h, Apoiador 24h)' },
       { name: '🔊 Salas temporárias (dono da sala)', value: 'Entre no ➕・criar-sala para ganhar sua sala\n`!salahub` • Lista as salas ativas\n`!sala` • Mostra sua sala • `!sala <nome>` renomeia\n`!convidar @u` • Chama alguém p/ sua sala\n`!salalock` • Tranca (`!salalock abrir` destranca)\n`!salalimit <0-99>` • Limite de usuários (0 = sem limite)\n`!salaexpulsar @u` • Remove alguém da sala\n`!limparvoz` • Apaga sua sala (dentro dela)' },
       { name: '🛠️ Staff', value: '`!staff` • Guia completo da staff (partida, roleta, limpeza, PDL, elos, temporada, clube)\nComandos de staff ficam só no `!staff` para não poluir esta lista.' }
@@ -2426,7 +2478,7 @@ module.exports = {
   handleRegisterCommand, handleNickUpdateCommand, handleSyncPlayerRankCommand, handleVoteCommand, pendingAutoStarts, triggerAutoStart,
   handleRematchCommand, handleRouletteCommand, handleRoletaSairCommand, handleRulesCommand, handleStaffCommand, handlePdlCommand,
   handleResultVoteButton, handleClubeCommand, handleClubeAdminCommand, handleClubeFixarCommand, handleQueroLiveCommand, handleLiveCommand,
-  handleConviteCommand, handleTopConvitesCommand, handleTorneioCommand,
+  handleConviteCommand, handleTopConvitesCommand, handleTorneioCommand, handleTempoCommand, handleTopVozCommand,
   LIVE_COOLDOWN_BY_TIER_MS,
   handleSalaHubCommand, handleConvidarCommand, handleLimparVozCommand, handleSalaCommand,
   handleSalaLockCommand, handleSalaLimitCommand, handleSalaExpulsarCommand,

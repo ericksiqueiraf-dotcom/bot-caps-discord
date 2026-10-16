@@ -322,6 +322,8 @@ function buildSlashCommands() {
     new SlashCommandBuilder().setName('clubeadmin').setDescription('Lista assinaturas ativas do clube (staff).'),
     new SlashCommandBuilder().setName('convite').setDescription('Seu link pessoal de convite + recompensas.'),
     new SlashCommandBuilder().setName('topconvites').setDescription('Ranking de quem mais trouxe gente.'),
+    new SlashCommandBuilder().setName('tempo').setDescription('Seu tempo em call (geral, semana, mês).'),
+    new SlashCommandBuilder().setName('topvoz').setDescription('Ranking de tempo em call do mês.'),
     new SlashCommandBuilder().setName('torneio').setDescription('Torneio CAPS ARENA: entrar, ver lista, status e regras.')
       .addStringOption((option) => option.setName('acao').setDescription('O que fazer').setRequired(true)
         .addChoices(
@@ -453,6 +455,7 @@ client.once('ready', async () => {
   startClubePromoScheduler();
   startSextaScheduler();
   startLclScheduler();
+  startVoiceTimeScheduler();
 
   // Snapshot de convites p/ atribuir quem convidou cada novo membro.
   try {
@@ -461,6 +464,29 @@ client.once('ready', async () => {
     }
   } catch (err) {
     console.error('[RESTART] Erro ao fotografar convites:', err);
+  }
+
+  // Reabre sessões de tempo em call p/ quem já está em voz (sem retroativo).
+  try {
+    const { ensureVoiceStore } = require('./services/voiceTimeService');
+    const { loadSystemMeta, saveSystemMeta } = require('./services/dataService');
+    const systemMeta = await loadSystemMeta();
+    const store = ensureVoiceStore(systemMeta);
+    const now = Date.now();
+    for (const guild of client.guilds.cache.values()) {
+      for (const channel of guild.channels.cache.values()) {
+        if (!channel?.isVoiceBased?.()) continue;
+        for (const [, member] of channel.members) {
+          if (member.user?.bot) continue;
+          if (isVoiceTimeCountable({ channel, mute: member.voice?.mute, deaf: member.voice?.deaf, selfMute: member.voice?.selfMute, selfDeaf: member.voice?.selfDeaf, suppress: member.voice?.suppress }, guild)) {
+            store.sessions[`${guild.id}:${member.id}`] = { since: now, channelId: channel.id };
+          }
+        }
+      }
+    }
+    await saveSystemMeta(systemMeta);
+  } catch (err) {
+    console.error('[RESTART] Erro ao reabrir sessões de call:', err);
   }
 
   // Retoma votacoes de MVP pendentes (se o bot reiniciou no meio de uma votacao)
@@ -517,7 +543,116 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
   await handleTempVoiceStateUpdate(oldState, newState).catch((error) => {
     console.error('[TEMP VOICE] Erro no evento de voz:', error.message);
   });
+  await handleVoiceTimeUpdate(oldState, newState).catch((error) => {
+    console.error('[VOICE TIME] Erro no evento de voz:', error.message);
+  });
 });
+
+function isVoiceTimeCountable(voiceState, guild) {
+  const channel = voiceState.channel;
+  if (!channel) return false;
+  if (guild?.afkChannelId && channel.id === guild.afkChannelId) return false;
+  if (voiceState.mute || voiceState.deaf || voiceState.selfMute || voiceState.selfDeaf || voiceState.suppress) return false;
+  return true;
+}
+
+async function handleVoiceTimeUpdate(oldState, newState) {
+  const member = newState.member || oldState.member;
+  if (!member || member.user?.bot) return;
+  const { ensureVoiceStore, closeSession } = require('./services/voiceTimeService');
+  const { loadSystemMeta, saveSystemMeta } = require('./services/dataService');
+  const now = Date.now();
+  const systemMeta = await loadSystemMeta();
+  const store = ensureVoiceStore(systemMeta);
+  closeSession(store, member.guild.id, member.id, now);
+  if (isVoiceTimeCountable(newState, member.guild)) {
+    store.sessions[`${member.guild.id}:${member.id}`] = { since: now, channelId: newState.channel.id };
+  }
+  await saveSystemMeta(systemMeta);
+}
+
+async function runVoiceTimeMonthlyTick(nowMs = Date.now()) {
+  const vt = require('./services/voiceTimeService');
+  const { loadSystemMeta, saveSystemMeta } = require('./services/dataService');
+  const parts = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' })
+    .formatToParts(new Date(nowMs)).filter((p) => p.type !== 'literal').map((p) => [p.type, p.value]);
+  const obj = Object.fromEntries(parts);
+  if (obj.day !== '01') return;
+  const thisMonth = `${obj.year}-${obj.month}`;
+  const systemMeta = await loadSystemMeta();
+  const store = vt.ensureVoiceStore(systemMeta);
+  if (store.lastRewardMonth === thisMonth) return;
+  const prev = new Date(Date.UTC(Number(obj.year), Number(obj.month) - 1, 1) - 24 * 3600 * 1000);
+  const prevMonth = `${prev.getUTCFullYear()}-${String(prev.getUTCMonth() + 1).padStart(2, '0')}`;
+  const { earners, vozDoMes, top } = vt.computeMonthlyRewards(store, prevMonth);
+  for (const guild of client.guilds.cache.values()) {
+    try {
+      const findOrCreateRole = async (name) => {
+        let role = guild.roles.cache.find((r) => r.name === name);
+        if (!role) role = await guild.roles.create({ name, reason: 'Tempo em call' }).catch(() => null);
+        return role;
+      };
+      // Cargos de escada (permanentes): garante o maior e tira os menores.
+      const ladder = ['🎙️ Ativo', '🎙️ Frequente', '🎙️ Viciado em Call'];
+      for (const [userId, rankName] of [
+        ...earners.viciado.map((id) => [id, '🎙️ Viciado em Call']),
+        ...earners.frequente.filter((id) => !earners.viciado.includes(id)).map((id) => [id, '🎙️ Frequente']),
+        ...earners.ativo.filter((id) => !earners.frequente.includes(id) && !earners.viciado.includes(id)).map((id) => [id, '🎙️ Ativo'])
+      ]) {
+        const m = await guild.members.fetch(userId).catch(() => null);
+        if (!m) continue;
+        for (const rName of ladder) {
+          const role = rName === rankName ? await findOrCreateRole(rName) : guild.roles.cache.find((r) => r.name === rName);
+          if (!role) continue;
+          if (rName === rankName) await m.roles.add(role, 'Tempo em call').catch(() => null);
+          else if (m.roles.cache.has(role.id)) await m.roles.remove(role, 'Subiu de cargo de call').catch(() => null);
+        }
+      }
+      // Lounge VIP do mês: quem fez 15h+ entra; quem tinha sai.
+      const lounge = guild.channels.cache.find((c) => c.name === '👑 Lounge VIP');
+      if (lounge) {
+        const prevList = Object.entries(store.loungeAccess || {}).filter(([, m]) => m !== thisMonth).map(([id]) => id);
+        for (const id of prevList) {
+          await lounge.permissionOverwrites.delete(id, 'Fim do acesso mensal').catch(() => null);
+          delete store.loungeAccess[id];
+        }
+        const granted = [...new Set([...earners.frequente, ...earners.viciado])];
+        for (const id of granted) {
+          await lounge.permissionOverwrites.edit(id, { ViewChannel: true, Connect: true, Speak: true }).catch(() => null);
+          store.loungeAccess[id] = thisMonth;
+        }
+      }
+      // Voz do Mês rotativo + anúncio.
+      if (vozDoMes) {
+        const role = await findOrCreateRole(vt.VOZ_DO_MES_ROLE);
+        if (role) {
+          for (const [, m] of role.members) await m.roles.remove(role, 'Nova voz do mês').catch(() => null);
+          const champ = await guild.members.fetch(vozDoMes).catch(() => null);
+          if (champ) await champ.roles.add(role, 'Voz do mês').catch(() => null);
+        }
+      }
+      const news = guild.channels.cache.find((c) => c.name === '📢┃comunicados' && c.isTextBased?.());
+      if (news?.isTextBased?.()) {
+        const lines = top.slice(0, 3).map((t, i) => `**${i + 1}º** <@${t.userId}> — ${vt.formatTempo(t.ms)}`);
+        await news.send(
+          `🎙️ **Apuração do tempo em call — ${prevMonth.slice(5)}/${prevMonth.slice(0, 4)}**\n` +
+          (lines.length ? lines.join('\n') + '\n' : 'Sem destaques.\n') +
+          (vozDoMes ? `\n👑 **Voz do Mês: <@${vozDoMes}>** (Lounge VIP liberado + cargo)!` : '')
+        ).catch(() => null);
+      }
+    } catch (error) {
+      console.error('[VOICE TIME] Erro na apuração mensal:', error.message);
+    }
+  }
+  store.lastRewardMonth = thisMonth;
+  await saveSystemMeta(systemMeta);
+}
+
+function startVoiceTimeScheduler() {
+  setInterval(() => {
+    runVoiceTimeMonthlyTick(Date.now()).catch((err) => console.error('[VOICE TIME] Erro no tick:', err.message));
+  }, 5 * 60 * 1000).unref?.();
+}
 
 client.on('channelDelete', async (channel) => {
   try {
@@ -585,6 +720,12 @@ async function processCommand(message, rawContent) {
         break;
       case 'topconvites':
         await handlers.handleTopConvitesCommand(message);
+        break;
+      case 'tempo':
+        await handlers.handleTempoCommand(message);
+        break;
+      case 'topvoz':
+        await handlers.handleTopVozCommand(message);
         break;
       case 'torneio':
         await handlers.handleTorneioCommand(message, args);
@@ -1060,6 +1201,12 @@ client.on('interactionCreate', async (interaction) => {
         break;
       case 'topconvites':
         await handlers.handleTopConvitesCommand(context);
+        break;
+      case 'tempo':
+        await handlers.handleTempoCommand(context);
+        break;
+      case 'topvoz':
+        await handlers.handleTopVozCommand(context);
         break;
       case 'torneio': {
         const acao = interaction.options.getString('acao');
