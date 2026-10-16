@@ -22,6 +22,7 @@ const config = require('./config.json');
 const { createVipPixPayment, getClubeTierConfig, recordPendingPayment, startVipPaymentPoller } = require('./services/clubePaymentsService');
 const { createRiotService } = require('./services/riotService');
 const { startSextaScheduler, startLclScheduler } = require('./services/eventoService');
+const { startBackupScheduler } = require('./services/backupService');
 const { handleTempVoiceStateUpdate } = require('./services/tempVoiceService');
 const {
   createBalancedTeams,
@@ -144,6 +145,21 @@ function buildSlashCommands() {
           { name: 'Lendário', value: 'lendario' }
         ))
       .addIntegerOption((option) => option.setName('dias').setDescription('Dias (padrão do tier)').setRequired(false).setMinValue(1).setMaxValue(365)),
+    new SlashCommandBuilder().setName('palpite').setDescription('Aposte pontos no vencedor da sua partida.')
+      .addIntegerOption((option) => option.setName('time').setDescription('Time vencedor').setRequired(true)
+        .addChoices({ name: 'Time 1', value: 1 }, { name: 'Time 2', value: 2 }))
+      .addIntegerOption((option) => option.setName('pontos').setDescription('10 a 100').setRequired(true).setMinValue(10).setMaxValue(100)),
+    new SlashCommandBuilder().setName('missoes').setDescription('Suas missões da semana.'),
+    new SlashCommandBuilder().setName('duelo').setDescription('Desafie alguém para um duelo de PDL.')
+      .addStringOption((option) => option.setName('acao').setDescription('O que fazer').setRequired(false)
+        .addChoices(
+          { name: 'Desafiar', value: 'desafiar' },
+          { name: 'Aceitar', value: 'aceitar' },
+          { name: 'Recusar', value: 'recusar' },
+          { name: 'Lista', value: 'lista' }
+        ))
+      .addUserOption((option) => option.setName('usuario').setDescription('Adversário (p/ desafiar)').setRequired(false))
+      .addIntegerOption((option) => option.setName('pontos').setDescription('10 a 200').setRequired(false).setMinValue(10).setMaxValue(200)),
     new SlashCommandBuilder()
       .setName('entrar')
       .setDescription('Entra na fila CLASSIC ou ARAM.')
@@ -467,6 +483,7 @@ client.once('ready', async () => {
   startSextaScheduler();
   startLclScheduler();
   startVoiceTimeScheduler();
+  startBackupScheduler();
 
   // Snapshot de convites p/ atribuir quem convidou cada novo membro.
   try {
@@ -851,6 +868,16 @@ async function processCommand(message, rawContent) {
         break;
       case 'pdl':
         await handlers.handlePdlCommand(message, args);
+        break;
+      case 'palpite':
+        await handlers.handlePalpiteCommand(message, args);
+        break;
+      case 'missoes':
+      case 'missao':
+        await handlers.handleMissoesCommand(message);
+        break;
+      case 'duelo':
+        await handlers.handleDueloCommand(message, args);
         break;
       case 'presentear':
         await handlers.handlePresentearCommand(message, args);
@@ -1305,6 +1332,34 @@ client.on('interactionCreate', async (interaction) => {
         const presenteTier = interaction.options.getString('tier');
         const presenteDias = interaction.options.getInteger('dias');
         await handlers.handlePresentearCommand(context, [presenteTier, ...(presenteDias != null ? [String(presenteDias)] : [])], presenteUser || null);
+        break;
+      }
+      case 'palpite': {
+        const palpiteTime = interaction.options.getInteger('time');
+        const palpitePontos = interaction.options.getInteger('pontos');
+        await handlers.handlePalpiteCommand(context, [String(palpiteTime), String(palpitePontos)]);
+        break;
+      }
+      case 'missoes':
+        await handlers.handleMissoesCommand(context);
+        break;
+      case 'duelo': {
+        const dueloAcao = interaction.options.getString('acao');
+        const dueloUser = interaction.options.getUser('usuario');
+        const dueloPontos = interaction.options.getInteger('pontos');
+        const dArgs = [...(dueloAcao && dueloAcao !== 'desafiar' ? [dueloAcao] : []), ...(dueloPontos != null ? [String(dueloPontos)] : [])];
+        await handlers.handleDueloCommand(context, dArgs, dueloUser || null);
+        break;
+      }
+      case 'missoes':
+        await handlers.handleMissoesCommand(context);
+        break;
+      case 'duelo': {
+        const dueloAcao = interaction.options.getString('acao');
+        const dueloUser = interaction.options.getUser('usuario');
+        const dueloPontos = interaction.options.getInteger('pontos');
+        const dArgs = [...(dueloAcao && dueloAcao !== 'desafiar' ? [dueloAcao] : []), ...(dueloPontos != null ? [String(dueloPontos)] : [])];
+        await handlers.handleDueloCommand(context, dArgs, dueloUser || null);
         break;
       }
       case 'roleta': {

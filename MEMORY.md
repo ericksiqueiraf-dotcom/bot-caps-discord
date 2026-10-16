@@ -337,6 +337,14 @@ database/                    ← fallback JSON local
 - Sessões reabertas no boot (sem retroativo); mutar/desmutar alterna a contagem.
 - Validação: `voice-time.test.js` 6/6, suíte 174/174; ambos bots online.
 
+### 2026-10-16 — Bolão, first-win, missões, duelo e backup
+- **🎯 Bolão (`!palpite <1|2> <10-100>` + `/palpite`)**: aposta com pontos custom (só da partida, 1 por jogo, debita na hora); liquidação no `registerVictory` (vencedores dividem o bolo proporcional). **Bug pego em teste:** upsert só com `discordId` trocava a chave e apagava a entrada — corrigido usando o objeto completo (handler e liquidação).
+- **🌅 First-win +50%**: primeira vitória do dia ganha metade a mais e carimba `ultimaVitoriaEm`; anunciado no resultado.
+- **🎖️ Missões (`!missoes` + `/missoes`)**: jogar 3 (+20) e vencer 2 (+40) na semana; bônus automático 1x; semana vira sozinha.
+- **⚔️ Duelo (`!duelo @u [pontos]` + `/duelo`)**: desafiar/aceitar/recusar/lista; 10–200 PDL; expira em 7d; liquida quando os dois caem em lados opostos (anuncia no resultado).
+- **📦 Backup diário 07h**: snapshot de todos os docs em `database/backup-AAAA-MM-DD.json`, mantém 7.
+- `!ajuda2` documenta tudo; suíte **187/187**; ambos bots online. Incidente: fragmento duplicado de builder quebrou o boot do teste (loop) — removido e verificado.
+
 ### 2026-10-16 — !presentear (só Admin)
 - `!presentear @usuário <apoiador|vip|lendario> [dias]` (+ `/presentear`): dá cargo + assinatura (expira sozinha, entra no `!clubeadmin`). Dias padrão do tier, 1–365. DM avisa o presenteado. Documentado no `!staff`.
 - TESTRE + prod; ambos bots online.

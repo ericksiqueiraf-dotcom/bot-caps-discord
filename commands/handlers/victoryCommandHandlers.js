@@ -130,6 +130,18 @@ async function handleVictoryCommandFlow({
   ]);
 
   await replyToMessage(message, `Vitoria registrada para a Equipe ${winningTeam}!`);
+  const extras = [];
+  for (const w of victoryResult.winners || []) {
+    if (Number(w.firstWinBonus) > 0) extras.push(`🌅 <@${w.discordId}>: primeira vitória do dia (+${w.firstWinBonus} PDL)!`);
+  }
+  for (const p of victoryResult.payouts || []) {
+    extras.push(`🎯 <@${p.discordId}> ganhou o bolão (+${p.valor} pontos)!`);
+  }
+  for (const w of victoryResult.winners || []) {
+    if (Number(w.duelBonus) > 0) extras.push(`⚔️ <@${w.discordId}> venceu o duelo (+${w.duelBonus} PDL)!`);
+    for (const desc of w.missoesConcluidas || []) extras.push(`🎖️ <@${w.discordId}> completou a missão (${desc}, +bônus)!`);
+  }
+  if (extras.length > 0) await replyToMessage(message, extras.join('\n'));
   await updateQueueDashboard(message.guild);
 
   const finishedAt = new Date().toISOString();

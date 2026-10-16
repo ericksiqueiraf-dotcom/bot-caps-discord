@@ -182,12 +182,51 @@ function createRegisterVictoryDeps() {
     getAramWeightByTeamSize,
     formatCustomRecord,
     getPdlMultiplier: () => require('../services/eventoService').getPdlMultiplier(),
-    onVictoryPdlApplied: async ({ winners }) => {
+    onVictoryPdlApplied: async ({ winners, match, winningTeam }) => {
       try {
         const evento = require('../services/eventoService');
-        if (!evento.isSextaRankedWindow()) return;
+        const missoes = require('../services/missoesService');
+        const duelo = require('../services/dueloService');
         const systemMeta = await loadSystemMeta();
-        evento.accumulateSextaGains(systemMeta, winners);
+        if (evento.isSextaRankedWindow()) {
+          evento.accumulateSextaGains(systemMeta, winners);
+        }
+        const teamOneIds = (match.teamOne || []).map((p) => p.discordId);
+        const teamTwoIds = (match.teamTwo || []).map((p) => p.discordId);
+        const allPlayers = [...(match.teamOne || []), ...(match.teamTwo || [])];
+        const byId = new Map(allPlayers.map((p) => [String(p.discordId), p]));
+        const playerStats = await loadPlayerStats();
+        const bucketKey = getStatsBucketKey(match.mode, match.format);
+        const credit = (discordId, valor) => {
+          const ref = byId.get(String(discordId)) || { discordId };
+          const stored = getStoredPlayerStats(playerStats, ref);
+          if (!stored) return;
+          const modes = getModeStats(stored, match.mode, match.format);
+          upsertPlayerStats(playerStats, ref, {
+            modes: { ...normalizePlayerModes(stored), [bucketKey]: { ...modes, internalRating: Math.max(0, Number(modes.internalRating || 0) + valor) } }
+          });
+        };
+        // Missões semanais: progresso + bônus na hora.
+        const mStore = missoes.ensureMissionsStore(systemMeta);
+        const done = missoes.recordMatchPlayed(mStore, [...teamOneIds, ...teamTwoIds], (winners || []).map((w) => w.discordId));
+        for (const { userId, mission } of done) {
+          credit(userId, mission.premio);
+          const w = (winners || []).find((x) => String(x.discordId) === String(userId));
+          if (w) {
+            w.missionBonus = Number(w.missionBonus || 0) + mission.premio;
+            (w.missoesConcluidas ||= []).push(mission.desc);
+          }
+        }
+        // Duelos: transfere pontos quando os dois estão em lados opostos.
+        systemMeta.duelos ||= [];
+        const { settled } = duelo.settleDuels(systemMeta.duelos, teamOneIds, teamTwoIds, winningTeam);
+        for (const s of settled) {
+          credit(s.winnerId, s.pontos);
+          credit(s.loserId, -s.pontos);
+          const w = (winners || []).find((x) => String(x.discordId) === String(s.winnerId));
+          if (w) w.duelBonus = Number(w.duelBonus || 0) + s.pontos;
+        }
+        await savePlayerStats(playerStats);
         await saveSystemMeta(systemMeta);
       } catch { /* nao quebra o registro da vitoria */ }
     }
@@ -1452,10 +1491,10 @@ function buildAjudaEmbed(page = 1) {
       .setTitle('📚 Guia de Comandos (2/2) — Ranking e extras')
       .setDescription('Ranking, clube VIP, salas temporárias e extras. Página 1 no `!ajuda`.')
       .addFields(
-        { name: '🏆 Ranking e pós-jogo', value: '`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking geral (CLASSIC = pontos custom)\n`!placar tiers` • Só Esmeralda+\n`!top10` • Top 10 CLASSIC por pontos custom, desempate por winrate\n`!top10 tiers` • Top 10 só Esmeralda+\n`!topstreak` • Ranking Streak 🔥\n`!toprankinfernal` • Quem mais pegou INFERNAL na temporada 🔥\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
+        { name: '🏆 Ranking e pós-jogo', value: '`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!palpite <1|2> <10-100>` • Aposta pontos no vencedor da sua partida\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking geral (CLASSIC = pontos custom)\n`!placar tiers` • Só Esmeralda+\n`!top10` • Top 10 CLASSIC por pontos custom, desempate por winrate\n`!top10 tiers` • Top 10 só Esmeralda+\n`!topstreak` • Ranking Streak 🔥\n`!toprankinfernal` • Quem mais pegou INFERNAL na temporada 🔥\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
         { name: '💎 Clube VIP', value: '`!clube` • Tiers, assinatura PIX e renovação -10%\n`!querolive` • Entrar/sair do ping 🔴 Ao Vivo\n`!live <link>` • Divulgar live Twitch/YouTube/Kick (Lendário 6h, VIP 12h, Apoiador 24h)' },
         { name: '🔊 Salas temporárias (dono da sala)', value: 'Entre no ➕・criar-sala para ganhar sua sala\n`!salahub` • Lista as salas ativas\n`!sala` • Mostra sua sala • `!sala <nome>` renomeia\n`!convidar @u` • Chama alguém p/ sua sala\n`!salalock` • Tranca (`!salalock abrir` destranca)\n`!salalimit <0-99>` • Limite de usuários (0 = sem limite)\n`!salaexpulsar @u` • Remove alguém da sala\n`!limparvoz` • Apaga sua sala (dentro dela)' },
-        { name: '🎁 Extras', value: '`!convite` • Seu link pessoal (traga gente e ganhe recompensas)\n`!topconvites` • Ranking de quem mais trouxe gente\n`!torneio` • Torneio mata-mata (entrar, lista, status)\n`!tempo` • Seu tempo em call • `!topvoz` • Ranking de call\n`!regras` • Regulamento completo' },
+        { name: '🎁 Extras', value: '`!convite` • Seu link pessoal (traga gente e ganhe recompensas)\n`!topconvites` • Ranking de quem mais trouxe gente\n`!torneio` • Torneio mata-mata (entrar, lista, status)\n`!tempo` • Seu tempo em call • `!topvoz` • Ranking de call\n`!palpite <1|2> <10-100>` • Bolão da partida • `!missoes` • Missões da semana • `!duelo @u` • Duelo de PDL\n🌅 Primeira vitória do dia vale +50% PDL (automático)\n`!regras` • Regulamento completo' },
         { name: '⬅️ Página 1', value: '`!ajuda` • Cadastro, fila e voto\n`!staff` • Guia da staff (restrito)' }
       );
     } else {
@@ -1472,6 +1511,120 @@ function buildAjudaEmbed(page = 1) {
     .setFooter({ text: `${FOOTER_PREFIX} • Ajuda Atualizada` })
     .setTimestamp();
   return embed;
+}
+
+async function handlePalpiteCommand(message, args = []) {
+  try {
+    const [timeArg, pontosArg] = args;
+    const time = String(timeArg || '');
+    const pontos = Number(pontosArg);
+    if (!['1', '2'].includes(time) || !Number.isInteger(pontos) || pontos < 10 || pontos > 100) {
+      return await replyToMessage(message, '❌ Use: `!palpite <1|2> <10-100>` (aposta com seus pontos custom).');
+    }
+    const currentMatchData = await loadCurrentMatch();
+    const entry = Object.entries(currentMatchData.matches || {}).find(([, e]) => {
+      if (!e?.active || !e?.match) return false;
+      return [...(e.match.teamOne || []), ...(e.match.teamTwo || [])].some((p) => p.discordId === message.author.id);
+    });
+    if (!entry) {
+      return await replyToMessage(message, '❌ Você não está em nenhuma partida ativa.');
+    }
+    const [matchId, matchEntry] = entry;
+    matchEntry.palpites ||= {};
+    if (matchEntry.palpites[message.author.id]) {
+      return await replyToMessage(message, '❌ Você já apostou nesta partida.');
+    }
+    const playerStats = await loadPlayerStats();
+    const bettor = [...(matchEntry.match.teamOne || []), ...(matchEntry.match.teamTwo || [])]
+      .find((p) => p.discordId === message.author.id) || { discordId: message.author.id };
+    const stored = getStoredPlayerStats(playerStats, bettor);
+    const bucketKey = getStatsBucketKey(matchEntry.match.mode, matchEntry.match.format);
+    const modeStats = getModeStats(stored, matchEntry.match.mode, matchEntry.match.format);
+    if (!stored || Number(modeStats?.internalRating || 0) < pontos) {
+      return await replyToMessage(message, `❌ Pontos insuficientes (você tem ${Math.floor(Number(modeStats?.internalRating || 0))}).`);
+    }
+    const updatedModes = {
+      ...normalizePlayerModes(stored),
+      [bucketKey]: { ...modeStats, internalRating: Number(modeStats.internalRating) - pontos }
+    };
+    upsertPlayerStats(playerStats, bettor, { modes: updatedModes });
+    await savePlayerStats(playerStats);
+    matchEntry.palpites[message.author.id] = { time, pontos };
+    await saveCurrentMatch(currentMatchData);
+    await replyToMessage(message, `🎯 Aposta registrada: **${pontos} pontos no time ${time}**! Boa sorte!`);
+  } catch (error) {
+    console.error('[ERRO] !palpite:', error);
+    await replyToMessage(message, `❌ Erro ao apostar: \`${error.message}\``);
+  }
+}
+
+async function handleMissoesCommand(message) {
+  try {
+    const missoes = require('../services/missoesService');
+    const systemMeta = await loadSystemMeta();
+    const store = missoes.ensureMissionsStore(systemMeta);
+    const progress = missoes.getProgress(store, message.author.id);
+    const lines = progress.map((p) => `${p.feito ? '✅' : '⬜'} ${p.desc} (${Math.min(p.atual, p.meta)}/${p.meta}) • +${p.premio} PDL`);
+    const { EmbedBuilder } = require('discord.js');
+    const embed = new EmbedBuilder()
+      .setColor(THEME?.RANK ?? '#FFD700')
+      .setTitle('🎖️ Missões da semana')
+      .setDescription(lines.join('\n') + '\n\nBônus cai sozinho ao completar. Zera toda segunda.')
+      .setFooter({ text: `${FOOTER_PREFIX} • Missões semanais` })
+      .setTimestamp();
+    await replyToMessage(message, { embeds: [embed] });
+  } catch (error) {
+    console.error('[ERRO] !missoes:', error);
+    await replyToMessage(message, `❌ Erro nas missões: \`${error.message}\``);
+  }
+}
+
+async function handleDueloCommand(message, args = [], targetUserOverride = null) {
+  try {
+    const duelo = require('../services/dueloService');
+    const sub = String(args[0] || '').toLowerCase();
+    const systemMeta = await loadSystemMeta();
+    systemMeta.duelos ||= [];
+    const save = async () => { await saveSystemMeta(systemMeta); };
+
+    if (['aceitar', 'aceito'].includes(sub)) {
+      const r = duelo.acceptDuel(systemMeta.duelos, message.author.id);
+      systemMeta.duelos = r.duelos;
+      await save();
+      if (!r.ok) return await replyToMessage(message, `❌ ${r.message}`);
+      return await replyToMessage(message, `⚔️ Duelo aceito! <@${r.duel.a}> 🆚 <@${r.duel.b}> valendo **${r.duel.pontos} PDL**. Joguem a partida — quem vencer leva!`);
+    }
+
+    if (['recusar', 'recuso', 'negar'].includes(sub)) {
+      const r = duelo.refuseDuel(systemMeta.duelos, message.author.id);
+      systemMeta.duelos = r.duelos;
+      await save();
+      return await replyToMessage(message, r.ok ? 'Duelo recusado.' : `❌ ${r.message}`);
+    }
+
+    if (['lista', 'status'].includes(sub)) {
+      const pendentes = duelo.expireDuels(systemMeta.duelos);
+      systemMeta.duelos = pendentes;
+      await save();
+      const mine = pendentes.filter((d) => d.status !== 'concluido' && (d.a === message.author.id || d.b === message.author.id));
+      if (mine.length === 0) return await replyToMessage(message, '📭 Nenhum duelo seu pendente. Desafie com `!duelo @usuário [pontos]`.');
+      return await replyToMessage(message, mine.map((d) => `⚔️ <@${d.a}> 🆚 <@${d.b}> — ${d.pontos} PDL (${d.status})`).join('\n'));
+    }
+
+    const targetUser = targetUserOverride || message.mentions.users.first();
+    const pontos = args.map(Number).find((n) => Number.isInteger(n)) ?? duelo.DUEL_DEFAULT;
+    if (!targetUser && !['aceitar', 'aceito', 'recusar', 'recuso', 'negar', 'lista', 'status'].includes(sub)) {
+      return await replyToMessage(message, '❌ Use: `!duelo @usuário [10-200]` • `!duelo aceitar` • `!duelo recusar` • `!duelo lista`.');
+    }
+    const r = duelo.createDuel(systemMeta.duelos, message.author.id, targetUser.id, pontos);
+    if (!r.ok) return await replyToMessage(message, `❌ ${r.message}`);
+    systemMeta.duelos = r.duelos;
+    await save();
+    return await replyToMessage(message, `${targetUser}, você foi desafiado por ${message.author} para um duelo valendo **${r.valor} PDL**! Responda com \`!duelo aceitar\` ou \`!duelo recusar\`.`);
+  } catch (error) {
+    console.error('[ERRO] !duelo:', error);
+    await replyToMessage(message, `❌ Erro no duelo: \`${error.message}\``);
+  }
 }
 
 async function handleHelpCommand(message, page = 1) {
@@ -2621,7 +2774,8 @@ module.exports = {
   handleRematchCommand, handleRouletteCommand, handleRoletaSairCommand, handleRulesCommand, handleStaffCommand, handlePdlCommand,
   handleResultVoteButton, handleClubeCommand, handleClubeAdminCommand, handleClubeFixarCommand, handleQueroLiveCommand, handleLiveCommand,
   handleConviteCommand, handleTopConvitesCommand, handleTorneioCommand, handleTempoCommand, handleTopVozCommand,
-  handleAjudaFixarCommand, buildAjudaEmbed, buildTempoEmbed, normalizePresentearTier, handlePresentearCommand,
+  handleAjudaFixarCommand, buildAjudaEmbed, buildTempoEmbed, normalizePresentearTier, handlePresentearCommand, handlePalpiteCommand,
+  handleMissoesCommand, handleDueloCommand,
   LIVE_COOLDOWN_BY_TIER_MS,
   handleSalaHubCommand, handleConvidarCommand, handleLimparVozCommand, handleSalaCommand,
   handleSalaLockCommand, handleSalaLimitCommand, handleSalaExpulsarCommand,
