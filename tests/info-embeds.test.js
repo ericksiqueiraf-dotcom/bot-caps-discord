@@ -34,6 +34,28 @@ describe('embeds informativos por sala', () => {
     assert.ok(embed.data.description.includes('Servidor X'));
   });
 
+  it('buildTempoEmbed tem visual proprio (avatar, cor por cargo, ritmo)', () => {
+    const legacy = require('../commands/legacyCommands');
+    const e0 = legacy.buildTempoEmbed({
+      displayName: 'Zerado', avatarURL: null,
+      times: { totalMs: 0, weekMs: 0, monthMs: 0 },
+      rank: { current: null, next: { name: '🎙️ Ativo', hours: 5 } }
+    }).toJSON();
+    assert.match(e0.title, /tempo em call/);
+    assert.ok(e0.description.includes('Zerado'));
+    assert.ok(!e0.thumbnail, 'sem avatar sem thumbnail');
+    assert.ok(e0.fields.some((f) => f.name === '💡 Ritmo'));
+    const e1 = legacy.buildTempoEmbed({
+      displayName: 'Ativo', avatarURL: 'https://x/y.png',
+      times: { totalMs: 10 * 3600000, weekMs: 2 * 3600000, monthMs: 8 * 3600000 },
+      rank: { current: { name: '🎙️ Ativo', hours: 5 }, next: { name: '🎙️ Frequente', hours: 15 } }
+    }).toJSON();
+    assert.equal(e1.thumbnail.url, 'https://x/y.png');
+    assert.ok(e1.fields.find((f) => f.name === '📊 Progresso').value.includes('▰'));
+    assert.ok(!e1.fields.find((f) => f.name === '📊 Progresso').value.includes('█'));
+    assert.ok(JSON.stringify(e1).length < 6000);
+  });
+
   it('buildAjudaEmbed tem 2 paginas com ida e volta', () => {
     const legacy = require('../commands/legacyCommands');
     const p1 = legacy.buildAjudaEmbed(1).toJSON();

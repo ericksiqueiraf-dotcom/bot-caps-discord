@@ -1299,28 +1299,58 @@ async function handleTorneioCommand(message, args = []) {
   }
 }
 
+const TEMPO_RANK_COLORS = {
+  '🎙️ Viciado em Call': '#FFD700',
+  '🎙️ Frequente': '#9B59B6',
+  '🎙️ Ativo': '#2ECC71'
+};
+
+function buildTempoEmbed({ displayName = '', avatarURL = null, times, rank }) {
+  const { EmbedBuilder } = require('discord.js');
+  const vt = require('../services/voiceTimeService');
+  const color = (rank.current && TEMPO_RANK_COLORS[rank.current.name]) || '#95A5A6';
+  const falta = rank.next ? vt.formatTempo(rank.next.hours * 3600000 - times.monthMs) : null;
+  const daysElapsed = Math.max(1, new Date().getUTCDate());
+  const dailyAvg = times.monthMs / daysElapsed;
+  const ritmo = !rank.next
+    ? 'Máximo alcançado! 🎉'
+    : dailyAvg <= 0
+      ? 'Entre em call para começar o ritmo!'
+      : `~${vt.formatTempo(dailyAvg)}/dia → cargo em ~${Math.ceil((rank.next.hours * 3600000 - times.monthMs) / dailyAvg)} dia(s)`;
+  const embed = new EmbedBuilder()
+    .setColor(color)
+    .setTitle('🎙️ Seu tempo em call')
+    .setDescription(`Estatísticas de **${displayName || 'você'}**`)
+    .addFields(
+      { name: '⏱️ Geral', value: vt.formatTempo(times.totalMs), inline: true },
+      { name: '📅 Semana', value: vt.formatTempo(times.weekMs), inline: true },
+      { name: '🗓️ Mês', value: vt.formatTempo(times.monthMs), inline: true },
+      { name: '🎖️ Cargo atual', value: rank.current ? rank.current.name : 'Cinzas', inline: true },
+      { name: '🎯 Próximo cargo', value: rank.next ? `${rank.next.name} — faltam ${falta}` : 'Máximo alcançado 🎉', inline: true },
+      { name: '📊 Progresso', value: vt.progressBar(times.monthMs, rank.next).replace(/█/g, '▰').replace(/□/g, '▱'), inline: false },
+      { name: '💡 Ritmo', value: ritmo, inline: false }
+    )
+    .setFooter({ text: 'Conta o tempo em call, mesmo sozinho • Pausa mudo, ensurdecido ou AFK' })
+    .setTimestamp();
+  if (avatarURL) embed.setThumbnail(avatarURL);
+  return embed;
+}
+
 async function handleTempoCommand(message) {
   try {
     const vt = require('../services/voiceTimeService');
     const systemMeta = await loadSystemMeta();
     const store = vt.ensureVoiceStore(systemMeta);
     const t = vt.getUserTime(store, message.author.id);
-    const { current, next } = vt.rankForMonth(t.monthMs);
-    const falta = next ? vt.formatTempo(next.hours * 3600000 - t.monthMs) : null;
-    const { EmbedBuilder } = require('discord.js');
-    const embed = new EmbedBuilder()
-      .setColor(THEME?.INFO ?? '#0099ff')
-      .setTitle('Seu tempo em call')
-      .addFields(
-        { name: 'Geral', value: vt.formatTempo(t.totalMs), inline: true },
-        { name: 'Semana', value: vt.formatTempo(t.weekMs), inline: true },
-        { name: 'Mês', value: vt.formatTempo(t.monthMs), inline: true },
-        { name: 'Cargo atual', value: current ? current.name : 'Cinzas', inline: true },
-        { name: 'Próximo cargo', value: next ? `${next.name.split(' ').slice(1).join(' ')}: faltam ${falta}` : 'Máximo alcançado 🎉', inline: true },
-        { name: 'Progresso', value: vt.progressBar(t.monthMs, next), inline: false }
-      )
-      .setFooter({ text: 'Conta o tempo em call, mesmo sozinho, exceto mudo, ensurdecido ou no canal AFK.' });
-    await replyToMessage(message, { embeds: [embed] });
+    const rank = vt.rankForMonth(t.monthMs);
+    await replyToMessage(message, {
+      embeds: [buildTempoEmbed({
+        displayName: message.member?.displayName || message.author?.username || '',
+        avatarURL: message.author?.displayAvatarURL?.(),
+        times: t,
+        rank
+      })]
+    });
   } catch (error) {
     console.error('[ERRO] !tempo:', error);
     await replyToMessage(message, `❌ Erro ao ver tempo: \`${error.message}\``);
@@ -2528,7 +2558,7 @@ module.exports = {
   handleRematchCommand, handleRouletteCommand, handleRoletaSairCommand, handleRulesCommand, handleStaffCommand, handlePdlCommand,
   handleResultVoteButton, handleClubeCommand, handleClubeAdminCommand, handleClubeFixarCommand, handleQueroLiveCommand, handleLiveCommand,
   handleConviteCommand, handleTopConvitesCommand, handleTorneioCommand, handleTempoCommand, handleTopVozCommand,
-  handleAjudaFixarCommand, buildAjudaEmbed,
+  handleAjudaFixarCommand, buildAjudaEmbed, buildTempoEmbed,
   LIVE_COOLDOWN_BY_TIER_MS,
   handleSalaHubCommand, handleConvidarCommand, handleLimparVozCommand, handleSalaCommand,
   handleSalaLockCommand, handleSalaLimitCommand, handleSalaExpulsarCommand,
