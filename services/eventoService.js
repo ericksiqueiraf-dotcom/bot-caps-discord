@@ -2,6 +2,7 @@
 // valem PDL em dobro; às 23h59 o bot posta top 3 + melhor da noite.
 // Estado em systemMeta.sextaRank { date, gains } e flags sextaAbertaEm/EncerradaEm.
 const { EmbedBuilder } = require('discord.js');
+const path = require('path');
 const config = require('../config.json');
 
 function getSPParts(nowMs = Date.now()) {
@@ -130,6 +131,164 @@ function startSextaScheduler() {
   }, 30000).unref?.();
 }
 
+// ─── Fim de semana LCL (sex 08h → dom 23h59, horário de SP) ────────────────
+// Sex 08h: abre a fila LCL ARENA e liga o LCL BOT. Dom 23h59: posta o ranking
+// do fim de semana (séries inter fechadas na janela) e desliga o LCL BOT.
+// Fora da janela a fila informa que volta sexta.
+
+const SP_WEEKDAY_INDEX = { dom: 0, sun: 0, seg: 1, mon: 1, ter: 2, tue: 2, qua: 3, wed: 3, qui: 4, thu: 4, sex: 5, fri: 5, sab: 6, sat: 6 };
+
+function spWeekdayIndex(nowMs = Date.now()) {
+  const wd = getSPParts(nowMs).weekday.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z]/g, '');
+  return SP_WEEKDAY_INDEX[wd] ?? -1;
+}
+
+function isLclWeekendWindow(nowMs = Date.now()) {
+  const { minutes } = getSPParts(nowMs);
+  const wd = spWeekdayIndex(nowMs);
+  if (wd === 5) return minutes >= 8 * 60; // sexta a partir das 08h
+  if (wd === 6) return true; // sábado inteiro
+  if (wd === 0) return minutes < 24 * 60; // domingo até 23h59
+  return false;
+}
+
+// Janela Fri 08:00 → Sun 23:59:59 (ms) contendo nowMs.
+function lclWeekendRange(nowMs = Date.now()) {
+  const parts = getSPParts(nowMs);
+  const [y, m, d] = parts.key.split('-').map(Number);
+  const base = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  const friday = new Date(base);
+  friday.setUTCDate(base.getUTCDate() - ((spWeekdayIndex(nowMs) - 5 + 7) % 7));
+  const startMs = Date.UTC(friday.getUTCFullYear(), friday.getUTCMonth(), friday.getUTCDate(), 11, 0, 0);
+  const sunday = new Date(friday);
+  sunday.setUTCDate(friday.getUTCDate() + 2);
+  const endMs = Date.UTC(sunday.getUTCFullYear(), sunday.getUTCMonth(), sunday.getUTCDate() + 1, 2, 59, 59);
+  return { startMs, endMs };
+}
+
+function spDateKey(ms) {
+  return getSPParts(ms).key;
+}
+
+function defaultLoadInterMatches() {
+  const candidates = [
+    process.env.LCL_BOT_DIR,
+    path.join(__dirname, '..', 'lcl-bot'),
+    'C:\\Users\\ErickSiqueira\\Documents\\BOT CAPS DISCORD\\lcl-bot'
+  ];
+  for (const dir of candidates) {
+    try {
+      if (!dir) continue;
+      const ds = require(path.join(dir, 'services', 'dataService.js'));
+      if (ds?.loadInterMatches) return ds.loadInterMatches();
+    } catch { /* proximo */ }
+  }
+  return Promise.resolve({ matches: {} });
+}
+
+async function getLclWeekendTop(loadInterMatches, startMs, endMs) {
+  const data = await loadInterMatches().catch(() => ({ matches: {} }));
+  const wins = {};
+  for (const match of Object.values(data.matches || {})) {
+    if (!match?.winner) continue;
+    const ts = new Date(match.closedAt || match.endedAt || 0).getTime();
+    if (!Number.isFinite(ts) || ts < startMs || ts > endMs) continue;
+    const side = match.winner === 'A' ? match.teamA : match.teamB;
+    const name = side?.name || `Lado ${match.winner}`;
+    const key = `${side?.originGuildId || '?'}:${name}`;
+    wins[key] ||= { name, originGuildId: side?.originGuildId || null, wins: 0 };
+    wins[key].wins += 1;
+  }
+  return Object.values(wins).sort((a, b) => b.wins - a.wins);
+}
+
+function buildLclWeekendEmbed(top) {
+  const embed = new EmbedBuilder()
+    .setColor('#FF6B00')
+    .setTitle('🔥 Fim de semana LCL — resultado')
+    .setFooter({ text: 'Caps Bot • LCL ARENA (sex–dom)' })
+    .setTimestamp();
+  if (top.length === 0) {
+    embed.setDescription('Sem séries inter concluídas neste fim de semana.');
+  } else {
+    embed.setDescription(
+      top.map((t, i) => `**${i + 1}º ${t.name}** — ${t.wins} vitória(s)`).join('\n')
+    );
+  }
+  return embed;
+}
+
+async function defaultPostLclOpen() {
+  const ids = [config.textChannels?.matchOngoingChannelId, config.textChannels?.queueStatusChannelId].filter(Boolean);
+  for (const id of [...new Set(ids)]) {
+    const channel = await global.discordClient?.channels?.fetch(id).catch(() => null);
+    if (channel?.isTextBased?.()) {
+      await channel.send('🔥 **LCL ARENA aberto** — fila interservidores até **domingo 23h59**! Boa sorte aos times.').catch(() => null);
+    }
+  }
+}
+
+async function defaultPostLclClose(top) {
+  const id = config.textChannels?.matchOngoingChannelId;
+  const channel = id ? await global.discordClient?.channels?.fetch(id).catch(() => null) : null;
+  if (channel?.isTextBased?.()) {
+    await channel.send({ embeds: [buildLclWeekendEmbed(top)] }).catch(() => null);
+  }
+}
+
+function defaultSetLclBot(active) {
+  const { exec } = require('child_process');
+  return new Promise((resolve) => {
+    exec(`pm2 ${active ? 'start' : 'stop'} lcl-bot`, { timeout: 30000, shell: true }, (error, stdout) => {
+      if (error) {
+        console.error(`[LCL] Falha ao ${active ? 'ligar' : 'desligar'} lcl-bot:`, error.message.slice(0, 150));
+        resolve({ ok: false });
+      } else {
+        console.log(`[LCL] lcl-bot ${active ? 'ligado' : 'desligado'} para o fim de semana.`);
+        resolve({ ok: true });
+      }
+    });
+  });
+}
+
+async function runLclTick(nowMs = Date.now(), deps = {}) {
+  const {
+    loadSystemMeta = require('./dataService').loadSystemMeta,
+    saveSystemMeta = require('./dataService').saveSystemMeta,
+    loadInterMatches = defaultLoadInterMatches,
+    postOpen = defaultPostLclOpen,
+    postClose = defaultPostLclClose,
+    setLclBot = defaultSetLclBot
+  } = deps;
+  const { startMs, endMs } = lclWeekendRange(nowMs);
+  const fridayKey = spDateKey(startMs);
+  const inWindow = isLclWeekendWindow(nowMs);
+  const meta = await loadSystemMeta();
+  if (inWindow) {
+    if (meta.lclAbertoEm !== fridayKey) {
+      await setLclBot(true);
+      await postOpen();
+      meta.lclAbertoEm = fridayKey;
+      await saveSystemMeta(meta);
+    }
+    return meta;
+  }
+  if (meta.lclAbertoEm === fridayKey && meta.lclEncerradoEm !== fridayKey && nowMs >= endMs) {
+    const top = await getLclWeekendTop(loadInterMatches, startMs, endMs);
+    await postClose(top);
+    await setLclBot(false);
+    meta.lclEncerradoEm = fridayKey;
+    await saveSystemMeta(meta);
+  }
+  return meta;
+}
+
+function startLclScheduler() {
+  setInterval(() => {
+    runLclTick(Date.now()).catch((err) => console.error('[LCL] Erro no tick:', err.message));
+  }, 60000).unref?.();
+}
+
 module.exports = {
   getSPParts,
   isFridaySP,
@@ -140,5 +299,11 @@ module.exports = {
   getSextaTop,
   buildSextaTopEmbed,
   runSextaTick,
-  startSextaScheduler
+  startSextaScheduler,
+  isLclWeekendWindow,
+  lclWeekendRange,
+  getLclWeekendTop,
+  buildLclWeekendEmbed,
+  runLclTick,
+  startLclScheduler
 };

@@ -21,7 +21,7 @@ const {
 const config = require('./config.json');
 const { createVipPixPayment, getClubeTierConfig, recordPendingPayment, startVipPaymentPoller } = require('./services/clubePaymentsService');
 const { createRiotService } = require('./services/riotService');
-const { startSextaScheduler } = require('./services/eventoService');
+const { startSextaScheduler, startLclScheduler } = require('./services/eventoService');
 const { handleTempVoiceStateUpdate } = require('./services/tempVoiceService');
 const {
   createBalancedTeams,
@@ -322,6 +322,15 @@ function buildSlashCommands() {
     new SlashCommandBuilder().setName('clubeadmin').setDescription('Lista assinaturas ativas do clube (staff).'),
     new SlashCommandBuilder().setName('convite').setDescription('Seu link pessoal de convite + recompensas.'),
     new SlashCommandBuilder().setName('topconvites').setDescription('Ranking de quem mais trouxe gente.'),
+    new SlashCommandBuilder().setName('torneio').setDescription('Torneio CAPS ARENA: entrar, ver lista, status e regras.')
+      .addStringOption((option) => option.setName('acao').setDescription('O que fazer').setRequired(true)
+        .addChoices(
+          { name: 'Entrar', value: 'entrar' },
+          { name: 'Sair', value: 'sair' },
+          { name: 'Lista', value: 'lista' },
+          { name: 'Status', value: 'status' },
+          { name: 'Regras', value: 'info' }
+        )),
     new SlashCommandBuilder().setName('clubefixar').setDescription('Posta e fixa os benefícios no #clube-vip (staff).'),
     new SlashCommandBuilder().setName('querolive').setDescription('Entra/sai do ping 🔴 Ao Vivo.'),
     new SlashCommandBuilder()
@@ -443,6 +452,7 @@ client.once('ready', async () => {
   startVipPaymentPoller({ config });
   startClubePromoScheduler();
   startSextaScheduler();
+  startLclScheduler();
 
   // Snapshot de convites p/ atribuir quem convidou cada novo membro.
   try {
@@ -575,6 +585,9 @@ async function processCommand(message, rawContent) {
         break;
       case 'topconvites':
         await handlers.handleTopConvitesCommand(message);
+        break;
+      case 'torneio':
+        await handlers.handleTorneioCommand(message, args);
         break;
       case 'clubefixar':
         await handlers.handleClubeFixarCommand(message);
@@ -1048,6 +1061,11 @@ client.on('interactionCreate', async (interaction) => {
       case 'topconvites':
         await handlers.handleTopConvitesCommand(context);
         break;
+      case 'torneio': {
+        const acao = interaction.options.getString('acao');
+        await handlers.handleTorneioCommand(context, acao ? [acao] : []);
+        break;
+      }
       case 'clubefixar':
         await handlers.handleClubeFixarCommand(context);
         break;

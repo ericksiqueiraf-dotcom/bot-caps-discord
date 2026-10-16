@@ -1112,6 +1112,161 @@ async function handleTopConvitesCommand(message) {
   }
 }
 
+async function resolveTorneioPool(guild, ids) {
+  const playerStats = await loadPlayerStats();
+  const out = [];
+  for (const id of ids || []) {
+    const member = await guild.members.fetch(id).catch(() => null);
+    let baseMmr = 1500;
+    let nickname = member?.displayName || id;
+    try {
+      const stored = getStoredPlayerStats(playerStats, { discordId: id });
+      const modeStats = stored ? getModeStats(stored, QUEUE_MODES.CLASSIC) : null;
+      if (Number.isFinite(Number(modeStats?.baseMmr))) baseMmr = Number(modeStats.baseMmr);
+      if (stored?.registeredNickname) nickname = member?.displayName || stored.registeredNickname;
+    } catch { /* fallback neutro */ }
+    out.push({ discordId: String(id), nickname, baseMmr });
+  }
+  return out;
+}
+
+function formatTorneioGames(games) {
+  return games.map((g) => {
+    const t1 = g.teamOne.map((p) => `<@${p.discordId}>`).join(' ');
+    const t2 = g.teamTwo.map((p) => `<@${p.discordId}>`).join(' ');
+    const placar = g.winner ? ` — **venceu time ${g.winner}**` : '';
+    return `**${g.id}**: ${t1} 🆚 ${t2}${placar}`;
+  }).join('\n');
+}
+
+async function handleTorneioCommand(message, args = []) {
+  const T = require('../services/torneioService');
+  const { createBalancedTeams } = require('../services/balanceService');
+  const sub = String(args[0] || 'info').toLowerCase();
+  const rest = args.slice(1);
+  try {
+    const systemMeta = await loadSystemMeta();
+    systemMeta.torneio ||= null;
+    const t = systemMeta.torneio;
+    const save = async () => { await saveSystemMeta(systemMeta); };
+
+    if (sub === 'info') {
+      return await replyToMessage(message, T.TORNEIO_INFO);
+    }
+
+    if (sub === 'entrar') {
+      if (!t?.active) return await replyToMessage(message, '❌ Nenhum torneio aberto. Aguarde o anúncio da staff.');
+      const r = T.joinTournament(t, message.author.id);
+      await save();
+      return await replyToMessage(message, r.ok ? `✅ Inscrito no **Torneio #${t.edition}**! (${r.count} inscritos)` : `❌ ${r.message}`);
+    }
+
+    if (sub === 'sair') {
+      if (!t?.active) return await replyToMessage(message, '❌ Nenhum torneio aberto.');
+      const r = T.leaveTournament(t, message.author.id);
+      await save();
+      return await replyToMessage(message, r.ok ? `Inscrição removida. (${r.count} inscritos)` : `❌ ${r.message}`);
+    }
+
+    if (sub === 'lista') {
+      if (!t?.active || t.players.length === 0) return await replyToMessage(message, '📭 Nenhum inscrito ainda. Use `!torneio entrar`.');
+      const mentions = t.players.map((id) => `<@${id}>`).join(' ');
+      return await replyToMessage(message, `🏆 **Torneio #${t.edition}** — ${t.players.length} inscrito(s):\n${mentions}`);
+    }
+
+    if (sub === 'status') {
+      if (!t?.active) return await replyToMessage(message, '📭 Nenhum torneio ativo.');
+      const st = T.getStatus(t);
+      const lines = [`🏆 **Torneio #${st.edition}** — ${st.inscritos} inscrito(s)`, `Rodada atual: ${st.rodada || 'ainda não sorteada'}`];
+      if (st.final) lines.push(`🔥 FINAL MD3: **${st.placarFinal}**`);
+      if (st.jogosPendentes.length) lines.push(`⏳ Aguardando: ${st.jogosPendentes.join(', ')}`);
+      if (st.champion) lines.push(`👑 Campeões: ${st.champion.team.map((id) => `<@${id}>`).join(' ')} (${st.champion.placar})`);
+      return await replyToMessage(message, lines.join('\n'));
+    }
+
+    // ---- staff ----
+    if (!isStaffViewer(message.member)) {
+      return await replyToMessage(message, '❌ Esse subcomando é da staff. Jogadores: `!torneio entrar | sair | lista | info | status`.');
+    }
+
+    if (sub === 'novo') {
+      if (t?.active && (t.players.length > 0 || t.rounds.length > 0) && !t.champion) {
+        return await replyToMessage(message, '❌ Já há torneio em andamento. Use `!torneio encerrar` primeiro.');
+      }
+      const edition = Number(rest[0]) > 0 ? Number(rest[0]) : ((t?.edition || 0) + 1);
+      systemMeta.torneio = T.newTournament(edition);
+      await save();
+      return await replyToMessage(message, `🏆 **Torneio #${edition} aberto!** Inscrevam-se com \`!torneio entrar\` (mínimo 20, múltiplo de 10).`);
+    }
+
+    if (sub === 'encerrar') {
+      if (!t?.active) return await replyToMessage(message, '📭 Nenhum torneio ativo.');
+      t.active = false;
+      await save();
+      return await replyToMessage(message, `Torneio #${t.edition} encerrado.`);
+    }
+
+    if (sub === 'sortear') {
+      if (!t?.active) return await replyToMessage(message, '❌ Nenhum torneio ativo.');
+      if (t.final) return await replyToMessage(message, '🔥 A final já está rolando. Use `!torneio resultado FINAL <1|2>`.');
+      if (t.rounds.length === 0) {
+        const req = T.startRequirement(t);
+        if (!req.ok) return await replyToMessage(message, `❌ ${req.message}`);
+        const pool = await resolveTorneioPool(message.guild, t.players);
+        const games = T.drawGames(pool, (g) => createBalancedTeams(g), 'R1');
+        t.rounds.push({ n: 1, games });
+        await save();
+        return await replyToMessage(message, `🎲 **Rodada 1 sorteada!**\n${formatTorneioGames(games)}\n\nStaff: \`!torneio resultado <jogo> <1|2>\``);
+      }
+      const adv = T.advanceTournament(t, (g) => createBalancedTeams(g));
+      if (!adv.ok) return await replyToMessage(message, `❌ ${adv.message}`);
+      await save();
+      if (adv.type === 'final') {
+        return await replyToMessage(message,
+          `🔥 **FINAL MD3!** Mesmos times, melhor de 3:\n${formatTorneioGames([{ id: 'FINAL', teamOne: t.final.teamOne, teamTwo: t.final.teamTwo, winner: null }])}\n\nStaff: \`!torneio resultado FINAL <1|2>\``);
+      }
+      const rep = adv.repechage?.length ? `\n🍀 Repescagem: ${adv.repechage.map((p) => `<@${p.discordId}>`).join(' ')}` : '';
+      return await replyToMessage(message, `🎲 **Rodada ${adv.round} sorteada!**${rep}\n${formatTorneioGames(adv.games)}\n\nStaff: \`!torneio resultado <jogo> <1|2>\``);
+    }
+
+    if (sub === 'resultado') {
+      if (!t?.active) return await replyToMessage(message, '❌ Nenhum torneio ativo.');
+      const [jogo, time] = rest;
+      if (!jogo || !time) return await replyToMessage(message, '❌ Use: `!torneio resultado <jogo> <1|2>` ou `!torneio resultado FINAL <1|2>`.');
+      if (String(jogo).toUpperCase() === 'FINAL') {
+        const r = T.recordFinalGame(t, time);
+        if (!r.ok) return await replyToMessage(message, `❌ ${r.message}`);
+        await save();
+        if (!r.champion) {
+          return await replyToMessage(message, `📝 Final: **${r.final.wins1}x${r.final.wins2}**. Faltam ${2 - Math.max(r.final.wins1, r.final.wins2)} vitória(s) para fechar!`);
+        }
+        const guild = message.guild;
+        let cargo = guild.roles.cache.find((r_) => r_.name === T.TORNEIO_CARGO_NOME);
+        if (!cargo) cargo = await guild.roles.create({ name: T.TORNEIO_CARGO_NOME, reason: 'Cargo de campeão do torneio' }).catch(() => null);
+        if (cargo) {
+          for (const [, m] of cargo.members) await m.roles.remove(cargo, 'Novo campeão do torneio').catch(() => null);
+          for (const id of t.champion.team) {
+            const m = await guild.members.fetch(id).catch(() => null);
+            if (m) await m.roles.add(cargo, 'Campeão do torneio').catch(() => null);
+          }
+        }
+        return await replyToMessage(message,
+          `🏆 **CAMPEÕES DO TORNEIO #${t.edition}** (${t.champion.placar})!\n` +
+          `${t.champion.team.map((id) => `<@${id}>`).join(' ')}\nParabéns!`);
+      }
+      const r = T.recordGameResult(t, jogo, time);
+      if (!r.ok) return await replyToMessage(message, `❌ ${r.message}`);
+      await save();
+      return await replyToMessage(message, `✅ ${r.game.id}: venceu o **time ${r.game.winner}**.`);
+    }
+
+    return await replyToMessage(message, '❌ Use: `!torneio entrar | sair | lista | info | status` (staff: `novo | sortear | resultado | encerrar`).');
+  } catch (error) {
+    console.error('[ERRO] !torneio:', error);
+    await replyToMessage(message, `❌ Erro no torneio: \`${error.message}\``);
+  }
+}
+
 async function handleHelpCommand(message) {
   try {
     const embed = new EmbedBuilder()
@@ -1121,7 +1276,7 @@ async function handleHelpCommand(message) {
     .addFields(
       { name: '🕹️ Cadastro (1x)', value: '`!cadastrar Nick#TAG` • Vincula sua conta Riot\n`!nick Nick#TAG` • Atualiza seu nick' },
       { name: '🎮 Jogador (1/2) — Fila e voto', value: '`!regras` • Regulamento completo\n`!convite` • Seu link pessoal (traga gente e ganhe recompensas)\n`!topconvites` • Ranking de quem mais trouxe gente\n`!entrar` • Fila Classic (no canal Lobby Classic ou Lobby TIER S)\n`!entrar aram` • Fila ARAM\n`!entrar aram 2x2` • ARAM formato\n`!fila` • Mostra jogadores em sala\n`!espera` • Entra na espera (🔥 INFERNAL entra na posição 5)\n`!esperatiers` • Espera do Lobby TIER S (só Esmeralda+)\n`!espera ver` • Mostra a ordem\n`!espera sair` • Sai da espera\n`!sair` • Sai da sala\n`!votar 1/2` • Vota no vencedor (abre painel com botões p/ os 10 votarem)\n`!votar` • Reabre o painel de votação' },
-      { name: '🎮 Jogador (2/2) — Ranking', value: '`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking geral (CLASSIC = pontos custom)\n`!placar tiers` • Só Esmeralda+\n`!top10` • Top 10 CLASSIC por pontos custom, desempate por winrate\n`!top10 tiers` • Top 10 só Esmeralda+\n`!topstreak` • Ranking Streak 🔥\n`!toprankinfernal` • Quem mais pegou INFERNAL na temporada 🔥\n`!clube` • Clube VIP: tiers, benefícios e membros 💎\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
+      { name: '🎮 Jogador (2/2) — Ranking', value: '`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking geral (CLASSIC = pontos custom)\n`!placar tiers` • Só Esmeralda+\n`!top10` • Top 10 CLASSIC por pontos custom, desempate por winrate\n`!top10 tiers` • Top 10 só Esmeralda+\n`!topstreak` • Ranking Streak 🔥\n`!toprankinfernal` • Quem mais pegou INFERNAL na temporada 🔥\n`!clube` • Clube VIP: tiers, benefícios e membros 💎\n`!torneio` • Torneio mata-mata (entrar, lista, status)\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
       { name: '💎 Clube VIP', value: '`!clube` • Tiers, assinatura PIX e renovação -10%\n`!querolive` • Entrar/sair do ping 🔴 Ao Vivo\n`!live <link>` • Divulgar live Twitch/YouTube/Kick (Lendário 6h, VIP 12h, Apoiador 24h)' },
       { name: '🔊 Salas temporárias (dono da sala)', value: 'Entre no ➕・criar-sala para ganhar sua sala\n`!salahub` • Lista as salas ativas\n`!sala` • Mostra sua sala • `!sala <nome>` renomeia\n`!convidar @u` • Chama alguém p/ sua sala\n`!salalock` • Tranca (`!salalock abrir` destranca)\n`!salalimit <0-99>` • Limite de usuários (0 = sem limite)\n`!salaexpulsar @u` • Remove alguém da sala\n`!limparvoz` • Apaga sua sala (dentro dela)' },
       { name: '🛠️ Staff', value: '`!staff` • Guia completo da staff (partida, roleta, limpeza, PDL, elos, temporada, clube)\nComandos de staff ficam só no `!staff` para não poluir esta lista.' }
@@ -2271,7 +2426,7 @@ module.exports = {
   handleRegisterCommand, handleNickUpdateCommand, handleSyncPlayerRankCommand, handleVoteCommand, pendingAutoStarts, triggerAutoStart,
   handleRematchCommand, handleRouletteCommand, handleRoletaSairCommand, handleRulesCommand, handleStaffCommand, handlePdlCommand,
   handleResultVoteButton, handleClubeCommand, handleClubeAdminCommand, handleClubeFixarCommand, handleQueroLiveCommand, handleLiveCommand,
-  handleConviteCommand, handleTopConvitesCommand,
+  handleConviteCommand, handleTopConvitesCommand, handleTorneioCommand,
   LIVE_COOLDOWN_BY_TIER_MS,
   handleSalaHubCommand, handleConvidarCommand, handleLimparVozCommand, handleSalaCommand,
   handleSalaLockCommand, handleSalaLimitCommand, handleSalaExpulsarCommand,

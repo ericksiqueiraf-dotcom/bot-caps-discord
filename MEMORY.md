@@ -288,6 +288,13 @@ database/                    ← fallback JSON local
 - Importante: o bot equilibra a **soma dos elos** — com lobby misto (Master + Pratas), algum time sempre fica com o Master + elos baixos. Sensação de injustiça individual é esperada; o PDL compensa (ganhar de time mais forte vale mais).
 - TESTRE + prod; suíte 149/149; ambos bots online.
 
+### 2026-10-16 — Captação: convites, Sexta Ranked, FDS LCL, torneio
+- **Item 1 — convites com recompensa** (`services/convitesService.js` + `!convite`/`!topconvites`, prefixo + slash): link pessoal por membro, atribuição por diff de usos, anti-fraude (conta <7d não conta, saída em 24h estorna, 1 ponto por membro). Metas 3 = 🌱 Recrutador, 5 = destaque, 10 = 7 dias de ⭐ VIP (cargo + assinatura free, expira sozinho). `!topconvites` mensal (zera dia 1º).
+- **Item 4a — SEXTA CAPS ARENA** (`services/eventoService.js`): sex 08h–23h59 SP, `!vitoria` com PDL 2x (hook opcional no `registerVictory`, derrota 1x), top 3 + melhor da noite às 23h59. Scheduler de 30s com flags anti-duplo.
+- **Item 4b — FDS LCL** (mesmo service): sex 08h abre + liga `lcl-bot` (via pm2); dom 23h59 posta ranking do fim de semana (séries inter fechadas na janela, lidas do banco LCL) + desliga o bot. Fecha tardio na segunda se o bot estava fora.
+- **Item 8 — torneio** (`services/torneioService.js` + `!torneio`/`/torneio`): inscrição individual (mín 20, múltiplo de 10), sorteio 5x5 balanceado por rodada, repescagem dos melhores perdedores, final MD3 mesmos times, cargo 🏆 Campeão CAPS rotativo. `!torneio info` explica o formato.
+- Validação: suíte **168/168**; ambos bots reiniciados e online. Incidente: port do handler torneio p/ prod quebrou `handleHelpCommand` (splice em âncora errada) — detectado pelo require, reparado e verificado.
+
 ### 2026-10-15 — Boas-vindas que vendem (item 2 do plano)
 - Texto novo de boas-vindas nos defaults (`contentTextService`, TESTRE + prod): título com vaga esperando, chamada 10 jogadores/PDL/roleta/MVP/INFERNAL + "2 minutos". DB vazio nos 2 → defaults mandam.
 - 3º botão **⚡ Quero jogar agora** (verde) abre direto o modal de Nick#TAG; fluxo de cadastro inalterado. TESTRE + prod.
