@@ -337,6 +337,13 @@ database/                    ← fallback JSON local
 - Sessões reabertas no boot (sem retroativo); mutar/desmutar alterna a contagem.
 - Validação: `voice-time.test.js` 6/6, suíte 174/174; ambos bots online.
 
+### 2026-10-16 — Estado atual + bug !votar corrigido
+- **Bug crítico:** `!votar` por texto crashava (`ReferenceError: VOTE_THRESHOLD is not defined` 3x no log) — `handleVoteCommand` referenciava const inexistente nas deps. Removido nas 2 bases (o `getVoteThreshold` real continua); botões de voto nunca foram afetados. Bots reiniciados.
+- **Falso alarme schedulers:** flags `sextaAbertaEm/lclAbertoEm` vazias porque são **02h31 de sexta** — janelas abrem às 08h. Ticks rodando, sem erro. Verificar posts às 08h (primeira Sexta + LCL reais).
+- **Temporada:** oficial #1, 252 cadastrados, 0 jogos. Ranking enche jogando (10 jogos p/ aparecer).
+- **Convites:** 1 link pessoal, 0 usos. **Voz:** 0 usuários rastreados. **Torneio:** nenhum aberto.
+- Pendentes seus: premiação do torneio, observar 1ª Sexta/LCL (08h), 1ª compra real do clube.
+
 ### 2026-10-16 — Destaque de recrutamento turbinado
 - Meta 5 agora: cargo rotativo **⭐ Destaque** (tira do anterior, passa ao novo) + post no `#📢┃comunicados` desafiando a tomar o lugar.
 - DM comemorativa por meta (3: cargo garantido; 5: destaque + faltam p/ VIP; 10: VIP ativo).

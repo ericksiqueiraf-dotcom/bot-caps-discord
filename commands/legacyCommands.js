@@ -586,7 +586,6 @@ async function handleVoteCommand(message, args) {
       message,
       args,
       deps: {
-        VOTE_THRESHOLD,
         getVoteThreshold,
         withQueueOperationLock,
         loadCurrentMatch,
