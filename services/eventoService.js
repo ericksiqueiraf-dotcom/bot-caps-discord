@@ -316,27 +316,39 @@ async function runTorneioTick(nowMs = Date.now(), deps = {}) {
     const t = meta.torneio;
     if (!t) return meta;
     const Torneio = require('./torneioService');
-    const decision = Torneio.autoTorneioAction(t, nowMs, { abertoEm: meta.torneioAbertoEm, fechadoEm: meta.torneioFechadoEm });
-    if (!decision) return meta;
-    const flag = decision.action === 'fechar' ? 'torneioFechadoEm' : 'torneioAbertoEm';
-    if (meta[flag] === decision.dateKey) return meta;
-    if (decision.action === 'abrir') {
-      const keep = t.active && !t.champion && (t.players || []).length > 0;
-      if (!keep) {
-        const nextEdition = !t.active || t.champion ? (t.edition || 0) + 1 : t.edition;
-        meta.torneio = Torneio.newTournament(nextEdition);
-        if (t.agenda) meta.torneio.agenda = t.agenda;
-      } else {
-        meta.torneio.active = true;
-        meta.torneio.inscricoes = true;
+
+    // 1) Fim da janela de inscrições: fecha (ou estende até bater o mínimo).
+    if (Torneio.inscricoesVencidas(t, nowMs)) {
+      const parts = getSPParts(nowMs);
+      if ((t.players || []).length >= Torneio.MIN_PLAYERS) {
+        const r = Torneio.fecharInscricoes(t);
+        const reservas = r.reservas?.length
+          ? `\n⬇️ Reservas (fora do sorteio): ${r.reservas.map((id) => `<@${id}>`).join(' ')}`
+          : '';
+        meta.torneioFechadoEm = parts.key;
+        await saveSystemMeta(meta);
+        await post(`🔒 **Inscrições do Torneio #${t.edition} encerradas!** ${r.kept} confirmados${reservas}\nStaff: \`!torneio sortear\`.`);
+        return meta;
       }
-      await post(`🏆 **Inscrições abertas — Torneio #${meta.torneio.edition}!** Use \`!torneio entrar\` (mínimo 20, múltiplo de 10).`);
-    } else {
-      meta.torneio.inscricoes = false;
-      await post(`🔒 **Inscrições do Torneio #${t.edition} encerradas.** Boa sorte a todos!`);
+      if (meta.torneioAvisoEm !== parts.key) {
+        meta.torneioAvisoEm = parts.key;
+        const faltam = Torneio.MIN_PLAYERS - (t.players || []).length;
+        await saveSystemMeta(meta);
+        await post(`⏳ **Torneio #${t.edition}:** inscrições estendidas — faltam **${faltam}** para ${Torneio.MIN_PLAYERS}. Use \`!torneio entrar\`.`);
+      }
+      return meta;
     }
-    meta[flag] = decision.dateKey;
+
+    // 2) Abertura automática pela agenda (não duplica com a ativação manual).
+    const decision = Torneio.autoTorneioAction(t, nowMs, { abertoEm: meta.torneioAbertoEm });
+    if (!decision) return meta;
+    if (meta.torneioAbertoEm === decision.dateKey) return meta;
+    const dias = Number(t.agenda?.diasInscricao) > 0 ? Number(t.agenda.diasInscricao) : Torneio.INSCRICOES_DIAS_DEFAULT;
+    meta.torneio = Torneio.novaEdicao(t, { origem: 'agenda', dias, nowMs });
+    meta.torneioHabilitado = true;
+    meta.torneioAbertoEm = decision.dateKey;
     await saveSystemMeta(meta);
+    await post(`🏆 **Inscrições abertas — Torneio #${meta.torneio.edition}!** Use \`!torneio entrar\` (${dias} dia(s) para se inscrever).`);
     return meta;
   });
 }

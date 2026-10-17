@@ -1264,12 +1264,21 @@ async function resolveTorneioPool(guild, ids) {
   return out;
 }
 
+function fmtDataBR(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
 function formatTorneioGames(games) {
+  const somaMmr = (team) => (team || []).reduce((s, p) => s + Number(p.baseMmr || 0), 0);
   return games.map((g) => {
     const t1 = g.teamOne.map((p) => `<@${p.discordId}>`).join(' ');
     const t2 = g.teamTwo.map((p) => `<@${p.discordId}>`).join(' ');
     const placar = g.winner ? ` — **venceu time ${g.winner}**` : '';
-    return `**${g.id}**: ${t1} 🆚 ${t2}${placar}`;
+    const diff = Math.abs(somaMmr(g.teamOne) - somaMmr(g.teamTwo));
+    return `**${g.id}**: ${t1} 🆚 ${t2}${placar} • **Δ MMR ${diff}**`;
   }).join('\n');
 }
 
@@ -1280,16 +1289,27 @@ async function handleTorneioCommand(message, args = []) {
   const rest = args.slice(1);
   try {
     const systemMeta = await loadSystemMeta();
-    systemMeta.torneio ||= null;
-    const t = systemMeta.torneio;
+    const t = systemMeta.torneio || null;
+    const habilitado = systemMeta.torneioHabilitado === true;
+    const staff = isStaffViewer(message.member);
     const save = async () => { await saveSystemMeta(systemMeta); };
 
     if (sub === 'info') {
-      return await replyToMessage(message, T.TORNEIO_INFO);
+      const lines = [];
+      if (!habilitado) lines.push('⏸️ O torneio está **desativado** no momento.');
+      if (t?.active && t.inscricoes !== false && t.inscricoesAte) {
+        lines.push(`📅 Inscrições abertas até **${fmtDataBR(t.inscricoesAte)}** — ${t.players.length} inscrito(s) (mínimo ${T.MIN_PLAYERS}).`);
+      }
+      if (t?.agenda) lines.push(`🗓️ Agenda: ${T.formatAgenda(t.agenda)}.`);
+      return await replyToMessage(message, lines.length ? `${lines.join('\n')}\n\n${T.TORNEIO_INFO}` : T.TORNEIO_INFO);
     }
 
     if (sub === 'entrar') {
+      if (!habilitado && !staff) {
+        return await replyToMessage(message, '🏆 O torneio está **desativado** no momento. Aguarde a staff ativar com `!torneioon`.');
+      }
       if (!t?.active) return await replyToMessage(message, '❌ Nenhum torneio aberto. Aguarde o anúncio da staff.');
+      if (t.inscricoes === false) return await replyToMessage(message, '❌ As inscrições já foram encerradas. Aguarde o sorteio!');
       const r = T.joinTournament(t, message.author.id);
       await save();
       return await replyToMessage(message, r.ok ? `✅ Inscrito no **Torneio #${t.edition}**! (${r.count} inscritos)` : `❌ ${r.message}`);
@@ -1312,6 +1332,8 @@ async function handleTorneioCommand(message, args = []) {
       if (!t?.active) return await replyToMessage(message, '📭 Nenhum torneio ativo.');
       const st = T.getStatus(t);
       const lines = [`🏆 **Torneio #${st.edition}** — ${st.inscritos} inscrito(s)`, `Rodada atual: ${st.rodada || 'ainda não sorteada'}`];
+      if (st.inscricoes && st.inscricoesAte) lines.push(`📅 Inscrições até ${fmtDataBR(st.inscricoesAte)}${st.reservas ? ` • ${st.reservas} reserva(s)` : ''}`);
+      if (!st.inscricoes && st.rodada === 0 && !st.champion) lines.push('🔒 Inscrições encerradas — aguardando o sorteio.');
       if (st.final) lines.push(`🔥 FINAL MD3: **${st.placarFinal}**`);
       if (st.jogosPendentes.length) lines.push(`⏳ Aguardando: ${st.jogosPendentes.join(', ')}`);
       if (st.champion) lines.push(`👑 Campeões: ${st.champion.team.map((id) => `<@${id}>`).join(' ')} (${st.champion.placar})`);
@@ -1319,18 +1341,71 @@ async function handleTorneioCommand(message, args = []) {
     }
 
     // ---- staff ----
-    if (!isStaffViewer(message.member)) {
+    if (!staff) {
       return await replyToMessage(message, '❌ Esse subcomando é da staff. Jogadores: `!torneio entrar | sair | lista | info | status`.');
     }
 
+    if (sub === 'on') {
+      const dias = Number(rest[0]) > 0 ? Math.floor(Number(rest[0])) : T.INSCRICOES_DIAS_DEFAULT;
+      const now = Date.now();
+      systemMeta.torneioHabilitado = true;
+      const emRodada = Boolean(t && (t.rounds || []).length > 0);
+      const emFinal = Boolean(t?.final);
+      if (t && t.active && !t.champion && (emRodada || emFinal)) {
+        await save();
+        return await replyToMessage(message,
+          `🏆 **Torneio #${t.edition} reativado.** Ele já está em andamento — conduza com \`!torneio sortear\`/\`resultado\`.`);
+      }
+      if (t && t.active && !t.champion && (t.players || []).length > 0) {
+        T.renovarInscricoes(t, dias, now);
+      } else {
+        systemMeta.torneio = T.novaEdicao(t, { origem: 'manual', dias, nowMs: now });
+      }
+      systemMeta.torneioAbertoEm = T.dateKeySP(now);
+      await save();
+      const ed = systemMeta.torneio.edition;
+      return await replyToMessage(message,
+        `🏆 **Torneio #${ed} aberto!** Inscrições até **${fmtDataBR(systemMeta.torneio.inscricoesAte)}** (${dias} dia(s)).\nMembros: \`!torneio entrar\`.`);
+    }
+
+    if (sub === 'off') {
+      systemMeta.torneioHabilitado = false;
+      if (t) t.inscricoes = false;
+      await save();
+      return await replyToMessage(message, '🔒 **Torneio desativado.** As inscrições estão fechadas — reative com `!torneioon`.');
+    }
+
+    if (sub === 'agenda') {
+      const alvo = String(rest[0] || '').toLowerCase();
+      if (['off', 'limpar', 'remover', 'cancelar'].includes(alvo)) {
+        if (systemMeta.torneio) systemMeta.torneio.agenda = null;
+        await save();
+        return await replyToMessage(message, '🗓️ Agendamento do torneio removido.');
+      }
+      if (!systemMeta.torneio) {
+        const placeholder = T.newTournament(0);
+        placeholder.active = false;
+        placeholder.inscricoes = false;
+        systemMeta.torneio = placeholder;
+      }
+      const r = T.setAgenda(systemMeta.torneio, rest[0], rest[1], rest[2]);
+      if (!r.ok) return await replyToMessage(message, `❌ ${r.message}`);
+      await save();
+      return await replyToMessage(message,
+        `🗓️ **Agenda do torneio:** ${T.formatAgenda(r.agenda)}.\nEle abre sozinho nesses dias (limpe com \`!torneioagenda off\`).`);
+    }
+
     if (sub === 'novo') {
-      if (t?.active && (t.players.length > 0 || t.rounds.length > 0) && !t.champion) {
+      if (T.torneioEmAndamento(t)) {
         return await replyToMessage(message, '❌ Já há torneio em andamento. Use `!torneio encerrar` primeiro.');
       }
+      const dias = Number(rest[1]) > 0 ? Math.floor(Number(rest[1])) : T.INSCRICOES_DIAS_DEFAULT;
       const edition = Number(rest[0]) > 0 ? Number(rest[0]) : ((t?.edition || 0) + 1);
-      systemMeta.torneio = T.newTournament(edition);
+      systemMeta.torneio = T.novaEdicao(t, { origem: 'manual', dias, nowMs: Date.now() });
+      systemMeta.torneio.edition = edition;
+      systemMeta.torneioHabilitado = true;
       await save();
-      return await replyToMessage(message, `🏆 **Torneio #${edition} aberto!** Inscrevam-se com \`!torneio entrar\` (mínimo 20, múltiplo de 10).`);
+      return await replyToMessage(message, `🏆 **Torneio #${edition} aberto!** Inscrições até **${fmtDataBR(systemMeta.torneio.inscricoesAte)}** (${dias} dia(s)). Use \`!torneio entrar\`.`);
     }
 
     if (sub === 'encerrar') {
@@ -1394,7 +1469,7 @@ async function handleTorneioCommand(message, args = []) {
       return await replyToMessage(message, `✅ ${r.game.id}: venceu o **time ${r.game.winner}**.`);
     }
 
-    return await replyToMessage(message, '❌ Use: `!torneio entrar | sair | lista | info | status` (staff: `novo | sortear | resultado | encerrar`).');
+    return await replyToMessage(message, '❌ Use: `!torneio entrar | sair | lista | info | status` (staff: `!torneioon`, `!torneiooff`, `!torneioagenda`, `novo | sortear | resultado | encerrar`).');
   } catch (error) {
     console.error('[ERRO] !torneio:', error);
     await replyToMessage(message, `❌ Erro no torneio: \`${error.message}\``);
@@ -1494,7 +1569,7 @@ function buildAjudaEmbed(page = 1) {
         { name: '🏆 Ranking e pós-jogo', value: '`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!palpite <1|2> <10-100>` • Aposta pontos no vencedor da sua partida\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking geral (CLASSIC = pontos custom)\n`!placar tiers` • Só Esmeralda+\n`!top10` • Top 10 CLASSIC por pontos custom, desempate por winrate\n`!top10 tiers` • Top 10 só Esmeralda+\n`!topstreak` • Ranking Streak 🔥\n`!toprankinfernal` • Quem mais pegou INFERNAL na temporada 🔥\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
         { name: '💎 Clube VIP', value: '`!clube` • Tiers, assinatura PIX e renovação -10%\n`!querolive` • Entrar/sair do ping 🔴 Ao Vivo\n`!live <link>` • Divulgar live Twitch/YouTube/Kick (Lendário 6h, VIP 12h, Apoiador 24h)' },
         { name: '🔊 Salas temporárias (dono da sala)', value: 'Entre no ➕・criar-sala para ganhar sua sala\n`!salahub` • Lista as salas ativas\n`!sala` • Mostra sua sala • `!sala <nome>` renomeia\n`!convidar @u` • Chama alguém p/ sua sala\n`!salalock` • Tranca (`!salalock abrir` destranca)\n`!salalimit <0-99>` • Limite de usuários (0 = sem limite)\n`!salaexpulsar @u` • Remove alguém da sala\n`!limparvoz` • Apaga sua sala (dentro dela)' },
-        { name: '🎁 Extras', value: '`!convite` • Seu link pessoal (traga gente e ganhe recompensas)\n`!topconvites` • Ranking de quem mais trouxe gente\n`!torneio` • Torneio mata-mata (entrar, lista, status)\n`!tempo` • Seu tempo em call • `!topvoz` • Ranking de call\n`!palpite <1|2> <10-100>` • Bolão da partida • `!missoes` • Missões da semana • `!duelo @u` • Duelo de PDL\n🌅 Primeira vitória do dia vale +50% PDL (automático)\n`!regras` • Regulamento completo' },
+        { name: '🎁 Extras', value: '`!convite` • Seu link pessoal (traga gente e ganhe recompensas)\n`!topconvites` • Ranking de quem mais trouxe gente\n`!torneio` • Torneio mata-mata (entrar, lista, status — staff: `!torneioon`/`!torneiooff`/`!torneioagenda`)\n`!tempo` • Seu tempo em call • `!topvoz` • Ranking de call\n`!palpite <1|2> <10-100>` • Bolão da partida • `!missoes` • Missões da semana • `!duelo @u` • Duelo de PDL\n🌅 Primeira vitória do dia vale +50% PDL (automático)\n`!regras` • Regulamento completo' },
         { name: '⬅️ Página 1', value: '`!ajuda` • Cadastro, fila e voto\n`!staff` • Guia da staff (restrito)' }
       );
     } else {

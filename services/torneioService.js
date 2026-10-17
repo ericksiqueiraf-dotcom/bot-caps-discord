@@ -10,6 +10,8 @@ const MIN_PLAYERS = 20;
 const TEAM_SIZE = 5;
 const FINAL_SIZE = 10;
 const TORNEIO_CARGO_NOME = '🏆 Campeão CAPS';
+const INSCRICOES_DIAS_DEFAULT = 7;
+const DIA_MS = 24 * 60 * 60 * 1000;
 
 const TORNEIO_INFO =
   '🏆 **TORNEIO CAPS ARENA** — mata-mata com sorteio por rodada.\n' +
@@ -17,12 +19,16 @@ const TORNEIO_INFO =
   '• A cada rodada o bot monta partidas **5x5 balanceadas**; quem perde sai, quem ganha avança\n' +
   '• Se os vencedores não fecharem 10, entra a **repescagem** (melhores perdedores da rodada)\n' +
   '• **Final**: 1 sorteio, mesmos times, **MD3** (melhor de 3)\n' +
-  '• Campeões ganham o cargo 🏆 (premiação extra a decidir)';
+  '• Campeões ganham o cargo 🏆 (premiação extra a decidir)\n' +
+  '• A staff abre/fecha o torneio com `!torneioon` / `!torneiooff`';
 
-function newTournament(edition = 1) {
+function newTournament(edition = 1, options = {}) {
   return {
     active: true,
     inscricoes: true,
+    inscricoesAte: options.inscricoesAte || null,
+    origem: options.origem || null,
+    reservas: [],
     agenda: null,
     edition,
     players: [],
@@ -31,6 +37,58 @@ function newTournament(edition = 1) {
     champion: null,
     createdAt: new Date().toISOString()
   };
+}
+
+function addDias(nowMs, dias = INSCRICOES_DIAS_DEFAULT) {
+  const n = Number(dias) > 0 ? Math.floor(Number(dias)) : INSCRICOES_DIAS_DEFAULT;
+  return new Date(Number(nowMs) + n * DIA_MS).toISOString();
+}
+
+// Cria a próxima edição (ou reaproveita a edição caso ainda esteja vazia).
+function novaEdicao(prev, { origem = 'manual', dias = INSCRICOES_DIAS_DEFAULT, nowMs = Date.now() } = {}) {
+  const edition = prev && prev.active && !prev.champion
+    ? (Number(prev.edition) || 1)
+    : Math.max(1, Number(prev?.edition || 0) + 1);
+  const t = newTournament(edition, { origem, inscricoesAte: addDias(nowMs, dias) });
+  if (prev?.agenda) t.agenda = prev.agenda;
+  return t;
+}
+
+function renovarInscricoes(t, dias = INSCRICOES_DIAS_DEFAULT, nowMs = Date.now()) {
+  t.active = true;
+  t.inscricoes = true;
+  t.inscricoesAte = addDias(nowMs, dias);
+  return t;
+}
+
+function inscricoesVencidas(t, nowMs = Date.now()) {
+  if (!t?.active || t.inscricoes === false) return false;
+  const at = Date.parse(t.inscricoesAte || '');
+  if (!Number.isFinite(at)) return false;
+  return Number(nowMs) >= at;
+}
+
+// Fecha as inscrições. Se o total não for múltiplo de 10, mantém os primeiros
+// (ordem de inscrição) e o excedente vira reserva.
+function fecharInscricoes(t) {
+  const players = t.players || [];
+  if (players.length < MIN_PLAYERS) {
+    return { ok: false, message: `Menos de ${MIN_PLAYERS} inscritos — inscrições seguem abertas.` };
+  }
+  const keep = Math.floor(players.length / FINAL_SIZE) * FINAL_SIZE;
+  t.reservas = players.slice(keep);
+  t.players = players.slice(0, keep);
+  t.inscricoes = false;
+  return { ok: true, kept: t.players.length, reservas: t.reservas };
+}
+
+// Há um torneio em andamento (com gente ou rodada sorteada) que não pode ser
+// sobrescrito pela agenda.
+function torneioEmAndamento(t) {
+  return Boolean(
+    t?.active && !t.champion &&
+    ((t.players || []).length > 0 || (t.rounds || []).length > 0 || t.final)
+  );
 }
 
 function joinTournament(t, userId) {
@@ -194,23 +252,24 @@ function formatAgenda(agenda) {
   const nomes = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
   const dias = agenda.dias.map((d) => nomes[d]).join(', ');
   const hora = (mins) => `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
-  return `${dias} • abre ${hora(agenda.abrirMin)} / fecha ${hora(agenda.fecharMin)}`;
+  const insc = Number(agenda.diasInscricao) > 0 ? Math.floor(Number(agenda.diasInscricao)) : INSCRICOES_DIAS_DEFAULT;
+  return `${dias} • abre ${hora(agenda.abrirMin)} • inscrições ${insc} dia(s)`;
 }
 
-function setAgenda(t, diasRaw, abrirRaw, fecharRaw) {
+// Agenda: dias + hora de abrir (+ dias de inscrição, padrão 7).
+function setAgenda(t, diasRaw, abrirRaw, diasInscricaoRaw) {
   const dias = parseDiasArg(diasRaw);
   const abrirMin = parseHoraArg(abrirRaw);
-  const fecharMin = parseHoraArg(fecharRaw);
   if (dias.length === 0) return { ok: false, message: 'Dias inválidos. Ex: `sex,sab` ou `5,6`.' };
-  if (abrirMin === null || fecharMin === null) return { ok: false, message: 'Horário inválido. Ex: `19:00`.' };
-  if (abrirMin >= fecharMin) return { ok: false, message: 'A abertura precisa ser antes do fechamento.' };
-  t.agenda = { dias, abrirMin, fecharMin };
+  if (abrirMin === null) return { ok: false, message: 'Horário inválido. Ex: `19:00`.' };
+  const diasInscricao = Number(diasInscricaoRaw) > 0 ? Math.floor(Number(diasInscricaoRaw)) : INSCRICOES_DIAS_DEFAULT;
+  t.agenda = { dias, abrirMin, diasInscricao };
   return { ok: true, agenda: t.agenda };
 }
 
-// Decide ação automática (ou null) para o instante dado.
-// flags: { abertoEm, fechadoEm } (dateKeys já anunciados) — garante 1x/dia.
-// Nunca mexe em torneio com rodada sorteada (em andamento).
+// Decide se deve abrir automaticamente agora (ou null). Abre 1x/dia no dia/hora
+// agendados e nunca sobrescreve um torneio em andamento — o que evita duplicar
+// com a ativação manual (`!torneioon` grava torneioAbertoEm = hoje).
 function autoTorneioAction(t, nowMs = Date.now(), flags = {}) {
   const agenda = t?.agenda;
   if (!agenda?.dias?.length) return null;
@@ -218,18 +277,15 @@ function autoTorneioAction(t, nowMs = Date.now(), flags = {}) {
   const parts = getSPParts(nowMs);
   const wd = weekdayIndex(parts.weekday);
   if (wd < 0 || !agenda.dias.includes(wd)) return null;
-  if ((t.rounds || []).length > 0 || t.final) return null;
-  if (parts.minutes >= agenda.abrirMin && parts.minutes < agenda.fecharMin) {
-    if (flags.abertoEm === parts.key) return null;
-    if ((t.rounds || []).length > 0 || t.final) return null;
-    return { action: 'abrir', dateKey: parts.key };
-  }
-  if (parts.minutes >= agenda.fecharMin) {
-    if (flags.fechadoEm === parts.key) return null;
-    if (t.active && t.inscricoes !== false) return { action: 'fechar', dateKey: parts.key };
-    return null;
-  }
-  return null;
+  if (parts.minutes < agenda.abrirMin) return null;
+  if (flags.abertoEm === parts.key) return null;
+  if (torneioEmAndamento(t)) return null;
+  return { action: 'abrir', dateKey: parts.key };
+}
+
+function dateKeySP(nowMs = Date.now()) {
+  const { getSPParts } = require('./eventoService');
+  return getSPParts(nowMs).key;
 }
 
 function weekdayIndex(weekdayStr) {
@@ -245,6 +301,10 @@ function getStatus(t) {
     active: true,
     edition: t.edition,
     inscritos: (t.players || []).length,
+    inscricoes: t.inscricoes !== false,
+    inscricoesAte: t.inscricoesAte || null,
+    reservas: (t.reservas || []).length,
+    origem: t.origem || null,
     rodada: lastN,
     jogosPendentes: pending,
     final: Boolean(t.final),
@@ -259,7 +319,14 @@ module.exports = {
   FINAL_SIZE,
   TORNEIO_CARGO_NOME,
   TORNEIO_INFO,
+  INSCRICOES_DIAS_DEFAULT,
+  addDias,
   newTournament,
+  novaEdicao,
+  renovarInscricoes,
+  inscricoesVencidas,
+  fecharInscricoes,
+  torneioEmAndamento,
   joinTournament,
   leaveTournament,
   startRequirement,
@@ -278,5 +345,6 @@ module.exports = {
   formatAgenda,
   setAgenda,
   weekdayIndex,
+  dateKeySP,
   autoTorneioAction
 };

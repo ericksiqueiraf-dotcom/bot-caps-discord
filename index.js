@@ -21,7 +21,7 @@ const {
 const config = require('./config.json');
 const { createVipPixPayment, getClubeTierConfig, recordPendingPayment, startVipPaymentPoller } = require('./services/clubePaymentsService');
 const { createRiotService } = require('./services/riotService');
-const { startSextaScheduler, startLclScheduler } = require('./services/eventoService');
+const { startSextaScheduler, startLclScheduler, startTorneioScheduler } = require('./services/eventoService');
 const { startBackupScheduler } = require('./services/backupService');
 const { handleTempVoiceStateUpdate } = require('./services/tempVoiceService');
 const {
@@ -358,8 +358,17 @@ function buildSlashCommands() {
           { name: 'Sair', value: 'sair' },
           { name: 'Lista', value: 'lista' },
           { name: 'Status', value: 'status' },
-          { name: 'Regras', value: 'info' }
+          { name: 'Regras', value: 'info' },
+          { name: 'Ativar torneio (staff)', value: 'on' },
+          { name: 'Desativar torneio (staff)', value: 'off' }
         )),
+    new SlashCommandBuilder().setName('torneioon').setDescription('Ativa o torneio e abre as inscrições (staff).')
+      .addIntegerOption((option) => option.setName('dias').setDescription('Dias de inscrição (padrão 7)').setMinValue(1).setMaxValue(60).setRequired(false)),
+    new SlashCommandBuilder().setName('torneiooff').setDescription('Desativa o torneio e fecha as inscrições (staff).'),
+    new SlashCommandBuilder().setName('torneioagenda').setDescription('Agenda a abertura automática do torneio (staff). Use "off" p/ limpar.')
+      .addStringOption((option) => option.setName('dias').setDescription('Dias da semana (ex: sex,sab) ou "off"').setRequired(true))
+      .addStringOption((option) => option.setName('hora').setDescription('Hora de abrir (ex: 19:00)').setRequired(false))
+      .addIntegerOption((option) => option.setName('diasinscricao').setDescription('Dias de inscrição (padrão 7)').setMinValue(1).setMaxValue(60).setRequired(false)),
     new SlashCommandBuilder().setName('clubefixar').setDescription('Posta e fixa os benefícios no #clube-vip (staff).'),
     new SlashCommandBuilder().setName('querolive').setDescription('Entra/sai do ping 🔴 Ao Vivo.'),
     new SlashCommandBuilder()
@@ -482,6 +491,7 @@ client.once('ready', async () => {
   startClubePromoScheduler();
   startSextaScheduler();
   startLclScheduler();
+  startTorneioScheduler();
   startVoiceTimeScheduler();
   startBackupScheduler();
 
@@ -763,6 +773,15 @@ async function processCommand(message, rawContent) {
         break;
       case 'torneio':
         await handlers.handleTorneioCommand(message, args);
+        break;
+      case 'torneioon':
+        await handlers.handleTorneioCommand(message, ['on', ...args]);
+        break;
+      case 'torneiooff':
+        await handlers.handleTorneioCommand(message, ['off']);
+        break;
+      case 'torneioagenda':
+        await handlers.handleTorneioCommand(message, ['agenda', ...args]);
         break;
       case 'clubefixar':
         await handlers.handleClubeFixarCommand(message);
@@ -1270,6 +1289,24 @@ client.on('interactionCreate', async (interaction) => {
       case 'torneio': {
         const acao = interaction.options.getString('acao');
         await handlers.handleTorneioCommand(context, acao ? [acao] : []);
+        break;
+      }
+      case 'torneioon': {
+        const dias = interaction.options.getInteger('dias');
+        await handlers.handleTorneioCommand(context, dias ? ['on', String(dias)] : ['on']);
+        break;
+      }
+      case 'torneiooff':
+        await handlers.handleTorneioCommand(context, ['off']);
+        break;
+      case 'torneioagenda': {
+        const dias = interaction.options.getString('dias');
+        const hora = interaction.options.getString('hora');
+        const diasInscricao = interaction.options.getInteger('diasinscricao');
+        const args = ['agenda', dias];
+        if (hora) args.push(hora);
+        if (diasInscricao) args.push(String(diasInscricao));
+        await handlers.handleTorneioCommand(context, args);
         break;
       }
       case 'clubefixar':

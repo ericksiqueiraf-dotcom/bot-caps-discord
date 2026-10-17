@@ -8,8 +8,8 @@
 ## 🗓️ Última Sessão
 
 - **Data:** 2026-10-17
-- **Foco:** Finalizar o refactor incompleto do `legacyCommands.js` (CAPS) + separar os bots CAPS × LCL por categoria + novo `!ajudalcl`/`/ajudalcl` (LCL)
-- **Status:** ✅ CAPS 92/92 e LCL 108/108; `caps-bot` + `lcl-bot` reiniciados e online. Cargos de call (`🎙️ Ativo` etc.) seguem só na apuração mensal (dia 1º).
+- **Foco:** Torneio — `!torneioon`/`!torneiooff`/`!torneioagenda` (staff) + janela de inscrição de 7 dias; base no merge `pr/local-into-main`
+- **Status:** ✅ CAPS 173/173 e LCL 108/108. Feature na branch `feat/torneio-onoff` (merge local×`origin/main` pendente de PR manual).
 
 ---
 
@@ -401,6 +401,16 @@ database/                    ← fallback JSON local
 - **"Comando desconhecido" cruzado (CAPS × LCL):** os 2 bots convivem na CAPS ARENA e escutam `!`; o CAPS respondia "Comando desconhecido" para comandos do LCL (ex.: `!ajudalcl`, `!regrasdesafio`). Escopo por categoria: `config.json → ignoredCategoryIds: ["1559621163120984158"]` (categoria 🔥・LCL) + guarda em `index.js` `messageCreate` — o CAPS ignora a categoria LCL. No LCL, `commandCategoryIds` + guarda espelhada (só responde dentro de 🔥・LCL quando `INTER_ONLY=1`). Acaba também com respostas duplicadas de `!ajuda`/`!ping`/`!regras`.
 - **LCL (resumo; detalhes em `lcl-bot/MEMORY.md`):** correção do gate do `!desafiar` (`isCapitaoOuStaff` por nome normalizado + `captainRoleId` real), padrão `🛠️ Staff`/`👑 Capitão LCL`, e novo `!ajudalcl`/`/ajudalcl`.
 - **Cargos de call (`🎙️ Ativo`/`🎙️ Frequente`/`🎙️ Viciado em Call`):** hoje são criados/atribuídos **só no tick mensal (dia 1º)** por `runVoiceTimeMonthlyTick` (`index.js`, com `findOrCreateRole`). O ✅ exibido no `!tempo` é apenas o rank ao vivo do mês corrente — NÃO indica cargo atribuído. (Pendente, se desejado: atribuir em tempo real ao bater a meta no mês.)
+
+### 2026-10-17 — Torneio: `!torneioon` / `!torneiooff` / `!torneioagenda` + janela de inscrição
+- **Base:** merge da linha local com `origin/main` na branch `pr/local-into-main` (merge `1278f13`; PR é aberto manualmente em `github.com/ericksiqueiraf-dotcom/bot-caps-discord`). A feature vive na branch `feat/torneio-onoff`.
+- **Gate (`systemMeta.torneioHabilitado`, default `false`):** desativado, só o **`entrar`** é bloqueado p/ não-staff; `info/lista/status` seguem livres. Staff abre/fecha com `!torneioon [dias]` / `!torneiooff` (prefixo e slash `/torneioon`, `/torneiooff`).
+- **Janela de inscrição:** `torneio.inscricoesAte = agora + N dias` (padrão 7, configurável). No fim do prazo o tick fecha as inscrições; se houver **≥20** fecha, senão **estende** até bater 20 (avisa 1x/dia).
+- **Corte p/ múltiplo de 10:** ao fechar com total não múltiplo (ex.: 23), mantém os **primeiros por ordem de inscrição** (maior múltiplo de 10 ≤ total) e o excedente vira `torneio.reservas`.
+- **Agenda:** `!torneioagenda <dias> <hora> [dias_inscricao]` (ex.: `sex,sab 19:00 3`; `off` limpa). `startTorneioScheduler()` agora sobe no `ready` (antes nunca era chamado → o torneio não abria sozinho nem fechava). A abertura automática **não duplica** o manual (`torneioAbertoEm` = dia em SP) e não sobrescreve torneio em andamento.
+- **Sorteio:** segue `createBalancedTeams` (o mesmo do CAPS BOT — soma do **elo/`baseMmr`**, busca exaustiva, menor diferença); o anúncio da rodada mostra **Δ MMR**; teste novo compara com força bruta.
+- **Docs:** seção nova em `!staff` e linha do `!torneio` no `!ajuda2`.
+- Validação: CAPS **173/173** (33 suites), LCL **108/108**.
 
 ### 2026-10-14 — Deploy clube VIP na ARENA oficial
 - `MP_ACCESS_TOKEN` (prod, mesmo validado na TESTE) copiado para `.env` do CAPS; `clubePagamentos` já estava no `config.json`.
