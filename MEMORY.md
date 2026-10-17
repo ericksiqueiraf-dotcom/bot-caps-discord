@@ -9,7 +9,7 @@
 
 - **Data:** 2026-10-17
 - **Foco:** Torneio — `!torneioon`/`!torneiooff`/`!torneioagenda` (staff) + janela de inscrição de 7 dias; base no merge `pr/local-into-main`
-- **Status:** ✅ CAPS 173/173 e LCL 108/108. Feature na branch `feat/torneio-onoff` (merge local×`origin/main` pendente de PR manual).
+- **Status:** ✅ CAPS **174/174** e LCL **108/108**. `caps-bot` (PROD, branch `feat/torneio-onoff`) e `lcl-bot` reiniciados e **online** (`CAPS BOT LOL#6241`, `LCL - LIGA CLANDESTINA DE LOL#8184`). Torneio segue **desativado** (default) até a staff rodar `!torneioon`. PR manual ainda pendente.
 
 ---
 
@@ -411,7 +411,8 @@ database/                    ← fallback JSON local
 - **Agenda:** `!torneioagenda <dias> <hora> [dias_inscricao]` (ex.: `sex,sab 19:00 3`; `off` limpa). `startTorneioScheduler()` agora sobe no `ready` (antes nunca era chamado → o torneio não abria sozinho nem fechava). A abertura automática **não duplica** o manual (`torneioAbertoEm` = dia em SP) e não sobrescreve torneio em andamento.
 - **Sorteio:** segue `createBalancedTeams` (o mesmo do CAPS BOT — soma do **elo/`baseMmr`**, busca exaustiva, menor diferença); o anúncio da rodada mostra **Δ MMR**; teste novo compara com força bruta.
 - **Docs:** seção nova em `!staff` e linha do `!torneio` no `!ajuda2`.
-- Validação: CAPS **173/173** (33 suites), LCL **108/108**.
+- **Deploy (2026-10-17):** `caps-bot` reiniciado a partir de `BOT CAPS DISCORD` na branch `feat/torneio-onoff` (`pm2 restart caps-bot --update-env`) e `lcl-bot` também reiniciado (`--update-env`); ambos **online**, boot limpo (`[DB] Conectado...` + `Bot conectado como...`). O torneio fica **desativado** até a staff rodar `!torneioon` — o `!torneio info` responde `⏸️ desativado` + regulamento. `caps-bot-teste` não foi tocado.
+- Validação: CAPS **174/174** (33 suites), LCL **108/108**.
 
 ### 2026-10-14 — Deploy clube VIP na ARENA oficial
 - `MP_ACCESS_TOKEN` (prod, mesmo validado na TESTE) copiado para `.env` do CAPS; `clubePagamentos` já estava no `config.json`.
