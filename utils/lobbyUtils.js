@@ -293,27 +293,72 @@ function isRecentVipSubscription(subscriptions, guildId, discordId, nowMs = Date
   } catch { return false; }
 }
 
-function buildClubeEmbed(guild) {
+function clubeTierPriceLabel(key) {
+  const value = Number(config?.clubePagamentos?.[key]?.preco);
+  return Number.isFinite(value) && value > 0 ? `R$ ${value.toFixed(2).replace('.', ',')}/30 dias` : null;
+}
+
+function buildClubeDetalEmbed() {
+  const tierName = (emoji, roleName, key) => {
+    const price = clubeTierPriceLabel(key);
+    return `${emoji} ${roleName.split(' ').slice(1).join(' ')}${price ? ` — ${price}` : ''}`;
+  };
   const embed = new EmbedBuilder()
     .setColor(THEME.RANK)
-    .setTitle('💎 Clube VIP — CAPS Arena')
-    .setDescription('Status e comodidade para quem apoia a Arena. **O clube NÃO dá vantagem em fila, sorteio, PDL ou vitória.**')
+    .setTitle('💎 Clube VIP — benefícios detalhados')
+    .setDescription('Tudo o que cada cargo libera. **O clube NÃO dá vantagem em fila, sorteio, PDL ou vitória** — é status, comodidade e apoio à Arena. 💜')
     .addFields(
       {
-        name: `💜 Apoiador — ${countVipTierMembers(guild, '💜 Apoiador')} membro(s)`,
-        value: 'Acesso ao lounge 💎・CLUBE VIP • selo 💜 no perfil e no ranking • anúncio de boas-vindas.'
+        name: tierName('💜', '💜 Apoiador', 'apoiador'),
+        value: 'Para quem quer apoiar a Arena e ser reconhecido:\n• Acesso ao lounge 💎・CLUBE VIP\n• Selo 💜 no perfil (`!perfil`) e no ranking\n• Anúncio de boas-vindas ao entrar no clube'
       },
       {
-        name: `⭐ VIP — ${countVipTierMembers(guild, '⭐ VIP')} membro(s)`,
-        value: 'Tudo do Apoiador • criar sala temporária ➕ • comando `!limparvoz`.'
+        name: tierName('⭐', '⭐ VIP', 'vip'),
+        value: 'O queridinho da galera — tudo do Apoiador, mais:\n• **Sua própria sala de voz**: entre no ➕・criar-sala e o bot cria uma sala sua\n• `!sala <nome>` para personalizar • `!convidar @usuário` para chamar os amigos\n• `!salalock` / `!salalimit <0-99>` / `!salaexpulsar @u` para gerenciar\n• `!limparvoz` para encerrar a sala'
       },
       {
-        name: `👑 Lendário — ${countVipTierMembers(guild, '👑 Lendário')} membro(s)`,
-        value: 'Tudo do VIP • `!live <link>` (divulgue sua stream com ping opt-in, 1x a cada 6h — só Twitch/YouTube/Kick) • anúncio de destaque • nome no topo da lista de membros.'
+        name: tierName('👑', '👑 Lendário', 'lendario'),
+        value: 'O topo da Arena — tudo do VIP, mais:\n• `!live <link>` para **divulgar sua stream** (Twitch/YouTube/Kick) com ping 🔴 Ao Vivo para a comunidade (1x a cada 6h)\n• Anúncio de destaque ao entrar no clube\n• Nome no topo da lista de membros'
       },
       {
         name: 'Como aderir',
-        value: 'Clique em **Assinar** no tier desejado e pague via PIX — ativação automática. Sem botões abaixo? Fale com a Staff.'
+        value: 'Digite `!clube` e clique em **Assinar** no tier desejado — pagamento via PIX com ativação automática na hora. Renovação com **-10% de desconto**.'
+      }
+    )
+    .setFooter({ text: `${FOOTER_PREFIX} • Clube VIP` })
+    .setTimestamp();
+  return embed;
+}
+
+function buildClubeEmbed(guild) {
+  const tierPrice = (key) => {
+    const value = Number(config?.clubePagamentos?.[key]?.preco);
+    return Number.isFinite(value) && value > 0 ? `R$ ${value.toFixed(2).replace('.', ',')}/30 dias` : null;
+  };
+  const tierName = (emoji, roleName, key) => {
+    const price = tierPrice(key);
+    return `${emoji} ${roleName.split(' ').slice(1).join(' ')}${price ? ` — ${price}` : ''} — ${countVipTierMembers(guild, roleName)} membro(s)`;
+  };
+  const embed = new EmbedBuilder()
+    .setColor(THEME.RANK)
+    .setTitle('💎 Clube VIP — CAPS Arena')
+    .setDescription('Apoie a Arena, suba de nível e desbloqueie comodidades exclusivas. **O clube NÃO dá vantagem em fila, sorteio, PDL ou vitória** — é status, comodidade e apoio à comunidade. 💜')
+    .addFields(
+      {
+        name: tierName('💜', '💜 Apoiador', 'apoiador'),
+        value: 'O primeiro passo para apoiar a Arena e ser reconhecido: acesso ao lounge 💎・CLUBE VIP • selo 💜 no perfil (`!perfil`) e no ranking • anúncio de boas-vindas ao entrar no clube.'
+      },
+      {
+        name: tierName('⭐', '⭐ VIP', 'vip'),
+        value: 'O queridinho da galera: tudo do Apoiador + **sua própria sala de voz** no ➕・criar-sala para jogar com os amigos • `!sala <nome>` para personalizar • `!convidar @usuário` para chamar gente • `!limparvoz` para encerrar.'
+      },
+      {
+        name: tierName('👑', '👑 Lendário', 'lendario'),
+        value: 'O topo da Arena: tudo do VIP + `!live <link>` para **divulgar sua stream** (Twitch/YouTube/Kick) com ping 🔴 Ao Vivo para a comunidade (1x a cada 6h) • anúncio de destaque • nome no topo da lista de membros.'
+      },
+      {
+        name: 'Como aderir',
+        value: 'Clique em **Assinar** no tier desejado e pague via PIX — ativação automática na hora. Renovação com **-10% de desconto**. Sem botões abaixo? Fale com a Staff.'
       }
     )
     .setFooter({ text: `${FOOTER_PREFIX} • Clube VIP` })
@@ -363,6 +408,12 @@ function getArchivedSeasonLabel(season) {
 
   return `Temporada #${season.seasonNumber}`;
 }
+function isGuildAllowed(guildId) {
+  const list = Array.isArray(config?.allowedGuildIds) ? config.allowedGuildIds.map(String) : [];
+  if (list.length === 0) return true;
+  return list.includes(String(guildId || ''));
+}
+
 function getQueueChannel(guild) {
   return {
     classicQueueChannel: guild.channels.cache.get(config.voiceChannels.classicQueueChannelId),
@@ -1190,7 +1241,10 @@ function getQueueFeedChannelId() {
 
 const QUEUE_JOIN_BUTTON_IDS = {
   CLASSIC: 'queue:classic:join',
-  ARAM: 'queue:aram:join'
+  ARAM: 'queue:aram:join',
+  TIERS: 'queue:tiers:join',
+  ESPERA: 'queue:espera:join',
+  LEAVE: 'queue:leave'
 };
 
 function parseQueueJoinButtonId(customId) {
@@ -1199,6 +1253,15 @@ function parseQueueJoinButtonId(customId) {
   }
   if (customId === QUEUE_JOIN_BUTTON_IDS.ARAM) {
     return { mode: QUEUE_MODES.ARAM, args: [QUEUE_MODES.ARAM] };
+  }
+  if (customId === QUEUE_JOIN_BUTTON_IDS.TIERS) {
+    return { mode: 'tiers', args: [] };
+  }
+  if (customId === QUEUE_JOIN_BUTTON_IDS.ESPERA) {
+    return { mode: 'espera', args: [] };
+  }
+  if (customId === QUEUE_JOIN_BUTTON_IDS.LEAVE) {
+    return { mode: 'leave', args: [] };
   }
   return null;
 }
@@ -1212,7 +1275,19 @@ function buildQueueJoinActionRow() {
     new ButtonBuilder()
       .setCustomId(QUEUE_JOIN_BUTTON_IDS.ARAM)
       .setLabel('Entrar Queue ARAM')
-      .setStyle(ButtonStyle.Primary)
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId(QUEUE_JOIN_BUTTON_IDS.TIERS)
+      .setLabel('Entrar Queue TIERS')
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId(QUEUE_JOIN_BUTTON_IDS.ESPERA)
+      .setLabel('Esperar Fila')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId(QUEUE_JOIN_BUTTON_IDS.LEAVE)
+      .setLabel('Sair da Fila')
+      .setStyle(ButtonStyle.Danger)
   );
 }
 
@@ -1757,7 +1832,7 @@ const RULES_SECTIONS = [
 const STAFF_SECTIONS = [
   {
     name: '⚔️ Partida — conduzir o jogo',
-    value: '`!start A` • Inicia a sala A manualmente (quando não iniciou sozinha).\n`!cancelarstart A` • Cancela a contagem de início (jogadores ficam na fila).\n`!vitoria 1 A` • Registra o time 1 como vencedor da sala A (pós-jogo).\n`!rematch A` • Volta os 10 da sala A para novo lobby, com times reequilibrados.'
+    value: '`!start A` • Inicia a sala A manualmente (quando não iniciou sozinha).\n`!cancelarstart A` • Cancela a contagem de início (jogadores ficam na fila).\n`!vitoria 1 A` • Registra o time 1 como vencedor da sala A (pós-jogo). Na **SEXTA CAPS ARENA** (sex 08h–23h59) vale **PDL em dobro**.\n`!rematch A` • Volta os 10 da sala A para novo lobby, com times reequilibrados.\n🔥 **FDS LCL (automático):** sex 08h abre a fila LCL e liga o LCL BOT; dom 23h59 fecha, posta o ranking e desliga.'
   },
   {
     name: '🎯 Roleta — vagas da próxima (Sala de Espera)',
@@ -1765,17 +1840,61 @@ const STAFF_SECTIONS = [
   },
   {
     name: '🧹 Filas e salas — organizar e limpar',
-    value: '`!pdl @jogador -50 motivo` • Punição/ajuste de PDL Classic, só Admin (-500 a +500, com auditoria no log).\n`!remover @jogador` • Tira alguém da fila (🔥 INFERNAL só sai com Admin).\n`!limparsalas A` • Apaga a sala A vazia/travada (sem letra = todas; com partida ativa, recusa).\n`!limpar 10` • Apaga 10 mensagens do canal.\n`!espera` + `!limparespera` • Ver a espera e (staff) zerá-la.\n`!reset` • Emergência: limpa filas e partidas (não mexe em pontos).'
+    value: '`!pdl @jogador -50 motivo` • Punição/ajuste de PDL Classic, só Admin (-500 a +500, com auditoria no log).\n`!remover @jogador` • Tira alguém da fila (🔥 INFERNAL só sai com Admin).\n`!limparsalas A` • Apaga a sala A vazia/travada (sem letra = todas; com partida ativa, recusa).\n`!limpar 10` • Apaga 10 mensagens do canal.\n`!espera` + `!limparespera` • Ver a espera e (staff) zerá-la.\n`!salahub` • Ver salas temporárias ativas (dono e ocupação).\n`!reset` • Emergência: limpa filas e partidas (não mexe em pontos).'
   },
   {
     name: '🎖️ Elos e cargos — manter atualizado',
     value: '`!sincronizarelo @jogador` • Atualiza elo Riot + cargo de um jogador (mostra se o cargo falhou).\n`!sincronizartodos` • Atualiza TODO MUNDO (demora ~2,5s por jogador; use com calma).\n`!sync` • Reaplica cargos pelo elo já salvo (sem chamar a Riot).\n`!sync infernal` • Limpa INFERNALs travados/órfãos.'
   },
   {
+    name: '💎 Clube VIP — assinaturas',
+    value: '`!clubeadmin` • Assinaturas ativas por tier, com vencimento de cada uma.\n`!clubefixar` • Posta e fixa os benefícios detalhados no #clube-vip.\n`!presentear @u <tier> [dias]` • Dá dias de clube de presente (só Admin).\n`!clube` • O que o jogador vê (tiers, preços, botões de assinar).'
+  },
+  {
+    name: '📌 Fixar guias (staff)',
+    value: '`!ajudafixar` • Posta e fixa `!ajuda` + `!ajuda2` no #infos-lol.\n`!clubefixar` • Posta e fixa os benefícios no #clube-vip.'
+  },
+  {
     name: '📊 Temporada — só Admin, com fila vazia',
     value: '`!temporadas` • Ver períodos arquivados.\n`!resetgeral` • Arquiva o período e ZERA os pontos (sem volta!).\n`!iniciartemporada` (ou `!iniciarseason`) • Liga a fase oficial.\nAbertura: `!resetgeral` e depois `!iniciartemporada`, antes dos primeiros jogos.'
   }
 ];
+
+const ONBOARDING_SECTIONS = [
+  {
+    name: '👋 1. Cadastre sua conta',
+    value: 'Digite `!cadastrar SeuNick#TAG` (ex: `!cadastrar Faker#BR1`) aqui ou no canal de comandos. Conta precisa ser level 30+. Mudou de conta? `!nick Nick#TAG` atualiza.'
+  },
+  {
+    name: '🎮 2. Entre na fila',
+    value: 'Entre num canal de voz 🎮・lobby (classic, tier S ou aram) e digite `!entrar`. Com 10 jogadores a partida começa sozinha, com times equilibrados pelo elo.'
+  },
+  {
+    name: '🗳️ 3. Jogou? Vote',
+    value: 'No fim da partida vote com `!votar 1` ou `!votar 2` (ou clique nos botões). Com 6 votos a vitória registra sozinha. Depois vote no MVP no canal de destaques.'
+  },
+  {
+    name: '❓ 4. Ajuda',
+    value: '`!ajuda` • lista de comandos\n`!regras` • regulamento completo\n`!perfil` • sua ficha e seus pontos'
+  }
+];
+
+function buildOnboardingGuideEmbed(guild = null) {
+  const embed = new EmbedBuilder()
+    .setColor(THEME.INFO)
+    .setTitle('🧩 Como jogar na CAPS Arena')
+    .setDescription(
+      guild?.name
+        ? `Bem-vindo à **${guild.name}**! Em 3 passos você já está jogando.`
+        : 'Bem-vindo! Em 3 passos você já está jogando.'
+    )
+    .setFooter({ text: `${FOOTER_PREFIX} • Como jogar` })
+    .setTimestamp();
+  for (const section of ONBOARDING_SECTIONS) {
+    embed.addFields({ name: section.name, value: section.value });
+  }
+  return embed;
+}
 
 function buildStaffEmbed() {
   const embed = new EmbedBuilder()
@@ -2227,7 +2346,7 @@ async function postDailyRankUpdates() {
   await channel.send({
     content: `Atualizacao diaria de rankings | ${getSeasonDisplayLabel(seasonMeta)}`,
     embeds: [
-      buildTopTenEmbed(statsData, seasonMeta, QUEUE_MODES.CLASSIC),
+      buildTopTenEmbed(statsData, seasonMeta, QUEUE_MODES.CLASSIC, null, { excludeTierS: true }),
       buildTopTenEmbed(statsData, seasonMeta, QUEUE_MODES.CLASSIC, null, { tierSOnly: true }),
       buildTopTenEmbed(statsData, seasonMeta, QUEUE_MODES.ARAM, '1x1'),
       buildTopInfernalEmbed(statsData, seasonMeta)
@@ -3121,6 +3240,7 @@ module.exports = {
   formatDateTimeForHistory,
   getArchivedSeasonLabel,
   getQueueChannel,
+  isGuildAllowed,
   isMemberInQueueVoiceChannel,
   formatRank,
   formatQueueMode,
@@ -3210,6 +3330,7 @@ module.exports = {
   formatCooldownRemaining,
   buildLiveEmbed,
   buildClubePromoEmbed,
+  buildClubeDetalEmbed,
   shouldPostClubePromo,
   findPromoChannel,
   ensureAoVivoRole,
@@ -3220,6 +3341,8 @@ module.exports = {
   RULES_SECTIONS,
   buildStaffEmbed,
   STAFF_SECTIONS,
+  buildOnboardingGuideEmbed,
+  ONBOARDING_SECTIONS,
   buildSeasonHistoryEmbed,
   resetStatsForNewSeason,
   deepClone,

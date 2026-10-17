@@ -9729,6 +9729,450 @@
       "leaguePoints": 37,
       "summonerId": null,
       "isFallbackUnranked": false
+    },
+    "buEgEyXap3t8BhugoQ5CMoIkDsTYpNeZeV3YcSYGJEG0e9aRgj8EFcCGfleGxzx16zwA7XMPIc2rXg": {
+      "discordId": "1559275489967739031",
+      "nickname": "tungtungap#sahur",
+      "puuid": "buEgEyXap3t8BhugoQ5CMoIkDsTYpNeZeV3YcSYGJEG0e9aRgj8EFcCGfleGxzx16zwA7XMPIc2rXg",
+      "customWins": 0,
+      "customLosses": 0,
+      "baseMmr": 1692,
+      "internalRating": 2692,
+      "modes": {
+        "classic": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 1692,
+          "internalRating": 2692,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 1692,
+          "internalRating": 2692,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram1x1": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 1692,
+          "internalRating": 2692,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram2x2": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 1692,
+          "internalRating": 2692,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram3x3": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 1692,
+          "internalRating": 2692,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram4x4": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 1692,
+          "internalRating": 2692,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram5x5": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 1692,
+          "internalRating": 2692,
+          "winStreak": 0,
+          "ratingVersion": 2
+        }
+      },
+      "registeredNickname": "tungtungap#sahur",
+      "registeredAt": "2026-10-15T11:09:43.993Z",
+      "tier": "PLATINUM",
+      "rank": "IV",
+      "leaguePoints": 92,
+      "summonerId": null,
+      "isFallbackUnranked": false
+    },
+    "EPBJl9rnUQlve8BNHSiwS8sZ1uCOVhhWNFcR4TeLjuNU1FLP_Q0xn32_ElrW7aj2_P7pMAKAPWkudg": {
+      "discordId": "296681282996535296",
+      "nickname": "DRTNaughtyDog#4i20",
+      "puuid": "EPBJl9rnUQlve8BNHSiwS8sZ1uCOVhhWNFcR4TeLjuNU1FLP_Q0xn32_ElrW7aj2_P7pMAKAPWkudg",
+      "customWins": 0,
+      "customLosses": 0,
+      "baseMmr": 961,
+      "internalRating": 1961,
+      "modes": {
+        "classic": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 961,
+          "internalRating": 1961,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 961,
+          "internalRating": 1961,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram1x1": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 961,
+          "internalRating": 1961,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram2x2": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 961,
+          "internalRating": 1961,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram3x3": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 961,
+          "internalRating": 1961,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram4x4": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 961,
+          "internalRating": 1961,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram5x5": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 961,
+          "internalRating": 1961,
+          "winStreak": 0,
+          "ratingVersion": 2
+        }
+      },
+      "registeredNickname": "DRTNaughtyDog#4i20",
+      "registeredAt": "2026-10-15T11:57:21.320Z",
+      "tier": "SILVER",
+      "rank": "III",
+      "leaguePoints": 61,
+      "summonerId": null,
+      "isFallbackUnranked": false
+    },
+    "bk4R8XKLqDcy59cz-rRnTSa7wXsJdr8ADkYuA4IkyfWmM0mXc5RyEvBOrX9qwrpWWH7uD9SjEUuitw": {
+      "discordId": "1091489624452505621",
+      "nickname": "Jotaka#d1ana",
+      "puuid": "bk4R8XKLqDcy59cz-rRnTSa7wXsJdr8ADkYuA4IkyfWmM0mXc5RyEvBOrX9qwrpWWH7uD9SjEUuitw",
+      "customWins": 0,
+      "customLosses": 0,
+      "baseMmr": 2400,
+      "internalRating": 3400,
+      "modes": {
+        "classic": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 2400,
+          "internalRating": 3400,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 2400,
+          "internalRating": 3400,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram1x1": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 2400,
+          "internalRating": 3400,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram2x2": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 2400,
+          "internalRating": 3400,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram3x3": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 2400,
+          "internalRating": 3400,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram4x4": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 2400,
+          "internalRating": 3400,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram5x5": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 2400,
+          "internalRating": 3400,
+          "winStreak": 0,
+          "ratingVersion": 2
+        }
+      },
+      "registeredNickname": "Jotaka#d1ana",
+      "registeredAt": "2026-10-15T11:57:53.678Z",
+      "tier": "DIAMOND",
+      "rank": "IV",
+      "leaguePoints": 0,
+      "summonerId": null,
+      "isFallbackUnranked": false
+    },
+    "mHYeYpTcZGuWf1hudBGsSlQz1vHqlDFwVf4ZX5WOurpWNupWsTPQVtd7CbMlQ2eN5tbRbS85jAPvoA": {
+      "discordId": "379624094204690432",
+      "nickname": "Zeradiel#Z01",
+      "puuid": "mHYeYpTcZGuWf1hudBGsSlQz1vHqlDFwVf4ZX5WOurpWNupWsTPQVtd7CbMlQ2eN5tbRbS85jAPvoA",
+      "customWins": 0,
+      "customLosses": 0,
+      "baseMmr": 1819,
+      "internalRating": 2819,
+      "modes": {
+        "classic": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 1819,
+          "internalRating": 2819,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 1819,
+          "internalRating": 2819,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram1x1": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 1819,
+          "internalRating": 2819,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram2x2": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 1819,
+          "internalRating": 2819,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram3x3": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 1819,
+          "internalRating": 2819,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram4x4": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 1819,
+          "internalRating": 2819,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram5x5": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 1819,
+          "internalRating": 2819,
+          "winStreak": 0,
+          "ratingVersion": 2
+        }
+      },
+      "registeredNickname": "Zeradiel#Z01",
+      "registeredAt": "2026-10-15T11:59:45.121Z",
+      "tier": "PLATINUM",
+      "rank": "II",
+      "leaguePoints": 19,
+      "summonerId": null,
+      "isFallbackUnranked": false
+    },
+    "cb4Aa596OiQRQJ94MsDaC9AXowKI4VcLn1y3LN20_PhK44-5JjzPlh95OkZpBzazLtbU_-OjV8DV3w": {
+      "discordId": "1177662110658994267",
+      "nickname": "sir alonne#boss",
+      "puuid": "cb4Aa596OiQRQJ94MsDaC9AXowKI4VcLn1y3LN20_PhK44-5JjzPlh95OkZpBzazLtbU_-OjV8DV3w",
+      "customWins": 0,
+      "customLosses": 0,
+      "baseMmr": 2350,
+      "internalRating": 3350,
+      "modes": {
+        "classic": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 2350,
+          "internalRating": 3350,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 2350,
+          "internalRating": 3350,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram1x1": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 2350,
+          "internalRating": 3350,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram2x2": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 2350,
+          "internalRating": 3350,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram3x3": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 2350,
+          "internalRating": 3350,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram4x4": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 2350,
+          "internalRating": 3350,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram5x5": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 2350,
+          "internalRating": 3350,
+          "winStreak": 0,
+          "ratingVersion": 2
+        }
+      },
+      "registeredNickname": "sir alonne#boss",
+      "registeredAt": "2026-10-15T12:11:54.072Z",
+      "tier": "EMERALD",
+      "rank": "I",
+      "leaguePoints": 50,
+      "summonerId": null,
+      "isFallbackUnranked": false
+    },
+    "WdhZgNdj8T2z_KyXE1BLdySuppuZGylKiVDMm3hlsMK2e31Oabb8vpE_fnNAjqt191a9ZgTsmJraAg": {
+      "discordId": "351176747955519498",
+      "nickname": "Key#K69",
+      "puuid": "WdhZgNdj8T2z_KyXE1BLdySuppuZGylKiVDMm3hlsMK2e31Oabb8vpE_fnNAjqt191a9ZgTsmJraAg",
+      "customWins": 0,
+      "customLosses": 0,
+      "baseMmr": 1619,
+      "internalRating": 2619,
+      "modes": {
+        "classic": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 1619,
+          "internalRating": 2619,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 1619,
+          "internalRating": 2619,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram1x1": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 1619,
+          "internalRating": 2619,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram2x2": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 1619,
+          "internalRating": 2619,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram3x3": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 1619,
+          "internalRating": 2619,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram4x4": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 1619,
+          "internalRating": 2619,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram5x5": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 1619,
+          "internalRating": 2619,
+          "winStreak": 0,
+          "ratingVersion": 2
+        }
+      },
+      "registeredNickname": "Key#K69",
+      "registeredAt": "2026-10-15T12:15:13.511Z",
+      "tier": "PLATINUM",
+      "rank": "IV",
+      "leaguePoints": 19,
+      "summonerId": null,
+      "isFallbackUnranked": false
     }
   }
 }

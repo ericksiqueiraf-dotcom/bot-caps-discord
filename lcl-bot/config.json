@@ -5,7 +5,7 @@
     "registeredPlayerRoleId": "1559621161342599240",
     "infernalRoleName": "🔥 INFERNAL",
     "mvpPlayerRoleName": "⭐ MVP",
-    "captainRoleId": "1559621160478445609",
+    "captainRoleId": "1487819172783325255",
     "visitanteRoleId": "1559613494595428483"
   },
   "voiceChannels": {
@@ -21,8 +21,12 @@
     "userLimit": 10,
     "deleteDelaySeconds": 60,
     "allowedRoleNames": [
-      "👑 Capitão de Customs",
+      "🛠️ Staff",
+      "👑 Capitão LCL",
       "Staff",
+      "Capitão",
+      "Capitão LCL",
+      "👑 Capitão de Customs",
       "⭐ VIP",
       "👑 Lendário"
     ],
@@ -47,6 +51,9 @@
     "timeoutSeconds": 300,
     "warnSeconds": 240
   },
+  "commandCategoryIds": [
+    "1559621163120984158"
+  ],
   "textChannels": {
     "rankUpdatesChannelId": "1559621193194020955",
     "matchHistoryChannelId": "1559621183048122458",

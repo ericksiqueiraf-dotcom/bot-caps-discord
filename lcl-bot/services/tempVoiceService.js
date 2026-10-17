@@ -97,7 +97,7 @@ function getAllowedRoleIds() {
 function getAllowedRoleNames() {
   const names = getTempVoiceConfig().allowedRoleNames;
   if (Array.isArray(names) && names.length > 0) return names.map(String);
-  return ['👑 Capitão de Customs', 'Staff', '⭐ VIP', '👑 Lendário'];
+  return ['🛠️ Staff', '👑 Capitão LCL', 'Staff', 'Capitão', 'Capitão LCL', '👑 Capitão de Customs', '⭐ VIP', '👑 Lendário'];
 }
 
 // Quem pode fazer a limpeza geral (!limparvoz): staff + Moderadores/VIP/Lendário.

@@ -8,6 +8,25 @@ const { formarMatch, registrarResultadoJogo, aplicarWO, findOpenMatchForPlayer }
 const { parseSerieArg, SERIES_MD1, SERIES_MD3, teamKey, sanitizeTeamName, drawSides } = require('../../domain/inter/series');
 const { createMatchInvite, buildInterInviteMessage, sendInterInvites } = require('../../services/inviteService');
 
+// Normaliza nome de cargo p/ comparacao sem acento/caixa/emoji.
+function normalizeRoleName(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+// Cargos que operam o inter por NOME (vale mesmo sem captainRoleId no config).
+// Padrao atual: "🛠️ Staff" e "👑 Capitão LCL". Variacoes sem emoji
+// ("Staff", "Capitão", "Capitão LCL") e o nome legado "👑 Capitão de Customs" tambem valem.
+const PRIVILEGED_ROLE_NAMES = new Set([
+  'staff',            // 🛠️ Staff / Staff
+  'capitaolcl',       // 👑 Capitão LCL / Capitão LCL
+  'capitao',          // Capitão
+  'capitaodecustoms'  // 👑 Capitão de Customs (legado)
+]);
+
 function isCapitaoOuStaff(member, config) {
   if (!member) return false;
   try {
@@ -19,7 +38,7 @@ function isCapitaoOuStaff(member, config) {
     if (captainRoleId && member.roles?.cache?.has(String(captainRoleId))) return true;
     // Cargo da liga por nome (vale em qualquer servidor, sem ID por guild).
     for (const role of member.roles?.cache?.values?.() || []) {
-      if (String(role?.name || '').toLowerCase() === 'capitão lcl') return true;
+      if (PRIVILEGED_ROLE_NAMES.has(normalizeRoleName(role?.name))) return true;
     }
   } catch { /* sem cargos */ }
   return false;

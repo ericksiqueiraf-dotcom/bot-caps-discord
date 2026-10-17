@@ -103,7 +103,11 @@ function makeRegisterVictoryDeps(state) {
     shouldMirrorAramGroupedStats,
     calculateEloDelta: B.calculateEloDelta,
     getAramWeightByTeamSize: B.getAramWeightByTeamSize,
-    formatCustomRecord: L.formatCustomRecord
+    formatCustomRecord: L.formatCustomRecord,
+    calculateTeamMmr: B.calculateTeamMmr,
+    calculateTeamPdlDelta: B.calculateTeamPdlDelta,
+    getPdlMultiplier: () => 1,
+    onVictoryPdlApplied: async () => {}
   };
 }
 

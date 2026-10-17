@@ -7,9 +7,9 @@
 
 ## 🗓️ Última Sessão
 
-- **Data:** 2026-10-14 (manhã)
-- **Foco:** Clube VIP com PIX validado de ponta a ponta (TESTE) + runbook de deploy na ARENA oficial
-- **Status:** ✅ Validado com pagamento real (cargo automático + DM + anúncio); deploy prod documentado e pendente
+- **Data:** 2026-10-17
+- **Foco:** Finalizar o refactor incompleto do `legacyCommands.js` (CAPS) + separar os bots CAPS × LCL por categoria + novo `!ajudalcl`/`/ajudalcl` (LCL)
+- **Status:** ✅ CAPS 92/92 e LCL 108/108; `caps-bot` + `lcl-bot` reiniciados e online. Cargos de call (`🎙️ Ativo` etc.) seguem só na apuração mensal (dia 1º).
 
 ---
 
@@ -270,6 +270,13 @@ database/                    ← fallback JSON local
 - **Setup teste:** fix `msg.pin()`/`fetchPins()` em `setup-servidor.js`; setup rodado em CAPS TESTE e CAPS BOT TESTRE; `config.json` = TESTRE (backups `.bak-*`); bot precisa de restart + hierarquia acima dos cargos
 - **Layout ARENA replicado no TESTRE (2026-10-10):** modelo em `docs/SERVER_LAYOUT_CAPS_ARENA.md`; `setup-servidor.js` com planta ARENA (6 cats, 19 TXT, 11 VOZ, 11 cargos); aplicado em `CAPS BOT TESTE (1558217291123138561)`; `config.json` remapeado (fila/partidas/resultados/destaques/logs/ranking/cadastro + 3 lobbies com limite 10/10/30)
 - Validação: `npm test` 49/49, 13 suites
+
+### 2026-10-17 — Refactor do `legacyCommands.js` (CAPS) finalizado + escopo de canais entre os bots
+- **Bug do boot:** `commands/legacyCommands.js` (CAPS) estava com o refactor pela metade — `handleHelpCommand`, `buildTempoEmbed` e `handleTorneioCommand` eram exportados/usados mas NÃO definidos → `ReferenceError` no load (o bot não subia e a suíte quebrava em `handleHelpCommand is not defined`). Reimplementados: `handleHelpCommand(message, page=1)` (usa `buildAjudaEmbed`), `buildTempoEmbed({displayName, avatarURL, times, rank})` (usa `voiceTimeService`) e `handleTorneioCommand(message, args)` (usa `torneioService`: entrar/sair/lista/status/info).
+- **Testes alinhados ao WIP:** `tests/helpers.js` (`makeRegisterVictoryDeps` agora passa `calculateTeamMmr`/`calculateTeamPdlDelta`/`getPdlMultiplier`/`onVictoryPdlApplied`) e `tests/queue-feed.test.js` (linha com 5 botões: CAPS/ARAM/TIERS/Esperar/Sair). Suíte CAPS **92/92**.
+- **"Comando desconhecido" cruzado (CAPS × LCL):** os 2 bots convivem na CAPS ARENA e escutam `!`; o CAPS respondia "Comando desconhecido" para comandos do LCL (ex.: `!ajudalcl`, `!regrasdesafio`). Escopo por categoria: `config.json → ignoredCategoryIds: ["1559621163120984158"]` (categoria 🔥・LCL) + guarda em `index.js` `messageCreate` — o CAPS ignora a categoria LCL. No LCL, `commandCategoryIds` + guarda espelhada (só responde dentro de 🔥・LCL quando `INTER_ONLY=1`). Acaba também com respostas duplicadas de `!ajuda`/`!ping`/`!regras`.
+- **LCL (resumo; detalhes em `lcl-bot/MEMORY.md`):** correção do gate do `!desafiar` (`isCapitaoOuStaff` por nome normalizado + `captainRoleId` real), padrão `🛠️ Staff`/`👑 Capitão LCL`, e novo `!ajudalcl`/`/ajudalcl`.
+- **Cargos de call (`🎙️ Ativo`/`🎙️ Frequente`/`🎙️ Viciado em Call`):** hoje são criados/atribuídos **só no tick mensal (dia 1º)** por `runVoiceTimeMonthlyTick` (`index.js`, com `findOrCreateRole`). O ✅ exibido no `!tempo` é apenas o rank ao vivo do mês corrente — NÃO indica cargo atribuído. (Pendente, se desejado: atribuir em tempo real ao bater a meta no mês.)
 
 ### 2026-10-14 — Deploy clube VIP na ARENA oficial
 - Teste de lembrete validado de ponta a ponta: assinatura forjada vencendo em ~3 dias → DM real `milestone: 3d` → assinatura de teste removida; assinatura real (`apoiador:active` até 13/11) intacta.

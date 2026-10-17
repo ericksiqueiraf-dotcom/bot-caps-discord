@@ -1,6 +1,8 @@
 {
-  "lastQueueMessageId": "1552541945455312947",
-  "queueDashboardMessageIds": {},
+  "lastQueueMessageId": "1560264298654343339",
+  "queueDashboardMessageIds": {
+    "idle": "1560264298654343339"
+  },
   "recentVictory": {
     "guildId": "1273653944169660427",
     "matchId": "classic-5x5-a",
@@ -9,5 +11,8 @@
     "format": "5x5",
     "letter": "A",
     "finishedAt": "2026-09-29T23:56:24.171Z"
+  },
+  "liveCooldowns": {
+    "860875184831332352": 1792066190318
   }
 }

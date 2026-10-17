@@ -136,6 +136,7 @@ function createRiotService(apiKey, region = DEFAULT_REGION) {
       return {
         puuid: summonerLookup.data.puuid,
         summonerId: summonerLookup.data.id || null,
+        summonerLevel: summonerLookup.data.summonerLevel ?? null,
         displayName: `${riotId.gameName}#${riotId.tagLine}`
       };
     }
@@ -210,6 +211,7 @@ function createRiotService(apiKey, region = DEFAULT_REGION) {
     const profile = {
       puuid: summoner.puuid,
       summonerId: summoner.summonerId,
+      summonerLevel: summoner.summonerLevel ?? null,
       nickname: summoner.displayName,
       tier: soloQueue.tier,
       rank: soloQueue.rank,

@@ -1,4 +1,28 @@
 {
   "lobbies": {},
-  "waitingLists": {}
+  "waitingLists": {
+    "classic:5x5": [
+      {
+        "discordId": "1437921963870916619",
+        "discordUsername": "marshdark7777",
+        "nickname": "MarshLol007#br1",
+        "joinedAt": "2026-10-15T12:39:28.464Z",
+        "isInfernalBoost": false
+      },
+      {
+        "discordId": "846768902347685899",
+        "discordUsername": "zumas_dos_anabols",
+        "nickname": "Zuki#L0VE",
+        "joinedAt": "2026-10-15T12:40:06.202Z",
+        "isInfernalBoost": false
+      },
+      {
+        "discordId": "1177662110658994267",
+        "discordUsername": "souslike",
+        "nickname": "sir alonne#boss",
+        "joinedAt": "2026-10-15T12:44:28.694Z",
+        "isInfernalBoost": false
+      }
+    ]
+  }
 }

@@ -183,8 +183,8 @@ function findDesiredChannel(guild, spec, type, parentId) {
 function basicOverwrites(guild, roles, spec, type) {
   const everyone = guild.roles.everyone;
   const jogador = roles.Jogador;
-  const capitao = roles.Capitão;
-  const staff = roles.Staff;
+  const capitao = roles['👑 Capitão LCL'];
+  const staff = roles['🛠️ Staff'];
   if (spec.open) {
     return [
       { id: everyone.id, deny: spec.talk ? [] : [PermissionFlagsBits.SendMessages] },
@@ -314,7 +314,7 @@ function updateConfigs(ids, roles) {
   caps.roles = {
     ...caps.roles,
     registeredPlayerRoleId: roles.Jogador?.id || caps.roles?.registeredPlayerRoleId,
-    captainRoleId: roles.Capitão?.id || caps.roles?.captainRoleId,
+    captainRoleId: roles['👑 Capitão LCL']?.id || caps.roles?.captainRoleId,
     visitanteRoleId: roles.Visitante?.id || caps.roles?.visitanteRoleId || ''
   };
   caps.voiceChannels = { ...caps.voiceChannels, ...ids.capsVoice };
@@ -333,7 +333,7 @@ function updateConfigs(ids, roles) {
   lcl.roles = {
     ...lcl.roles,
     registeredPlayerRoleId: roles.Jogador?.id || lcl.roles?.registeredPlayerRoleId,
-    captainRoleId: roles.Capitão?.id || lcl.roles?.captainRoleId
+    captainRoleId: roles['👑 Capitão LCL']?.id || lcl.roles?.captainRoleId
   };
   lcl.voiceChannels = { ...lcl.voiceChannels, ...ids.lclVoice };
   lcl.textChannels = { ...lcl.textChannels, ...ids.lclText };
@@ -365,7 +365,7 @@ async function main() {
   await guild.roles.fetch().catch(() => null);
 
   // Nomes anteriores ao padrão com emoticons: nunca apagados automaticamente.
-  for (const legacy of ['Jogador Ativo', 'Capitão', 'MVP player', 'INFERNAL']) {
+  for (const legacy of ['Jogador Ativo', 'Capitão', 'MVP player', 'INFERNAL', 'Staff', '👑 Capitão de Customs']) {
     const found = guild.roles.cache.find((r) => r.name === legacy);
     if (found) console.log(`! cargo legado "${legacy}" ainda existe (${found.id}) — remova manualmente após migrar os membros`);
   }

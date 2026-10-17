@@ -2,6 +2,8 @@
 
 Todos exigem cargo **Capitão** ou Staff, exceto consulta.
 
+> Guia rápido no Discord: `!ajudalcl` ou `/ajudalcl`.
+
 ## Compartilhado da fila interna (Admin)
 
 ```

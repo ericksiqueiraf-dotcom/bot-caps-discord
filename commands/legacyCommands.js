@@ -51,12 +51,25 @@ const {
 } = require('../services/dataService');
 const { getResolvedContentTemplates } = require('../services/contentTextService');
 
-const { 
-  calculateSeedRating, calculateHybridMmr, calculateEloDelta, 
-  createBalancedTeams, applyLeagueMmrChange, migrateInternalRating
+const {
+  calculateSeedRating, calculateHybridMmr, calculateEloDelta,
+  createBalancedTeams, applyLeagueMmrChange, migrateInternalRating,
+  calculateTeamMmr, calculateTeamPdlDelta
 } = require('../services/balanceService');
 
 const getRiotService = () => global.riotService;
+
+/**
+ * Trava de level mínimo da conta Riot (config.cadastro.minSummonerLevel).
+ * Fail-open quando o level é desconhecido (ex.: cache antigo sem o campo).
+ */
+function getSummonerLevelGate(summonerLevel) {
+  const minLevel = Number(config.cadastro?.minSummonerLevel || 0);
+  const level = Number(summonerLevel);
+  if (!(minLevel > 0) || !(level > 0)) return { ok: true, minLevel, level: null };
+  if (level < minLevel) return { ok: false, minLevel, level };
+  return { ok: true, minLevel, level };
+}
 
 /**
  * Atribui o cargo definido em config.roles.registeredPlayerRoleId apos !cadastrar / !nick.
@@ -168,7 +181,58 @@ function createRegisterVictoryDeps() {
     shouldMirrorAramGroupedStats,
     calculateEloDelta,
     getAramWeightByTeamSize,
-    formatCustomRecord
+    formatCustomRecord,
+    calculateTeamMmr,
+    calculateTeamPdlDelta,
+    getPdlMultiplier: () => require('../services/eventoService').getPdlMultiplier(),
+    onVictoryPdlApplied: async ({ winners, match, winningTeam }) => {
+      try {
+        const evento = require('../services/eventoService');
+        const missoes = require('../services/missoesService');
+        const duelo = require('../services/dueloService');
+        const systemMeta = await loadSystemMeta();
+        if (evento.isSextaRankedWindow()) {
+          evento.accumulateSextaGains(systemMeta, winners);
+        }
+        const teamOneIds = (match.teamOne || []).map((p) => p.discordId);
+        const teamTwoIds = (match.teamTwo || []).map((p) => p.discordId);
+        const allPlayers = [...(match.teamOne || []), ...(match.teamTwo || [])];
+        const byId = new Map(allPlayers.map((p) => [String(p.discordId), p]));
+        const playerStats = await loadPlayerStats();
+        const bucketKey = getStatsBucketKey(match.mode, match.format);
+        const credit = (discordId, valor) => {
+          const ref = byId.get(String(discordId)) || { discordId };
+          const stored = getStoredPlayerStats(playerStats, ref);
+          if (!stored) return;
+          const modes = getModeStats(stored, match.mode, match.format);
+          upsertPlayerStats(playerStats, ref, {
+            modes: { ...normalizePlayerModes(stored), [bucketKey]: { ...modes, internalRating: Math.max(0, Number(modes.internalRating || 0) + valor) } }
+          });
+        };
+        // Missões semanais: progresso + bônus na hora.
+        const mStore = missoes.ensureMissionsStore(systemMeta);
+        const done = missoes.recordMatchPlayed(mStore, [...teamOneIds, ...teamTwoIds], (winners || []).map((w) => w.discordId));
+        for (const { userId, mission } of done) {
+          credit(userId, mission.premio);
+          const w = (winners || []).find((x) => String(x.discordId) === String(userId));
+          if (w) {
+            w.missionBonus = Number(w.missionBonus || 0) + mission.premio;
+            (w.missoesConcluidas ||= []).push(mission.desc);
+          }
+        }
+        // Duelos: transfere pontos quando os dois estão em lados opostos.
+        systemMeta.duelos ||= [];
+        const { settled } = duelo.settleDuels(systemMeta.duelos, teamOneIds, teamTwoIds, winningTeam);
+        for (const s of settled) {
+          credit(s.winnerId, s.pontos);
+          credit(s.loserId, -s.pontos);
+          const w = (winners || []).find((x) => String(x.discordId) === String(s.winnerId));
+          if (w) w.duelBonus = Number(w.duelBonus || 0) + s.pontos;
+        }
+        await savePlayerStats(playerStats);
+        await saveSystemMeta(systemMeta);
+      } catch { /* nao quebra o registro da vitoria */ }
+    }
   };
 }
 
@@ -383,6 +447,11 @@ async function handleRegisterCommand(message, args) {
     }
     await replyToMessage(message, '⏳ Validando sua conta na Riot...');
     const rankProfile = await global.riotService.getPlayerRankProfile(nickname);
+    const levelGate = getSummonerLevelGate(rankProfile.summonerLevel);
+    if (!levelGate.ok) {
+      await replyToMessage(message, `❌ Conta level ${levelGate.level}. O mínimo para jogar na CAPS Arena é level ${levelGate.minLevel} — upe sua conta e tente de novo.`);
+      return;
+    }
     const playerStats = await loadPlayerStats();
 
     // Busca entrada anterior do mesmo discordId para migrar o histórico de partidas
@@ -442,6 +511,11 @@ async function handleNickUpdateCommand(message, args) {
       if (storedEntry?.puuid) global.riotService.invalidateCache(storedEntry.puuid);
     }
     const rankProfile = await global.riotService.getPlayerRankProfile(nickname);
+    const nickLevelGate = getSummonerLevelGate(rankProfile.summonerLevel);
+    if (!nickLevelGate.ok) {
+      await replyToMessage(message, `❌ Conta level ${nickLevelGate.level}. O mínimo para jogar na CAPS Arena é level ${nickLevelGate.minLevel} — upe sua conta e tente de novo.`);
+      return;
+    }
     const playerStats = await loadPlayerStats();
     const storedStats = getStoredPlayerStats(playerStats, { discordId: message.author.id, nickname: rankProfile.nickname, puuid: rankProfile.puuid });
     upsertPlayerStats(playerStats, { discordId: message.author.id, nickname: rankProfile.nickname, puuid: rankProfile.puuid }, {
@@ -554,7 +628,6 @@ async function handleVoteCommand(message, args) {
       message,
       args,
       deps: {
-        VOTE_THRESHOLD,
         getVoteThreshold,
         withQueueOperationLock,
         loadCurrentMatch,
@@ -823,7 +896,7 @@ async function handlePingCommand(message) {
 async function handleLeaderboardCommand(message, args = []) {
   const statsData = await loadPlayerStats();
   const { mode, format, tierSOnly } = parseModeAndFormatArgs(args);
-  const embed = buildLeaderboardEmbed(statsData, mode, format, { tierSOnly, tierResolver: buildVipTierResolver(message.guild) });
+  const embed = buildLeaderboardEmbed(statsData, mode, format, { tierSOnly, tierResolver: buildVipTierResolver(message.guild), excludeTierS: !tierSOnly && mode === QUEUE_MODES.CLASSIC });
   await sendToMessageChannel(message, { embeds: [embed] });
 }
 
@@ -831,7 +904,7 @@ async function handleTopTenCommand(message, args = []) {
   const statsData = await loadPlayerStats();
   const seasonMeta = await loadSeasonMeta();
   const { mode, format, tierSOnly } = parseModeAndFormatArgs(args);
-  const embed = buildTopTenEmbed(statsData, seasonMeta, mode, format, { tierSOnly, tierResolver: buildVipTierResolver(message.guild) });
+  const embed = buildTopTenEmbed(statsData, seasonMeta, mode, format, { tierSOnly, tierResolver: buildVipTierResolver(message.guild), excludeTierS: !tierSOnly && mode === QUEUE_MODES.CLASSIC });
   await sendToMessageChannel(message, { embeds: [embed] });
 }
 
@@ -858,6 +931,134 @@ async function handlePlayerCardCommand(message, targetUser = null) {
   await sendToMessageChannel(message, { embeds: [buildPlayerCardEmbed(playerStats, selectedUser, getMemberVipTier(targetMember))] });
 }
 
+async function handleClubeFixarCommand(message) {
+  try {
+    if (!isStaffViewer(message.member)) {
+      return await replyToMessage(message, '❌ Restrito à staff.');
+    }
+    const { buildClubeDetalEmbed } = require('../utils/lobbyUtils');
+    const guild = message.guild;
+    const target = guild.channels.cache.find((c) => c.name === '🔰clube-vip' && c.isTextBased?.())
+      || (message.channel?.isTextBased?.() ? message.channel : null);
+    if (!target) {
+      return await replyToMessage(message, '❌ Canal #clube-vip não encontrado.');
+    }
+    const embed = buildClubeDetalEmbed();
+    const title = embed.data?.title;
+    const botId = guild.members.me?.id;
+    const pinned = await target.messages.fetchPinned().catch(() => null);
+    const olds = [...(pinned?.values?.() || [])].filter(
+      (m) => m.author?.id === botId && (m.embeds || []).some((e) => e.title === title)
+    );
+    for (const old of olds) {
+      await old.unpin().catch(() => null);
+      await old.delete().catch(() => null);
+    }
+    const sent = await target.send({ embeds: [embed] });
+    await sent.pin().catch(() => null);
+    await replyToMessage(message, `✅ Benefícios detalhados postados e fixados em ${target}. Apague a mensagem antiga manualmente se ainda estiver lá.`);
+  } catch (error) {
+    console.error('[ERRO] !clubefixar:', error);
+    await replyToMessage(message, `❌ Erro ao fixar benefícios: \`${error.message}\``);
+  }
+}
+
+async function handleAjudaFixarCommand(message) {
+  try {
+    if (!isStaffViewer(message.member)) {
+      return await replyToMessage(message, '❌ Restrito à staff.');
+    }
+    const guild = message.guild;
+    const target = guild.channels.cache.find((c) => c.name === '💡┃infos-lol' && c.isTextBased?.())
+      || (message.channel?.isTextBased?.() ? message.channel : null);
+    if (!target) {
+      return await replyToMessage(message, '❌ Canal #infos-lol não encontrado.');
+    }
+    const titles = ['📚 Guia de Comandos (1/2) — O essencial', '📚 Guia de Comandos (2/2) — Ranking e extras'];
+    const botId = guild.members.me?.id;
+    const pinned = await target.messages.fetchPinned().catch(() => null);
+    const olds = [...(pinned?.values?.() || [])].filter(
+      (m) => m.author?.id === botId && (m.embeds || []).some((e) => titles.includes(e.title))
+    );
+    for (const old of olds) {
+      await old.unpin().catch(() => null);
+      await old.delete().catch(() => null);
+    }
+    for (const page of [1, 2]) {
+      const sent = await target.send({ embeds: [buildAjudaEmbed(page)] });
+      await sent.pin().catch(() => null);
+    }
+    await replyToMessage(message, `✅ Guias postados e fixados em ${target}. Apague as mensagens antigas manualmente se ainda estiverem lá.`);
+  } catch (error) {
+    console.error('[ERRO] !ajudafixar:', error);
+    await replyToMessage(message, `❌ Erro ao fixar ajuda: \`${error.message}\``);
+  }
+}
+
+function normalizePresentearTier(raw) {
+  const v = String(raw || '').toLowerCase();
+  if (v.includes('apoiador') || v.includes('💜')) return 'apoiador';
+  if (v === 'vip' || v.includes('⭐')) return 'vip';
+  if (v.includes('lendario') || v.includes('lendário') || v.includes('👑')) return 'lendario';
+  return null;
+}
+
+async function handlePresentearCommand(message, args = [], targetUserOverride = null) {
+  try {
+    if (!message.member?.permissions?.has(PermissionFlagsBits.Administrator)) {
+      return await replyToMessage(message, '❌ Restrito a administradores.');
+    }
+    const { getClubeTierConfig } = require('../services/clubePaymentsService');
+    const targetUser = targetUserOverride || message.mentions.users.first();
+    const tierKey = normalizePresentearTier(args.find((a) => normalizePresentearTier(a)));
+    const diasArg = args.map(Number).find((n) => Number.isInteger(n));
+    if (!targetUser) {
+      return await replyToMessage(message, '❌ Use: `!presentear @usuário <apoiador|vip|lendario> [dias]`.');
+    }
+    if (!tierKey) {
+      return await replyToMessage(message, '❌ Tier inválido. Use: `apoiador`, `vip` ou `lendario`.');
+    }
+    const tier = getClubeTierConfig(config, tierKey);
+    if (!tier) {
+      return await replyToMessage(message, '❌ Tier inválido.');
+    }
+    const dias = diasArg && diasArg >= 1 && diasArg <= 365 ? diasArg : tier.dias;
+    const guild = message.guild;
+    const member = await guild.members.fetch(targetUser.id).catch(() => null);
+    if (!member) {
+      return await replyToMessage(message, '❌ Usuário não está no servidor.');
+    }
+    const role = guild.roles.cache.find((r) => r.name === tier.roleName);
+    if (!role) {
+      return await replyToMessage(message, `❌ Cargo ${tier.roleName} não encontrado no servidor.`);
+    }
+    await member.roles.add(role, `Presente de ${message.author?.tag || message.author?.id}`).catch(() => null);
+    const { loadVipSubscriptions, saveVipSubscriptions } = require('../services/dataService');
+    const { subscriptions } = await loadVipSubscriptions();
+    const now = Date.now();
+    subscriptions.push({
+      paymentId: `presente:${message.author.id}:${now}`,
+      guildId: guild.id,
+      discordId: targetUser.id,
+      tierKey,
+      status: 'active',
+      startedAt: new Date(now).toISOString(),
+      expiresAt: new Date(now + dias * 24 * 3600 * 1000).toISOString(),
+      gift: true,
+      grantedBy: message.author.id
+    });
+    await saveVipSubscriptions({ subscriptions });
+    try {
+      const dm = await member.createDM();
+      await dm.send(`🎁 Você ganhou **${dias} dias de ${tier.roleName}** na CAPS Arena! Aproveite!`).catch(() => null);
+    } catch { /* DM fechada: segue o jogo */ }
+    await replyToMessage(message, `✅ ${targetUser} ganhou **${dias} dias de ${tier.roleName}**! 🎁`);
+  } catch (error) {
+    console.error('[ERRO] !presentear:', error);
+    await replyToMessage(message, `❌ Erro ao presentear: \`${error.message}\``);
+  }
+}
+
 async function handleQueroLiveCommand(message) {
   const guild = message.guild;
   if (!guild) return;
@@ -873,11 +1074,19 @@ async function handleQueroLiveCommand(message) {
   return await replyToMessage(message, '🔔 Você entrou no 🔴 Ao Vivo e será avisado das lives!');
 }
 
+const LIVE_COOLDOWN_BY_TIER_MS = {
+  '👑 Lendário': 6 * 60 * 60 * 1000,
+  '⭐ VIP': 12 * 60 * 60 * 1000,
+  '💜 Apoiador': 24 * 60 * 60 * 1000
+};
+
 async function handleLiveCommand(message, args = []) {
   const guild = message.guild;
   if (!guild) return;
-  if (getMemberVipTier(message.member) !== '👑 Lendário') {
-    return await replyToMessage(message, '❌ O `!live` é exclusivo do **👑 Lendário**. Veja o `!clube`.');
+  const liveTier = getMemberVipTier(message.member);
+  const tierCooldownMs = LIVE_COOLDOWN_BY_TIER_MS[liveTier] || 0;
+  if (!tierCooldownMs) {
+    return await replyToMessage(message, '❌ O `!live` é do **Clube VIP** (Apoiador 24h, VIP 12h, Lendário 6h). Veja o `!clube`.');
   }
   const parsed = parseLiveLink(args.join(' '));
   if (!parsed) {
@@ -885,7 +1094,7 @@ async function handleLiveCommand(message, args = []) {
   }
   const systemMeta = await loadSystemMeta();
   systemMeta.liveCooldowns ||= {};
-  const remaining = getLiveCooldownRemainingMs(systemMeta.liveCooldowns[message.author.id]);
+  const remaining = Math.max(0, Number(systemMeta.liveCooldowns[message.author.id] || 0) + tierCooldownMs - Date.now());
   if (remaining > 0) {
     return await replyToMessage(message, `⏳ Aguarde **${formatCooldownRemaining(remaining)}** para divulgar de novo.`);
   }
@@ -930,32 +1139,430 @@ async function handleClubeCommand(message) {
   await sendToMessageChannel(message, payload);
 }
 
-async function handleHelpCommand(message) {
+async function handleClubeAdminCommand(message) {
   try {
+    if (!isStaffViewer(message.member)) {
+      return await replyToMessage(message, '❌ Restrito à staff.');
+    }
+    const { TIER_KEYS, TIER_ROLE_NAMES } = require('../services/clubePaymentsService');
+    const { subscriptions } = await loadVipSubscriptions();
+    const guildId = String(message.guild?.id || '');
+    const now = Date.now();
+    const active = (subscriptions || []).filter(
+      (s) => s?.status === 'active' && String(s?.guildId || '') === guildId
+    );
+
+    if (active.length === 0) {
+      return await replyToMessage(message, '💎 Nenhuma assinatura ativa do clube neste servidor.');
+    }
+
+    const dayMs = 24 * 60 * 60 * 1000;
+    const lines = [];
+    for (const tierKey of [...TIER_KEYS].reverse()) {
+      const subs = active
+        .filter((s) => s.tierKey === tierKey)
+        .sort((a, b) => new Date(a.expiresAt).getTime() - new Date(b.expiresAt).getTime());
+      if (subs.length === 0) continue;
+      const rows = subs.map((s) => {
+        const diffDays = Math.ceil((new Date(s.expiresAt).getTime() - now) / dayMs);
+        const when = diffDays <= 0 ? 'vence hoje' : diffDays === 1 ? 'vence amanhã' : `vence em ${diffDays} dias`;
+        return `• <@${s.discordId}> — ${when}`;
+      });
+      lines.push(`**${TIER_ROLE_NAMES[tierKey]} (${subs.length})**\n${rows.join('\n')}`);
+    }
+
+    const { EmbedBuilder } = require('discord.js');
     const embed = new EmbedBuilder()
-    .setColor(THEME.INFO)
-    .setTitle('📚 Guia Completo de Comandos')
-    .setDescription('Aqui estao os comandos para gerenciar a CAPS Arena.')
+      .setColor(THEME?.INFO ?? '#0099ff')
+      .setTitle('💎 Assinaturas ativas do clube')
+      .setDescription(lines.join('\n\n'))
+      .setFooter({ text: `${FOOTER_PREFIX} • visível só aqui (comando de staff)` })
+      .setTimestamp();
+    await replyToMessage(message, { embeds: [embed] });
+  } catch (error) {
+    console.error('[ERRO] !clubeadmin:', error);
+    await replyToMessage(message, `❌ Erro ao listar assinaturas: \`${error.message}\``);
+  }
+}
+
+async function handleConviteCommand(message) {
+  try {
+    const { ensureInvitesStore, getRecruiterStats } = require('../services/convitesService');
+    const systemMeta = await loadSystemMeta();
+    const store = ensureInvitesStore(systemMeta);
+
+    let invite = null;
+    try {
+      const invites = await message.guild.invites.fetch();
+      invite = [...invites.values()].find((inv) => inv.inviterId === message.author.id && !inv.expiresAt) || null;
+    } catch { /* sem permissao de ver convites: cria direto */ }
+    if (!invite) {
+      const welcome = message.guild.channels.cache.find((c) => c.name === '👋-boas-vindas' && c.isTextBased?.());
+      const target = welcome || (message.channel?.isTextBased?.() ? message.channel : null);
+      if (target?.createInvite) {
+        invite = await target.createInvite({ maxAge: 0, maxUses: 0, reason: `Convite pessoal de ${message.author.tag}` }).catch(() => null);
+      }
+    }
+    if (!invite) {
+      return await replyToMessage(message, '❌ Não consegui criar seu link agora. Fale com a Staff.');
+    }
+
+    store.links[message.author.id] = { code: invite.code, channelId: invite.channelId, createdAt: new Date().toISOString() };
+    await saveSystemMeta(systemMeta);
+    const stats = getRecruiterStats(store, message.author.id);
+    await replyToMessage(message,
+      `🔗 Seu link pessoal: ${invite.url}\n` +
+      `Traga gente e ganhe: **3** = cargo 🌱 Recrutador • **5** = destaque na Arena • **10** = **7 dias de ⭐ VIP grátis**\n` +
+      `Você já trouxe **${stats.lifetime}** (${stats.month} este mês). Use \`!topconvites\` para ver o ranking.`
+    );
+  } catch (error) {
+    console.error('[ERRO] !convite:', error);
+    await replyToMessage(message, `❌ Erro ao gerar convite: \`${error.message}\``);
+  }
+}
+
+async function handleTopConvitesCommand(message) {
+  try {
+    const { ensureInvitesStore, getMonthlyTop, monthKey } = require('../services/convitesService');
+    const systemMeta = await loadSystemMeta();
+    const store = ensureInvitesStore(systemMeta);
+    const month = monthKey();
+    const top = getMonthlyTop(store, month, 10);
+    if (top.length === 0) {
+      return await replyToMessage(message, '📭 Ninguém trouxe gente nova este mês ainda. Use `!convite` e seja o primeiro!');
+    }
+    const lines = top.map((t) => `${t.position === 1 ? '👑 ' : ''}**${t.position}º** <@${t.userId}> — ${t.count} convite(s)`);
+    const { EmbedBuilder } = require('discord.js');
+    const embed = new EmbedBuilder()
+      .setColor(THEME?.RANK ?? '#FFD700')
+      .setTitle(`🔗 Top convites — ${month.slice(5)}/${month.slice(0, 4)}`)
+      .setDescription(lines.join('\n') + '\n\nMetas: 3 = 🌱 Recrutador • 5 = destaque • 10 = 7 dias de ⭐ VIP grátis')
+      .setFooter({ text: `${FOOTER_PREFIX} • zera todo dia 1º` })
+      .setTimestamp();
+    await replyToMessage(message, { embeds: [embed] });
+  } catch (error) {
+    console.error('[ERRO] !topconvites:', error);
+    await replyToMessage(message, `❌ Erro ao listar ranking: \`${error.message}\``);
+  }
+}
+
+async function resolveTorneioPool(guild, ids) {
+  const playerStats = await loadPlayerStats();
+  const out = [];
+  for (const id of ids || []) {
+    const member = await guild.members.fetch(id).catch(() => null);
+    let baseMmr = 1500;
+    let nickname = member?.displayName || id;
+    try {
+      const stored = getStoredPlayerStats(playerStats, { discordId: id });
+      const modeStats = stored ? getModeStats(stored, QUEUE_MODES.CLASSIC) : null;
+      if (Number.isFinite(Number(modeStats?.baseMmr))) baseMmr = Number(modeStats.baseMmr);
+      if (stored?.registeredNickname) nickname = member?.displayName || stored.registeredNickname;
+    } catch { /* fallback neutro */ }
+    out.push({ discordId: String(id), nickname, baseMmr });
+  }
+  return out;
+}
+
+async function handleTorneioCommand(message, args = []) {
+  try {
+    const Torneio = require('../services/torneioService');
+    const sub = String(args[0] || '').toLowerCase();
+    const systemMeta = await loadSystemMeta();
+    const t = systemMeta.torneio;
+
+    if (!sub || ['info', 'regras', 'regra', 'ajuda', 'como'].includes(sub)) {
+      return await replyToMessage(message, Torneio.TORNEIO_INFO);
+    }
+
+    if (['entrar', 'inscrever', 'join', 'in'].includes(sub)) {
+      if (!t) return await replyToMessage(message, '📭 Nenhum torneio aberto agora. Aguarde o próximo!');
+      const r = Torneio.joinTournament(t, message.author.id);
+      if (!r.ok) return await replyToMessage(message, `❌ ${r.message}`);
+      await saveSystemMeta(systemMeta);
+      const req = Torneio.startRequirement(t);
+      return await replyToMessage(message, `🏆 <@${message.author.id}> inscrito! Total: **${r.count}**. ${req.ok ? '✅ Inscrições completas — aguardem o sorteio da staff.' : `ℹ️ ${req.message}`}`);
+    }
+
+    if (['sair', 'leave', 'out'].includes(sub)) {
+      if (!t) return await replyToMessage(message, '📭 Nenhum torneio ativo.');
+      const r = Torneio.leaveTournament(t, message.author.id);
+      if (!r.ok) return await replyToMessage(message, `❌ ${r.message}`);
+      await saveSystemMeta(systemMeta);
+      return await replyToMessage(message, `👋 <@${message.author.id}> saiu do torneio. Total: **${r.count}**.`);
+    }
+
+    if (['lista', 'list', 'inscritos'].includes(sub)) {
+      if (!t?.players?.length) return await replyToMessage(message, '📭 Ninguém inscrito ainda. Use `!torneio entrar`.');
+      const linhas = t.players.map((id, i) => `**${i + 1}º** <@${id}>`);
+      const embed = new EmbedBuilder()
+        .setColor(THEME?.INFO ?? '#5865F2')
+        .setTitle(`🏆 Inscritos — Torneio #${t.edition} (${t.players.length})`)
+        .setDescription(linhas.join('\n').slice(0, 4000))
+        .setFooter({ text: `${FOOTER_PREFIX} • mínimo ${Torneio.MIN_PLAYERS}, múltiplo de ${Torneio.FINAL_SIZE}` })
+        .setTimestamp();
+      return await replyToMessage(message, { embeds: [embed] });
+    }
+
+    if (['status', 'situacao'].includes(sub)) {
+      const s = Torneio.getStatus(t);
+      if (!s.active) return await replyToMessage(message, '📭 Nenhum torneio ativo agora.');
+      const embed = new EmbedBuilder()
+        .setColor(THEME?.RANK ?? '#FFD700')
+        .setTitle(`🏆 Torneio #${s.edition} — status`)
+        .addFields(
+          { name: 'Inscritos', value: String(s.inscritos), inline: true },
+          { name: 'Rodada', value: String(s.rodada || 0), inline: true },
+          { name: 'Final', value: s.final ? (s.placarFinal || 'em andamento') : 'não iniciada', inline: true },
+          { name: 'Jogos pendentes', value: s.jogosPendentes?.length ? s.jogosPendentes.join(', ') : 'nenhum' }
+        )
+        .setFooter({ text: FOOTER_PREFIX })
+        .setTimestamp();
+      if (s.champion) embed.setDescription(`🏆 Campeão: ${s.champion.team.map((id) => `<@${id}>`).join(', ')} (${s.champion.placar})`);
+      return await replyToMessage(message, { embeds: [embed] });
+    }
+
+    return await replyToMessage(message, '❌ Use: `!torneio entrar` • `!torneio sair` • `!torneio lista` • `!torneio status` • `!torneio info`.');
+  } catch (error) {
+    console.error('[ERRO] !torneio:', error);
+    await replyToMessage(message, `❌ Erro no torneio: \`${error.message}\``);
+  }
+}
+
+async function handlePalpiteCommand(message, args = []) {
+  try {
+    const [timeArg, pontosArg] = args;
+    const time = String(timeArg || '');
+    const pontos = Number(pontosArg);
+    if (!['1', '2'].includes(time) || !Number.isInteger(pontos) || pontos < 10 || pontos > 100) {
+      return await replyToMessage(message, '❌ Use: `!palpite <1|2> <10-100>` (aposta com seus pontos custom).');
+    }
+    const currentMatchData = await loadCurrentMatch();
+    const entry = Object.entries(currentMatchData.matches || {}).find(([, e]) => {
+      if (!e?.active || !e?.match) return false;
+      return [...(e.match.teamOne || []), ...(e.match.teamTwo || [])].some((p) => p.discordId === message.author.id);
+    });
+    if (!entry) {
+      return await replyToMessage(message, '❌ Você não está em nenhuma partida ativa.');
+    }
+    const [matchId, matchEntry] = entry;
+    matchEntry.palpites ||= {};
+    if (matchEntry.palpites[message.author.id]) {
+      return await replyToMessage(message, '❌ Você já apostou nesta partida.');
+    }
+    // Janela de aposta: 5 minutos após a formação dos times.
+    const PALPITE_WINDOW_MS = 5 * 60 * 1000;
+    const matchAgeMs = Date.now() - new Date(matchEntry.match.createdAt || 0).getTime();
+    if (!Number.isFinite(matchAgeMs) || matchAgeMs > PALPITE_WINDOW_MS) {
+      return await replyToMessage(message, '❌ Apostas encerradas para essa partida (vale nos primeiros 5 minutos após formar os times).');
+    }
+    const playerStats = await loadPlayerStats();
+    const bettor = [...(matchEntry.match.teamOne || []), ...(matchEntry.match.teamTwo || [])]
+      .find((p) => p.discordId === message.author.id) || { discordId: message.author.id };
+    const stored = getStoredPlayerStats(playerStats, bettor);
+    const bucketKey = getStatsBucketKey(matchEntry.match.mode, matchEntry.match.format);
+    const modeStats = getModeStats(stored, matchEntry.match.mode, matchEntry.match.format);
+    if (!stored || Number(modeStats?.internalRating || 0) < pontos) {
+      return await replyToMessage(message, `❌ Pontos insuficientes (você tem ${Math.floor(Number(modeStats?.internalRating || 0))}).`);
+    }
+    const updatedModes = {
+      ...normalizePlayerModes(stored),
+      [bucketKey]: { ...modeStats, internalRating: Number(modeStats.internalRating) - pontos }
+    };
+    upsertPlayerStats(playerStats, bettor, { modes: updatedModes });
+    await savePlayerStats(playerStats);
+    matchEntry.palpites[message.author.id] = { time, pontos, betAt: new Date().toISOString() };
+    await saveCurrentMatch(currentMatchData);
+    await replyToMessage(message, `🎯 Aposta registrada: **${pontos} pontos no time ${time}**! Boa sorte!`);
+  } catch (error) {
+    console.error('[ERRO] !palpite:', error);
+    await replyToMessage(message, `❌ Erro ao apostar: \`${error.message}\``);
+  }
+}
+
+async function handleMissoesCommand(message) {
+  try {
+    const missoes = require('../services/missoesService');
+    const systemMeta = await loadSystemMeta();
+    const store = missoes.ensureMissionsStore(systemMeta);
+    const progress = missoes.getProgress(store, message.author.id);
+    const lines = progress.map((p) => `${p.feito ? '✅' : '⬜'} ${p.desc} (${Math.min(p.atual, p.meta)}/${p.meta}) • +${p.premio} PDL`);
+    const { EmbedBuilder } = require('discord.js');
+    const embed = new EmbedBuilder()
+      .setColor(THEME?.RANK ?? '#FFD700')
+      .setTitle('🎖️ Missões da semana')
+      .setDescription(lines.join('\n') + '\n\nBônus cai sozinho ao completar. Zera toda segunda.')
+      .setFooter({ text: `${FOOTER_PREFIX} • Missões semanais` })
+      .setTimestamp();
+    await replyToMessage(message, { embeds: [embed] });
+  } catch (error) {
+    console.error('[ERRO] !missoes:', error);
+    await replyToMessage(message, `❌ Erro nas missões: \`${error.message}\``);
+  }
+}
+
+async function handleDueloCommand(message, args = [], targetUserOverride = null) {
+  try {
+    const duelo = require('../services/dueloService');
+    const sub = String(args[0] || '').toLowerCase();
+    const systemMeta = await loadSystemMeta();
+    systemMeta.duelos ||= [];
+    const save = async () => { await saveSystemMeta(systemMeta); };
+
+    if (['aceitar', 'aceito'].includes(sub)) {
+      const r = duelo.acceptDuel(systemMeta.duelos, message.author.id);
+      systemMeta.duelos = r.duelos;
+      await save();
+      if (!r.ok) return await replyToMessage(message, `❌ ${r.message}`);
+      return await replyToMessage(message, `⚔️ Duelo aceito! <@${r.duel.a}> 🆚 <@${r.duel.b}> valendo **${r.duel.pontos} PDL**. Joguem a partida — quem vencer leva!`);
+    }
+
+    if (['recusar', 'recuso', 'negar'].includes(sub)) {
+      const r = duelo.refuseDuel(systemMeta.duelos, message.author.id);
+      systemMeta.duelos = r.duelos;
+      await save();
+      return await replyToMessage(message, r.ok ? 'Duelo recusado.' : `❌ ${r.message}`);
+    }
+
+    if (['lista', 'status'].includes(sub)) {
+      const pendentes = duelo.expireDuels(systemMeta.duelos);
+      systemMeta.duelos = pendentes;
+      await save();
+      const mine = pendentes.filter((d) => d.status !== 'concluido' && (d.a === message.author.id || d.b === message.author.id));
+      if (mine.length === 0) return await replyToMessage(message, '📭 Nenhum duelo seu pendente. Desafie com `!duelo @usuário [pontos]`.');
+      return await replyToMessage(message, mine.map((d) => `⚔️ <@${d.a}> 🆚 <@${d.b}> — ${d.pontos} PDL (${d.status})`).join('\n'));
+    }
+
+    const targetUser = targetUserOverride || message.mentions.users.first();
+    const pontos = args.map(Number).find((n) => Number.isInteger(n)) ?? duelo.DUEL_DEFAULT;
+    if (!targetUser && !['aceitar', 'aceito', 'recusar', 'recuso', 'negar', 'lista', 'status'].includes(sub)) {
+      return await replyToMessage(message, '❌ Use: `!duelo @usuário [10-200]` • `!duelo aceitar` • `!duelo recusar` • `!duelo lista`.');
+    }
+    const r = duelo.createDuel(systemMeta.duelos, message.author.id, targetUser.id, pontos);
+    if (!r.ok) return await replyToMessage(message, `❌ ${r.message}`);
+    systemMeta.duelos = r.duelos;
+    await save();
+    return await replyToMessage(message, `${targetUser}, você foi desafiado por ${message.author} para um duelo valendo **${r.valor} PDL**! Responda com \`!duelo aceitar\` ou \`!duelo recusar\`.`);
+  } catch (error) {
+    console.error('[ERRO] !duelo:', error);
+    await replyToMessage(message, `❌ Erro no duelo: \`${error.message}\``);
+  }
+}
+
+function buildTempoEmbed({ displayName = '', avatarURL = null, times = {}, rank = {} } = {}) {
+  const vt = require('../services/voiceTimeService');
+  const { totalMs = 0, weekMs = 0, monthMs = 0 } = times || {};
+  const { current = null, next = null } = rank || {};
+  const cargos = vt.VOICE_RANKS
+    .map((r) => `${current?.name === r.name ? '✅' : '▫️'} ${r.name} — ${r.hours}h`)
+    .join('\n');
+  const faltaMs = next ? Math.max(0, next.hours * 3600000 - Number(monthMs || 0)) : 0;
+  const progresso = next
+    ? `${vt.progressBar(monthMs, next)}\nFaltam **${vt.formatTempo(faltaMs)}** p/ ${next.name}`
+    : 'Você está no topo dos cargos de call! 🎉';
+  const embed = new EmbedBuilder()
+    .setColor(THEME?.RANK ?? '#FFD700')
+    .setTitle(`🎙️ Tempo em call — ${displayName || 'Jogador'}`)
+    .addFields(
+      { name: '📅 Mês', value: vt.formatTempo(monthMs), inline: true },
+      { name: '🗓️ Semana', value: vt.formatTempo(weekMs), inline: true },
+      { name: '⏱️ Total', value: vt.formatTempo(totalMs), inline: true },
+      { name: '🏅 Cargos de call', value: cargos },
+      { name: next ? `📈 Progresso p/ ${next.name} (${next.hours}h)` : '📈 Progresso', value: progresso }
+    )
+    .setFooter({ text: `${FOOTER_PREFIX} • 5h Ativo • 15h Frequente (+Lounge) • 30h Viciado` })
+    .setTimestamp();
+  if (avatarURL) embed.setThumbnail(avatarURL);
+  return embed;
+}
+
+async function handleTempoCommand(message) {
+  try {
+    const vt = require('../services/voiceTimeService');
+    const systemMeta = await loadSystemMeta();
+    const store = vt.ensureVoiceStore(systemMeta);
+    const t = vt.getUserTime(store, message.author.id);
+    const rank = vt.rankForMonth(t.monthMs);
+    await replyToMessage(message, {
+      embeds: [buildTempoEmbed({
+        displayName: message.member?.displayName || message.author?.username || '',
+        avatarURL: message.author?.displayAvatarURL?.(),
+        times: t,
+        rank
+      })]
+    });
+  } catch (error) {
+    console.error('[ERRO] !tempo:', error);
+    await replyToMessage(message, `❌ Erro ao ver tempo: \`${error.message}\``);
+  }
+}
+
+async function handleTopVozCommand(message) {
+  try {
+    const vt = require('../services/voiceTimeService');
+    const systemMeta = await loadSystemMeta();
+    const store = vt.ensureVoiceStore(systemMeta);
+    const top = vt.getMonthlyTop(store, vt.monthKey(), 10);
+    if (top.length === 0) {
+      return await replyToMessage(message, '📭 Ninguém pontuou tempo em call este mês ainda. Entre em voz!');
+    }
+    const lines = top.map((t) => `**${t.position}º** <@${t.userId}> — ${vt.formatTempo(t.ms)}`);
+    const { EmbedBuilder } = require('discord.js');
+    const embed = new EmbedBuilder()
+      .setColor(THEME?.RANK ?? '#FFD700')
+      .setTitle('🎙️ Top tempo em call do mês')
+      .setDescription(lines.join('\n'))
+      .setFooter({ text: `${FOOTER_PREFIX} • 5h Ativo • 15h Frequente (+Lounge) • 30h Viciado` })
+      .setTimestamp();
+    await replyToMessage(message, { embeds: [embed] });
+  } catch (error) {
+    console.error('[ERRO] !topvoz:', error);
+    await replyToMessage(message, `❌ Erro no ranking: \`${error.message}\``);
+  }
+}
+
+function buildAjudaEmbed(page = 1) {
+  const embed = new EmbedBuilder()
+  .setColor(THEME.INFO);
+  if (Number(page) === 2) {
+      embed
+      .setTitle('📚 Guia de Comandos (2/2) — Ranking e extras')
+      .setDescription('Ranking, clube VIP, salas temporárias e extras. Página 1 no `!ajuda`.')
+      .addFields(
+        { name: '🏆 Ranking e pós-jogo', value: '`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!palpite <1|2> <10-100>` • Aposta pontos no vencedor da sua partida\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking geral (CLASSIC = pontos custom)\n`!placar tiers` • Só Esmeralda+\n`!top10` • Top 10 CLASSIC por pontos custom, desempate por winrate\n`!top10 tiers` • Top 10 só Esmeralda+\n`!topstreak` • Ranking Streak 🔥\n`!toprankinfernal` • Quem mais pegou INFERNAL na temporada 🔥\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
+        { name: '💎 Clube VIP', value: '`!clube` • Tiers, assinatura PIX e renovação -10%\n`!querolive` • Entrar/sair do ping 🔴 Ao Vivo\n`!live <link>` • Divulgar live Twitch/YouTube/Kick (Lendário 6h, VIP 12h, Apoiador 24h)' },
+        { name: '🔊 Salas temporárias (dono da sala)', value: 'Entre no ➕・criar-sala para ganhar sua sala\n`!salahub` • Lista as salas ativas\n`!sala` • Mostra sua sala • `!sala <nome>` renomeia\n`!convidar @u` • Chama alguém p/ sua sala\n`!salalock` • Tranca (`!salalock abrir` destranca)\n`!salalimit <0-99>` • Limite de usuários (0 = sem limite)\n`!salaexpulsar @u` • Remove alguém da sala\n`!limparvoz` • Apaga sua sala (dentro dela)' },
+        { name: '🎁 Extras', value: '`!convite` • Seu link pessoal (traga gente e ganhe recompensas)\n`!topconvites` • Ranking de quem mais trouxe gente\n`!torneio` • Torneio mata-mata (entrar, lista, status)\n`!tempo` • Seu tempo em call • `!topvoz` • Ranking de call\n`!palpite <1|2> <10-100>` • Bolão da partida • `!missoes` • Missões da semana • `!duelo @u` • Duelo de PDL\n🌅 Primeira vitória do dia vale +50% PDL (automático)\n`!regras` • Regulamento completo' },
+        { name: '⬅️ Página 1', value: '`!ajuda` • Cadastro, fila e voto\n`!staff` • Guia da staff (restrito)' }
+      );
+    } else {
+    embed
+    .setTitle('📚 Guia de Comandos (1/2) — O essencial')
+    .setDescription('O básico para jogar na CAPS Arena. O resto está no `!ajuda2`.')
     .addFields(
       { name: '🕹️ Cadastro (1x)', value: '`!cadastrar Nick#TAG` • Vincula sua conta Riot\n`!nick Nick#TAG` • Atualiza seu nick' },
-      { name: '🎮 Jogador (1/2) — Fila e voto', value: '`!regras` • Regulamento completo\n`!entrar` • Fila Classic (no canal Lobby Classic ou Lobby TIER S)\n`!entrar aram` • Fila ARAM\n`!entrar aram 2x2` • ARAM formato\n`!fila` • Mostra jogadores em sala\n`!espera` • Entra na espera (🔥 INFERNAL entra na posição 5)\n`!esperatiers` • Espera do Lobby TIER S (só Esmeralda+)\n`!espera ver` • Mostra a ordem\n`!espera sair` • Sai da espera\n`!sair` • Sai da sala\n`!votar 1/2` • Vota no vencedor (abre painel com botões p/ os 10 votarem)\n`!votar` • Reabre o painel de votação' },
-      { name: '🎮 Jogador (2/2) — Ranking', value: '`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking geral (CLASSIC = pontos custom)\n`!placar tiers` • Só Esmeralda+\n`!top10` • Top 10 CLASSIC por pontos custom, desempate por winrate\n`!top10 tiers` • Top 10 só Esmeralda+\n`!topstreak` • Ranking Streak 🔥\n`!toprankinfernal` • Quem mais pegou INFERNAL na temporada 🔥\n`!clube` • Clube VIP: tiers, benefícios e membros 💎\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
-      { name: '💎 Clube VIP', value: '`!clube` • Tiers, assinatura PIX e renovação -10%\n`!querolive` • Entrar/sair do ping 🔴 Ao Vivo\n`!live <link>` • Divulgar live Twitch/YouTube/Kick (só 👑 Lendário, 1x a cada 6h)' },
-      { name: '🛠️ Staff', value: '`!staff` • Guia completo da staff\n`!pdl @u -50 motivo` • Ajuste/punição de PDL Classic (só Admin)\n`!remover @u`, `!limpar [qnt]`, `!limparsalas [sala]` • Limpa sala A/B/C (sem letra = todas)\n`!sincronizarelo @u`, `!sincronizartodos` (ou `!sync todos`), `!sync`, `!onboarding`' },
-      { name: '⚙️ Partida (Staff)', value: '`!start [sala]`, `!vitoria [1|2] [sala]`, `!cancelarstart [sala]`\n`!rematch [sala]` • Volta os 10 pra fila, rebalanceia e inicia na hora' },
-      { name: '📊 Temporada', value: '`!temporadas`, `!resetgeral` (Admin)' }
-    )
+      { name: '🎮 Fila e voto', value: '`!entrar` • Fila Classic (no canal Lobby Classic ou Lobby TIER S)\n`!entrar aram` • Fila ARAM\n`!entrar aram 2x2` • ARAM formato (1x1 até 5x5)\n`!fila` • Mostra jogadores em sala\n`!espera` • Entra na espera (🔥 INFERNAL entra na posição 5)\n`!esperatiers` • Espera do Lobby TIER S (só Esmeralda+)\n`!espera ver` • Mostra a ordem • `!espera sair` • Sai da espera\n`!sair` • Sai da sala\n`!votar 1/2` • Vota no vencedor (abre painel com botões p/ os 10 votarem)\n`!votar` • Reabre o painel de votação' },
+      { name: '➡️ Página 2', value: '`!ajuda2` • Ranking, clube VIP, salas temporárias, torneio, convites e tempo em call\n`!staff` • Guia da staff (restrito)' }
+    );
+    }
+    embed
     .setFooter({ text: `${FOOTER_PREFIX} • Ajuda Atualizada` })
     .setTimestamp();
-  const sent = await sendToMessageChannel(message, { embeds: [embed] });
+  return embed;
+}
+
+async function handleHelpCommand(message, page = 1) {
+  try {
+    const sent = await sendToMessageChannel(message, { embeds: [buildAjudaEmbed(page)] });
     if (!sent) {
-      await replyToMessage(message, '📚 Comandos: `!cadastrar Nick#TAG` • `!entrar` • `!entrar aram` • `!fila` • `!espera` • `!sair` • `!votar 1/2` • `!perfil` • `!placar` • `!top10` • `!topstreak` • `!clube` • `!querolive` • `!live` • `!staff` • `!start` • `!vitoria` • `!temporadas`');
+      await replyToMessage(message, '📚 Comandos: `!cadastrar Nick#TAG` • `!entrar` • `!entrar aram` • `!fila` • `!espera` • `!sair` • `!votar 1/2` • `!perfil` • `!placar` • `!top10` • `!topstreak` • `!clube` • `!staff` • `!start` • `!vitoria` • `!temporadas`');
     }
   } catch (error) {
     console.error('[ERRO] !ajuda:', error);
     await replyToMessage(message, '❌ Erro ao mostrar ajuda. Tente de novo ou use `/ajuda`.').catch(() => null);
   }
 }
+
 
 async function handleLeaveCommand(message) {
   try {
@@ -1862,6 +2469,168 @@ async function handleStaffCommand(message) {
   }
 }
 
+// --- Temp Voice Management Commands ---
+
+const {
+  inviteToTempRoom,
+  renameTempRoom,
+  deleteTempRoom,
+  listTempRooms,
+  isTempRoomOwner,
+  getUserTempRoom
+} = require('../services/tempVoiceService');
+
+async function handleSalaHubCommand(message, args = []) {
+  try {
+    const guild = message.guild;
+    const rooms = listTempRooms(guild);
+    
+    if (rooms.length === 0) {
+      return await replyToMessage(message, '📭 Nenhuma sala temporária ativa no momento.');
+    }
+    
+    const lines = rooms.map((r) =>
+      `${r.locked ? '🔒' : '🔊'} **${r.channel.name}** — Dono: ${r.owner} — ${r.memberCount} membro(s)`
+    );
+    
+    await replyToMessage(message, `**Salas temporárias ativas (${rooms.length}):**\n${lines.join('\n')}`);
+  } catch (error) {
+    console.error('[ERRO] !salahub:', error);
+    await replyToMessage(message, `❌ Erro ao listar salas: \`${error.message}\``);
+  } finally {
+    if (message.deletable) await message.delete().catch(() => null);
+  }
+}
+
+async function handleConvidarCommand(message, args = [], targetUserOverride = null) {
+  try {
+    const targetUser = targetUserOverride || message.mentions.users.first();
+    if (!targetUser) {
+      return await replyToMessage(message, '❌ Use: `!convidar @usuario` para convidar alguém para sua sala.');
+    }
+    
+    if (targetUser.bot) {
+      return await replyToMessage(message, '❌ Não é possível convidar bots.');
+    }
+    
+    if (targetUser.id === message.author.id) {
+      return await replyToMessage(message, '❌ Você não pode se convidar.');
+    }
+    
+    const result = await inviteToTempRoom(message.member, targetUser);
+    await replyToMessage(message, result.message);
+  } catch (error) {
+    console.error('[ERRO] !convidar:', error);
+    await replyToMessage(message, `❌ Erro ao convidar: \`${error.message}\``);
+  } finally {
+    if (message.deletable) await message.delete().catch(() => null);
+  }
+}
+
+async function handleLimparVozCommand(message, args = []) {
+  try {
+    // Check if user is in a temp voice channel they own
+    const voiceChannel = message.member.voice.channel;
+    if (!voiceChannel) {
+      return await replyToMessage(message, '❌ Você precisa estar em uma sala temporária para usar este comando.');
+    }
+    
+    const { isManagedTempVoiceChannel } = require('../services/tempVoiceService');
+    if (!isManagedTempVoiceChannel(voiceChannel)) {
+      return await replyToMessage(message, '❌ Este comando só funciona em salas temporárias criadas pelo bot.');
+    }
+    
+    if (!isTempRoomOwner(message.member, voiceChannel.id)) {
+      return await replyToMessage(message, '❌ Apenas o dono da sala ou administradores podem limpar a sala.');
+    }
+    
+    // Delete the channel
+    const result = await deleteTempRoom(message.member);
+    await replyToMessage(message, result.message);
+  } catch (error) {
+    console.error('[ERRO] !limparvoz:', error);
+    await replyToMessage(message, `❌ Erro ao limpar sala: \`${error.message}\``);
+  } finally {
+    if (message.deletable) await message.delete().catch(() => null);
+  }
+}
+
+async function handleSalaCommand(message, args = []) {
+  try {
+    if (args.length === 0) {
+      const roomId = getUserTempRoom(message.author.id, message.guild.id);
+      if (!roomId) {
+        return await replyToMessage(message, '❌ Você não possui uma sala temporária ativa.\nUse `!sala <novo-nome>` para renomear sua sala.');
+      }
+      
+      const channel = message.guild.channels.cache.get(roomId);
+      if (channel) {
+        return await replyToMessage(message, `🔊 Sua sala atual: **${channel.name}** (${channel.members.size} membro(s))`);
+      }
+      return await replyToMessage(message, '❌ Sala não encontrada.');
+    }
+    
+    // Rename command: !sala <novo-nome>
+    const newName = args.join(' ');
+    const result = await renameTempRoom(message.member, newName);
+    await replyToMessage(message, result.message);
+  } catch (error) {
+    console.error('[ERRO] !sala:', error);
+    await replyToMessage(message, `❌ Erro ao gerenciar sala: \`${error.message}\``);
+  } finally {
+    if (message.deletable) await message.delete().catch(() => null);
+  }
+}
+
+async function handleSalaLockCommand(message, args = []) {
+  try {
+    const { setTempRoomLock } = require('../services/tempVoiceService');
+    const arg = String(args[0] || '').toLowerCase();
+    const unlockWords = ['abrir', 'aberta', 'aberto', 'unlock', 'off', 'destrancar'];
+    const locked = !unlockWords.includes(arg);
+    const result = await setTempRoomLock(message.member, locked);
+    await replyToMessage(message, result.message);
+  } catch (error) {
+    console.error('[ERRO] !salalock:', error);
+    await replyToMessage(message, `❌ Erro ao trancar sala: \`${error.message}\``);
+  } finally {
+    if (message.deletable) await message.delete().catch(() => null);
+  }
+}
+
+async function handleSalaLimitCommand(message, args = []) {
+  try {
+    const { setTempRoomLimit } = require('../services/tempVoiceService');
+    if (args.length === 0) {
+      return await replyToMessage(message, '❌ Use: `!salalimit <0-99>` (0 = sem limite).');
+    }
+    const result = await setTempRoomLimit(message.member, args[0]);
+    await replyToMessage(message, result.message);
+  } catch (error) {
+    console.error('[ERRO] !salalimit:', error);
+    await replyToMessage(message, `❌ Erro ao mudar limite: \`${error.message}\``);
+  } finally {
+    if (message.deletable) await message.delete().catch(() => null);
+  }
+}
+
+async function handleSalaExpulsarCommand(message, args = [], targetUserOverride = null) {
+  try {
+    const { kickFromTempRoom } = require('../services/tempVoiceService');
+    const targetUser = targetUserOverride || message.mentions.users.first();
+    if (!targetUser) {
+      return await replyToMessage(message, '❌ Use: `!salaexpulsar @usuario` para remover alguém da sua sala.');
+    }
+    const result = await kickFromTempRoom(message.member, targetUser);
+    await replyToMessage(message, result.message);
+  } catch (error) {
+    console.error('[ERRO] !salaexpulsar:', error);
+    await replyToMessage(message, `❌ Erro ao expulsar: \`${error.message}\``);
+  } finally {
+    if (message.deletable) await message.delete().catch(() => null);
+  }
+}
+
 async function handleRoletaSairCommand(message, args = []) {
   const { handleRouletteOptOutFlow } = require('./handlers/rouletteCommandHandlers');
   try {
@@ -1927,7 +2696,14 @@ module.exports = {
   handleSyncAllRolesCommand, handleSyncAllPlayersEloCommand, handleVictoryCommand, handleOnboardingCommand, handleClearCommand,
   handleRegisterCommand, handleNickUpdateCommand, handleSyncPlayerRankCommand, handleVoteCommand, pendingAutoStarts, triggerAutoStart,
   handleRematchCommand, handleRouletteCommand, handleRoletaSairCommand, handleRulesCommand, handleStaffCommand, handlePdlCommand,
-  handleResultVoteButton, handleClubeCommand, handleQueroLiveCommand, handleLiveCommand,
+  handleResultVoteButton, handleClubeCommand, handleClubeAdminCommand, handleClubeFixarCommand, handleQueroLiveCommand, handleLiveCommand,
+  handleConviteCommand, handleTopConvitesCommand, handleTorneioCommand, handleTempoCommand, handleTopVozCommand,
+  handleAjudaFixarCommand, buildAjudaEmbed, buildTempoEmbed, normalizePresentearTier, handlePresentearCommand, handlePalpiteCommand,
+  handleMissoesCommand, handleDueloCommand,
+  LIVE_COOLDOWN_BY_TIER_MS,
+  handleSalaHubCommand, handleConvidarCommand, handleLimparVozCommand, handleSalaCommand,
+  handleSalaLockCommand, handleSalaLimitCommand, handleSalaExpulsarCommand,
+  getSummonerLevelGate,
   findRecentVictoryByLetter,
   findPendingAutoStartLobby,
   resolveCleanupTargets

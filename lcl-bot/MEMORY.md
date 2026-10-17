@@ -7,9 +7,9 @@
 
 ## 🗓️ Última Sessão
 
-- **Data:** 2026-10-14
-- **Foco:** Padronização dos cargos com emoticons + fixes no setup + restart
-- **Status:** ✅ Concluído (LCL 108/108, `lcl-bot` reiniciado e online como `LCL - LIGA CLANDESTINA DE LOL#8184`)
+- **Data:** 2026-10-17
+- **Foco:** Gate de cargos do `!desafiar` + padrão `🛠️ Staff` / `👑 Capitão LCL` + novo `!ajudalcl`/`/ajudalcl` + escopo por categoria (fim do "Comando desconhecido" cruzado)
+- **Status:** ✅ LCL 108/108 e CAPS 92/92; `lcl-bot` + `caps-bot` online. Cargos NÃO alterados no servidor (por decisão).
 
 ---
 
@@ -245,6 +245,16 @@ database/                    ← fallback JSON local
 ---
 
 ## 📝 Notas de Sessão
+
+### 2026-10-17 — Cargos operadores do inter: padrão `🛠️ Staff` / `👑 Capitão LCL`
+- **Padrão novo (com emoticon):** `🛠️ Staff` e `👑 Capitão LCL`. Variações sem emoji continuam valendo: `Staff`, `Capitão`, `Capitão LCL`. Legado `👑 Capitão de Customs` mantido por compatibilidade.
+- **Bug do `!desafiar` (causa raiz):** `captainRoleId` estava órfão (`1559621160478445609` não existe no CAPS ARENA) e o fallback por nome do gate só aceitava `"capitão lcl"` (inexistente). Corrigido: `isCapitaoOuStaff` normaliza o nome (sem acento/emoji) e aceita `staff`/`capitaolcl`/`capitao`/`capitaodecustoms`; `config.json` (LCL e CAPS) aponta p/ `1487819172783325255` (cargo real `👑 Capitão LCL`/`👑 Capitão de Customs`).
+- **Arquivos:** `server-pattern.json` (LCL + CAPS), `setup-servidor.js` (LCL + CAPS), `organize-official-discord.js` (lia `roles.Capitão`, chave inexistente → `roles['👑 Capitão LCL']`), `config.json` (`allowedRoleNames` com padrão + variações + legado), `interCommandHandlers.js`, `services/tempVoiceService.js` LCL, `tests/inter-only.test.js`.
+- **NÃO aplicado no servidor:** cargos do CAPS ARENA não foram criados/renomeados (decisão do usuário). Rodando `setup-servidor.js`/`organize-official-discord.js` depois, cria `🛠️ Staff`/`👑 Capitão LCL` e reponta o `captainRoleId`.
+- **Novo guia `!ajudalcl` / `/ajudalcl`:** `buildAjudaLclEmbed` + `handleAjudaLclCommand` em `commands/legacyCommands.js` (desafiar, cancelar, resultado/W.O., consultas, regras rápidas e pontuação lida de `config.inter`); adicionado a `INTER_COMMANDS`/`INTER_ONLY_SLASH`, citado no `INTER_ONLY_REPLY`, coberto em `tests/inter-only.test.js` e em `interservidores/COMANDOS.md`.
+- **Escopo por categoria (fim do "Comando desconhecido" cruzado):** os 2 bots convivem na CAPS ARENA e escutam `!`; o CAPS respondia "Comando desconhecido" no canal do LCL. Agora `config.json → commandCategoryIds: ["1559621163120984158"]` (categoria 🔥・LCL) + guarda em `index.js` `messageCreate`: o LCL só responde dentro de 🔥・LCL (com `INTER_ONLY=1`). No CAPS, `ignoredCategoryIds` espelhado (ver MEMORY raiz).
+- **Cargos de call:** `🎙️ Ativo`/`🎙️ Frequente`/`🎙️ Viciado em Call` são apurados/atribuídos pelo bot CAPS **só no tick mensal (dia 1º)**; o ✅ do `!tempo` é apenas o rank ao vivo do mês corrente (não significa cargo atribuído).
+- Validação: LCL `npm test` 108/108 (31 suites) e CAPS 92/92 (o `handleHelpCommand is not defined` foi resolvido — ver MEMORY raiz).
 
 ### 2026-10-14 — Cargos com emoticons + setup LCL
 - **Pattern LCL:** `Capitão` → `👑 Capitão de Customs` (igual CAPS ARENA, confirmado via API); LCL segue com 3 cargos (`Staff`, `👑 Capitão de Customs`, `Jogador`) — `Visitante`/`INFERNAL`/`MVP` são do CAPS e não são criados aqui; textos `🔥・LCL` com `talk: false` explícito (Jogador lê, Capitão/Staff operam).

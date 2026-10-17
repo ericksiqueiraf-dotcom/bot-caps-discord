@@ -21,6 +21,8 @@ const {
 const config = require('./config.json');
 const { createVipPixPayment, getClubeTierConfig, recordPendingPayment, startVipPaymentPoller } = require('./services/clubePaymentsService');
 const { createRiotService } = require('./services/riotService');
+const { startSextaScheduler, startLclScheduler } = require('./services/eventoService');
+const { startBackupScheduler } = require('./services/backupService');
 const { handleTempVoiceStateUpdate } = require('./services/tempVoiceService');
 const {
   createBalancedTeams,
@@ -34,7 +36,8 @@ const RIOT_API_KEY = process.env.RIOT_API_KEY;
 const BOT_VERSION = 'v1.8.0';
 const ONBOARDING_BUTTON_IDS = {
   LOL_PLAYER: 'onboarding_lol_player',
-  NON_PLAYER: 'onboarding_non_player'
+  NON_PLAYER: 'onboarding_non_player',
+  QUICK_START: 'onboarding_quick_start'
 };
 const ONBOARDING_MODAL_ID = 'onboarding_lol_registration';
 const ONBOARDING_MODAL_FIELD_ID = 'riot_nickname';
@@ -123,6 +126,8 @@ function buildSlashCommands() {
   return [
     new SlashCommandBuilder().setName('ping').setDescription('Verifica se o bot esta online.'),
     new SlashCommandBuilder().setName('ajuda').setDescription('Mostra a lista de comandos.'),
+    new SlashCommandBuilder().setName('ajuda2').setDescription('Ranking, clube, salas e extras.'),
+    new SlashCommandBuilder().setName('ajudafixar').setDescription('Posta e fixa as ajudas no #infos-lol (staff).'),
     new SlashCommandBuilder().setName('regras').setDescription('Mostra o regulamento da CAPS Arena.'),
     new SlashCommandBuilder().setName('staff').setDescription('Guia de comandos da staff.'),
     new SlashCommandBuilder().setName('roletasair').setDescription('Fica fora da próxima partida (sem sorteio nem subida).')
@@ -131,6 +136,30 @@ function buildSlashCommands() {
       .addUserOption((option) => option.setName('jogador').setDescription('Jogador').setRequired(true))
       .addIntegerOption((option) => option.setName('valor').setDescription('Ex: -50').setRequired(true).setMinValue(-500).setMaxValue(500))
       .addStringOption((option) => option.setName('motivo').setDescription('Motivo').setRequired(false)),
+    new SlashCommandBuilder().setName('presentear').setDescription('Dá dias de clube de presente (só Admin).')
+      .addUserOption((option) => option.setName('usuario').setDescription('Quem recebe').setRequired(true))
+      .addStringOption((option) => option.setName('tier').setDescription('Tier').setRequired(true)
+        .addChoices(
+          { name: 'Apoiador', value: 'apoiador' },
+          { name: 'VIP', value: 'vip' },
+          { name: 'Lendário', value: 'lendario' }
+        ))
+      .addIntegerOption((option) => option.setName('dias').setDescription('Dias (padrão do tier)').setRequired(false).setMinValue(1).setMaxValue(365)),
+    new SlashCommandBuilder().setName('palpite').setDescription('Aposte pontos no vencedor da sua partida.')
+      .addIntegerOption((option) => option.setName('time').setDescription('Time vencedor').setRequired(true)
+        .addChoices({ name: 'Time 1', value: 1 }, { name: 'Time 2', value: 2 }))
+      .addIntegerOption((option) => option.setName('pontos').setDescription('10 a 100').setRequired(true).setMinValue(10).setMaxValue(100)),
+    new SlashCommandBuilder().setName('missoes').setDescription('Suas missões da semana.'),
+    new SlashCommandBuilder().setName('duelo').setDescription('Desafie alguém para um duelo de PDL.')
+      .addStringOption((option) => option.setName('acao').setDescription('O que fazer').setRequired(false)
+        .addChoices(
+          { name: 'Desafiar', value: 'desafiar' },
+          { name: 'Aceitar', value: 'aceitar' },
+          { name: 'Recusar', value: 'recusar' },
+          { name: 'Lista', value: 'lista' }
+        ))
+      .addUserOption((option) => option.setName('usuario').setDescription('Adversário (p/ desafiar)').setRequired(false))
+      .addIntegerOption((option) => option.setName('pontos').setDescription('10 a 200').setRequired(false).setMinValue(10).setMaxValue(200)),
     new SlashCommandBuilder()
       .setName('entrar')
       .setDescription('Entra na fila CLASSIC ou ARAM.')
@@ -232,6 +261,19 @@ function buildSlashCommands() {
       .setDescription('Remove um usuario da fila.')
       .addUserOption((option) => option.setName('usuario').setDescription('Usuario a remover').setRequired(true)),
     addModeAndLobbyOptions(new SlashCommandBuilder().setName('limparsalas').setDescription('Limpa salas automaticas ou uma sala especifica.')),
+    new SlashCommandBuilder().setName('salahub').setDescription('Lista as salas temporárias ativas.'),
+    new SlashCommandBuilder().setName('sala').setDescription('Mostra ou renomeia sua sala temporária.')
+      .addStringOption((option) => option.setName('nome').setDescription('Novo nome da sala').setRequired(false)),
+    new SlashCommandBuilder().setName('convidar').setDescription('Convida alguém para sua sala temporária.')
+      .addUserOption((option) => option.setName('usuario').setDescription('Usuário a convidar').setRequired(true)),
+    new SlashCommandBuilder().setName('limparvoz').setDescription('Apaga sua sala temporária (use dentro dela).'),
+    new SlashCommandBuilder().setName('salalock').setDescription('Tranca/destranca sua sala temporária.')
+      .addStringOption((option) => option.setName('acao').setDescription('Trancar ou destrancar').setRequired(false)
+        .addChoices({ name: 'Trancar', value: 'trancar' }, { name: 'Destrancar', value: 'destrancar' })),
+    new SlashCommandBuilder().setName('salalimit').setDescription('Limite de usuários da sua sala (0 = sem limite).')
+      .addIntegerOption((option) => option.setName('limite').setDescription('0 a 99').setRequired(true).setMinValue(0).setMaxValue(99)),
+    new SlashCommandBuilder().setName('salaexpulsar').setDescription('Remove alguém da sua sala temporária.')
+      .addUserOption((option) => option.setName('usuario').setDescription('Usuário a remover').setRequired(true)),
     new SlashCommandBuilder().setName('roleta').setDescription('Participa da roleta de quem sai (losers).')
       .addIntegerOption((option) => option.setName('quantidade').setDescription('Quantos saem (1-5)').setRequired(false))
       .addStringOption((option) => option.setName('sala').setDescription('Letra da sala, ex.: A').setRequired(false))
@@ -304,6 +346,21 @@ function buildSlashCommands() {
       .setName('toprankinfernal')
       .setDescription('Quem mais conquistou o INFERNAL na temporada.'),
     new SlashCommandBuilder().setName('clube').setDescription('Mostra o clube VIP: tiers, benefícios e membros.'),
+    new SlashCommandBuilder().setName('clubeadmin').setDescription('Lista assinaturas ativas do clube (staff).'),
+    new SlashCommandBuilder().setName('convite').setDescription('Seu link pessoal de convite + recompensas.'),
+    new SlashCommandBuilder().setName('topconvites').setDescription('Ranking de quem mais trouxe gente.'),
+    new SlashCommandBuilder().setName('tempo').setDescription('Seu tempo em call (geral, semana, mês).'),
+    new SlashCommandBuilder().setName('topvoz').setDescription('Ranking de tempo em call do mês.'),
+    new SlashCommandBuilder().setName('torneio').setDescription('Torneio CAPS ARENA: entrar, ver lista, status e regras.')
+      .addStringOption((option) => option.setName('acao').setDescription('O que fazer').setRequired(true)
+        .addChoices(
+          { name: 'Entrar', value: 'entrar' },
+          { name: 'Sair', value: 'sair' },
+          { name: 'Lista', value: 'lista' },
+          { name: 'Status', value: 'status' },
+          { name: 'Regras', value: 'info' }
+        )),
+    new SlashCommandBuilder().setName('clubefixar').setDescription('Posta e fixa os benefícios no #clube-vip (staff).'),
     new SlashCommandBuilder().setName('querolive').setDescription('Entra/sai do ping 🔴 Ao Vivo.'),
     new SlashCommandBuilder()
       .setName('live')
@@ -332,7 +389,9 @@ const {
   formatDateTimeForHistory,
   getArchivedSeasonLabel,
   getQueueChannel,
+  isGuildAllowed,
   isMemberInQueueVoiceChannel,
+  isMemberInTierSVoiceChannel,
   formatRank,
   formatQueueMode,
   getStatsBucketKey,
@@ -421,6 +480,42 @@ client.once('ready', async () => {
   startDailyRankScheduler();
   startVipPaymentPoller({ config });
   startClubePromoScheduler();
+  startSextaScheduler();
+  startLclScheduler();
+  startVoiceTimeScheduler();
+  startBackupScheduler();
+
+  // Snapshot de convites p/ atribuir quem convidou cada novo membro.
+  try {
+    for (const guild of client.guilds.cache.values()) {
+      await snapshotGuildInvites(guild);
+    }
+  } catch (err) {
+    console.error('[RESTART] Erro ao fotografar convites:', err);
+  }
+
+  // Reabre sessões de tempo em call p/ quem já está em voz (sem retroativo).
+  try {
+    const { ensureVoiceStore } = require('./services/voiceTimeService');
+    const { loadSystemMeta, saveSystemMeta } = require('./services/dataService');
+    const systemMeta = await loadSystemMeta();
+    const store = ensureVoiceStore(systemMeta);
+    const now = Date.now();
+    for (const guild of client.guilds.cache.values()) {
+      for (const channel of guild.channels.cache.values()) {
+        if (!channel?.isVoiceBased?.()) continue;
+        for (const [, member] of channel.members) {
+          if (member.user?.bot) continue;
+          if (isVoiceTimeCountable({ channel, mute: member.voice?.mute, deaf: member.voice?.deaf, selfMute: member.voice?.selfMute, selfDeaf: member.voice?.selfDeaf, suppress: member.voice?.suppress }, guild)) {
+            store.sessions[`${guild.id}:${member.id}`] = { since: now, channelId: channel.id };
+          }
+        }
+      }
+    }
+    await saveSystemMeta(systemMeta);
+  } catch (err) {
+    console.error('[RESTART] Erro ao reabrir sessões de call:', err);
+  }
 
   // Retoma votacoes de MVP pendentes (se o bot reiniciou no meio de uma votacao)
   try {
@@ -476,6 +571,124 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
   await handleTempVoiceStateUpdate(oldState, newState).catch((error) => {
     console.error('[TEMP VOICE] Erro no evento de voz:', error.message);
   });
+  await handleVoiceTimeUpdate(oldState, newState).catch((error) => {
+    console.error('[VOICE TIME] Erro no evento de voz:', error.message);
+  });
+});
+
+function isVoiceTimeCountable(voiceState, guild) {
+  const channel = voiceState.channel;
+  if (!channel) return false;
+  if (guild?.afkChannelId && channel.id === guild.afkChannelId) return false;
+  if (voiceState.mute || voiceState.deaf || voiceState.selfMute || voiceState.selfDeaf || voiceState.suppress) return false;
+  return true;
+}
+
+async function handleVoiceTimeUpdate(oldState, newState) {
+  const member = newState.member || oldState.member;
+  if (!member || member.user?.bot) return;
+  const { ensureVoiceStore, closeSession } = require('./services/voiceTimeService');
+  const { loadSystemMeta, saveSystemMeta } = require('./services/dataService');
+  const now = Date.now();
+  const systemMeta = await loadSystemMeta();
+  const store = ensureVoiceStore(systemMeta);
+  closeSession(store, member.guild.id, member.id, now);
+  if (isVoiceTimeCountable(newState, member.guild)) {
+    store.sessions[`${member.guild.id}:${member.id}`] = { since: now, channelId: newState.channel.id };
+  }
+  await saveSystemMeta(systemMeta);
+}
+
+async function runVoiceTimeMonthlyTick(nowMs = Date.now()) {
+  const vt = require('./services/voiceTimeService');
+  const { loadSystemMeta, saveSystemMeta } = require('./services/dataService');
+  const parts = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' })
+    .formatToParts(new Date(nowMs)).filter((p) => p.type !== 'literal').map((p) => [p.type, p.value]);
+  const obj = Object.fromEntries(parts);
+  if (obj.day !== '01') return;
+  const thisMonth = `${obj.year}-${obj.month}`;
+  const systemMeta = await loadSystemMeta();
+  const store = vt.ensureVoiceStore(systemMeta);
+  if (store.lastRewardMonth === thisMonth) return;
+  const prev = new Date(Date.UTC(Number(obj.year), Number(obj.month) - 1, 1) - 24 * 3600 * 1000);
+  const prevMonth = `${prev.getUTCFullYear()}-${String(prev.getUTCMonth() + 1).padStart(2, '0')}`;
+  const { earners, vozDoMes, top } = vt.computeMonthlyRewards(store, prevMonth);
+  for (const guild of client.guilds.cache.values()) {
+    try {
+      const findOrCreateRole = async (name) => {
+        let role = guild.roles.cache.find((r) => r.name === name);
+        if (!role) role = await guild.roles.create({ name, reason: 'Tempo em call' }).catch(() => null);
+        return role;
+      };
+      // Cargos de escada (permanentes): garante o maior e tira os menores.
+      const ladder = ['🎙️ Ativo', '🎙️ Frequente', '🎙️ Viciado em Call'];
+      for (const [userId, rankName] of [
+        ...earners.viciado.map((id) => [id, '🎙️ Viciado em Call']),
+        ...earners.frequente.filter((id) => !earners.viciado.includes(id)).map((id) => [id, '🎙️ Frequente']),
+        ...earners.ativo.filter((id) => !earners.frequente.includes(id) && !earners.viciado.includes(id)).map((id) => [id, '🎙️ Ativo'])
+      ]) {
+        const m = await guild.members.fetch(userId).catch(() => null);
+        if (!m) continue;
+        for (const rName of ladder) {
+          const role = rName === rankName ? await findOrCreateRole(rName) : guild.roles.cache.find((r) => r.name === rName);
+          if (!role) continue;
+          if (rName === rankName) await m.roles.add(role, 'Tempo em call').catch(() => null);
+          else if (m.roles.cache.has(role.id)) await m.roles.remove(role, 'Subiu de cargo de call').catch(() => null);
+        }
+      }
+      // Lounge VIP do mês: quem fez 15h+ entra; quem tinha sai.
+      const lounge = guild.channels.cache.find((c) => c.name === '👑 Lounge VIP');
+      if (lounge) {
+        const prevList = Object.entries(store.loungeAccess || {}).filter(([, m]) => m !== thisMonth).map(([id]) => id);
+        for (const id of prevList) {
+          await lounge.permissionOverwrites.delete(id, 'Fim do acesso mensal').catch(() => null);
+          delete store.loungeAccess[id];
+        }
+        const granted = [...new Set([...earners.frequente, ...earners.viciado])];
+        for (const id of granted) {
+          await lounge.permissionOverwrites.edit(id, { ViewChannel: true, Connect: true, Speak: true }).catch(() => null);
+          store.loungeAccess[id] = thisMonth;
+        }
+      }
+      // Voz do Mês rotativo + anúncio.
+      if (vozDoMes) {
+        const role = await findOrCreateRole(vt.VOZ_DO_MES_ROLE);
+        if (role) {
+          for (const [, m] of role.members) await m.roles.remove(role, 'Nova voz do mês').catch(() => null);
+          const champ = await guild.members.fetch(vozDoMes).catch(() => null);
+          if (champ) await champ.roles.add(role, 'Voz do mês').catch(() => null);
+        }
+      }
+      const news = guild.channels.cache.find((c) => c.name === '📢┃comunicados' && c.isTextBased?.());
+      if (news?.isTextBased?.()) {
+        const lines = top.slice(0, 3).map((t, i) => `**${i + 1}º** <@${t.userId}> — ${vt.formatTempo(t.ms)}`);
+        await news.send(
+          `🎙️ **Apuração do tempo em call — ${prevMonth.slice(5)}/${prevMonth.slice(0, 4)}**\n` +
+          (lines.length ? lines.join('\n') + '\n' : 'Sem destaques.\n') +
+          (vozDoMes ? `\n👑 **Voz do Mês: <@${vozDoMes}>** (Lounge VIP liberado + cargo)!` : '')
+        ).catch(() => null);
+      }
+    } catch (error) {
+      console.error('[VOICE TIME] Erro na apuração mensal:', error.message);
+    }
+  }
+  store.lastRewardMonth = thisMonth;
+  await saveSystemMeta(systemMeta);
+}
+
+function startVoiceTimeScheduler() {
+  setInterval(() => {
+    runVoiceTimeMonthlyTick(Date.now()).catch((err) => console.error('[VOICE TIME] Erro no tick:', err.message));
+  }, 5 * 60 * 1000).unref?.();
+}
+
+client.on('channelDelete', async (channel) => {
+  try {
+    const { unregisterTempRoom } = require('./services/tempVoiceService');
+    if (channel?.id && channel?.guild?.id) unregisterTempRoom(channel.id, channel.guild.id);
+  } catch (error) {
+    console.error('[TEMP VOICE] Erro ao limpar registro da sala apagada:', error.message);
+  }
 });
 
 async function processCommand(message, rawContent) {
@@ -491,6 +704,12 @@ async function processCommand(message, rawContent) {
         break;
       case 'ajuda':
         await handlers.handleHelpCommand(message);
+        break;
+      case 'ajuda2':
+        await handlers.handleHelpCommand(message, 2);
+        break;
+      case 'ajudafixar':
+        await handlers.handleAjudaFixarCommand(message);
         break;
       case 'entrar':
       case 'entra':
@@ -526,6 +745,27 @@ async function processCommand(message, rawContent) {
         break;
       case 'clube':
         await handlers.handleClubeCommand(message);
+        break;
+      case 'clubeadmin':
+        await handlers.handleClubeAdminCommand(message);
+        break;
+      case 'convite':
+        await handlers.handleConviteCommand(message);
+        break;
+      case 'topconvites':
+        await handlers.handleTopConvitesCommand(message);
+        break;
+      case 'tempo':
+        await handlers.handleTempoCommand(message);
+        break;
+      case 'topvoz':
+        await handlers.handleTopVozCommand(message);
+        break;
+      case 'torneio':
+        await handlers.handleTorneioCommand(message, args);
+        break;
+      case 'clubefixar':
+        await handlers.handleClubeFixarCommand(message);
         break;
       case 'querolive':
       case 'quero-live':
@@ -605,8 +845,42 @@ async function processCommand(message, rawContent) {
       case 'roletasair':
         await handlers.handleRoletaSairCommand(message, args);
         break;
+      case 'salahub':
+        await handlers.handleSalaHubCommand(message, args);
+        break;
+      case 'convidar':
+        await handlers.handleConvidarCommand(message, args);
+        break;
+      case 'limparvoz':
+        await handlers.handleLimparVozCommand(message, args);
+        break;
+      case 'sala':
+        await handlers.handleSalaCommand(message, args);
+        break;
+      case 'salalock':
+        await handlers.handleSalaLockCommand(message, args);
+        break;
+      case 'salalimit':
+        await handlers.handleSalaLimitCommand(message, args);
+        break;
+      case 'salaexpulsar':
+        await handlers.handleSalaExpulsarCommand(message, args);
+        break;
       case 'pdl':
         await handlers.handlePdlCommand(message, args);
+        break;
+      case 'palpite':
+        await handlers.handlePalpiteCommand(message, args);
+        break;
+      case 'missoes':
+      case 'missao':
+        await handlers.handleMissoesCommand(message);
+        break;
+      case 'duelo':
+        await handlers.handleDueloCommand(message, args);
+        break;
+      case 'presentear':
+        await handlers.handlePresentearCommand(message, args);
         break;
       case 'regras':
       case 'regra':
@@ -667,6 +941,16 @@ client.on('messageCreate', async (message) => {
     return;
   }
 
+  if (!isGuildAllowed(message.guild.id)) {
+    return;
+  }
+
+  // Canais de outras features (ex.: categoria 🔥・LCL) sao operados por outro bot.
+  const ignoredCategoryIds = config.ignoredCategoryIds || [];
+  if (ignoredCategoryIds.length && message.channel?.parentId && ignoredCategoryIds.includes(message.channel.parentId)) {
+    return;
+  }
+
   const lines = message.content
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -686,9 +970,13 @@ client.on('interactionCreate', async (interaction) => {
     return;
   }
 
+  if (!isGuildAllowed(interaction.guild.id)) {
+    return;
+  }
+
   if (interaction.isButton()) {
     try {
-      if (interaction.customId === ONBOARDING_BUTTON_IDS.LOL_PLAYER) {
+      if (interaction.customId === ONBOARDING_BUTTON_IDS.LOL_PLAYER || interaction.customId === ONBOARDING_BUTTON_IDS.QUICK_START) {
         const modal = new ModalBuilder()
           .setCustomId(ONBOARDING_MODAL_ID)
           .setTitle('Cadastro LoL');
@@ -748,6 +1036,27 @@ client.on('interactionCreate', async (interaction) => {
       const queueJoin = parseQueueJoinButtonId(interaction.customId);
       if (queueJoin) {
         await interaction.deferReply({ ephemeral: true }).catch(() => null);
+        if (queueJoin.mode === 'leave') {
+          const context = createInteractionContext(interaction, {
+            content: '!sair'
+          });
+          await handlers.handleLeaveCommand(context);
+          return;
+        }
+        if (queueJoin.mode === 'espera') {
+          const context = createInteractionContext(interaction, {
+            content: '!espera'
+          });
+          await handlers.handleWaitingListCommand(context, []);
+          return;
+        }
+        if (queueJoin.mode === 'tiers' && !isMemberInTierSVoiceChannel(interaction.member)) {
+          const context = createInteractionContext(interaction, {
+            content: '!entrar'
+          });
+          await replyToMessage(context, 'Voce precisa estar no canal de voz `Lobby TIER S` para entrar nessa fila (só Esmeralda IV+).');
+          return;
+        }
         const context = createInteractionContext(interaction, {
           content: ['!entrar', ...queueJoin.args].join(' ')
         });
@@ -881,6 +1190,12 @@ client.on('interactionCreate', async (interaction) => {
       case 'ajuda':
         await handlers.handleHelpCommand(context);
         break;
+      case 'ajuda2':
+        await handlers.handleHelpCommand(context, 2);
+        break;
+      case 'ajudafixar':
+        await handlers.handleAjudaFixarCommand(context);
+        break;
       case 'entrar': {
         const selectedMode = interaction.options.getString('modo') || QUEUE_MODES.CLASSIC;
         const selectedFormat = interaction.options.getString('formato');
@@ -937,6 +1252,29 @@ client.on('interactionCreate', async (interaction) => {
       case 'clube':
         await handlers.handleClubeCommand(context);
         break;
+      case 'clubeadmin':
+        await handlers.handleClubeAdminCommand(context);
+        break;
+      case 'convite':
+        await handlers.handleConviteCommand(context);
+        break;
+      case 'topconvites':
+        await handlers.handleTopConvitesCommand(context);
+        break;
+      case 'tempo':
+        await handlers.handleTempoCommand(context);
+        break;
+      case 'topvoz':
+        await handlers.handleTopVozCommand(context);
+        break;
+      case 'torneio': {
+        const acao = interaction.options.getString('acao');
+        await handlers.handleTorneioCommand(context, acao ? [acao] : []);
+        break;
+      }
+      case 'clubefixar':
+        await handlers.handleClubeFixarCommand(context);
+        break;
       case 'querolive':
         await handlers.handleQueroLiveCommand(context);
         break;
@@ -951,6 +1289,31 @@ client.on('interactionCreate', async (interaction) => {
         break;
       case 'remover':
         await handlers.handleRemoveCommand(context, targetUser);
+        break;
+      case 'salahub':
+        await handlers.handleSalaHubCommand(context);
+        break;
+      case 'sala': {
+        const salaNome = interaction.options.getString('nome');
+        await handlers.handleSalaCommand(context, salaNome ? [salaNome] : []);
+        break;
+      }
+      case 'convidar':
+        await handlers.handleConvidarCommand(context, [], targetUser);
+        break;
+      case 'limparvoz':
+        await handlers.handleLimparVozCommand(context);
+        break;
+      case 'salalock': {
+        const acao = interaction.options.getString('acao');
+        await handlers.handleSalaLockCommand(context, acao ? [acao] : []);
+        break;
+      }
+      case 'salalimit':
+        await handlers.handleSalaLimitCommand(context, [String(interaction.options.getInteger('limite'))]);
+        break;
+      case 'salaexpulsar':
+        await handlers.handleSalaExpulsarCommand(context, [], targetUser);
         break;
       case 'regras':
         await handlers.handleRulesCommand(context);
@@ -968,6 +1331,30 @@ client.on('interactionCreate', async (interaction) => {
         const pdlValor = interaction.options.getInteger('valor');
         const pdlMotivo = interaction.options.getString('motivo');
         await handlers.handlePdlCommand(context, [String(pdlValor), ...(pdlMotivo ? [pdlMotivo] : [])], pdlUser || null);
+        break;
+      }
+      case 'presentear': {
+        const presenteUser = interaction.options.getUser('usuario');
+        const presenteTier = interaction.options.getString('tier');
+        const presenteDias = interaction.options.getInteger('dias');
+        await handlers.handlePresentearCommand(context, [presenteTier, ...(presenteDias != null ? [String(presenteDias)] : [])], presenteUser || null);
+        break;
+      }
+      case 'palpite': {
+        const palpiteTime = interaction.options.getInteger('time');
+        const palpitePontos = interaction.options.getInteger('pontos');
+        await handlers.handlePalpiteCommand(context, [String(palpiteTime), String(palpitePontos)]);
+        break;
+      }
+      case 'missoes':
+        await handlers.handleMissoesCommand(context);
+        break;
+      case 'duelo': {
+        const dueloAcao = interaction.options.getString('acao');
+        const dueloUser = interaction.options.getUser('usuario');
+        const dueloPontos = interaction.options.getInteger('pontos');
+        const dArgs = [...(dueloAcao && dueloAcao !== 'desafiar' ? [dueloAcao] : []), ...(dueloPontos != null ? [String(dueloPontos)] : [])];
+        await handlers.handleDueloCommand(context, dArgs, dueloUser || null);
         break;
       }
       case 'roleta': {
@@ -1101,6 +1488,10 @@ client.on('guildMemberAdd', async (member) => {
       .setLabel('Jogo LoL')
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
+      .setCustomId(ONBOARDING_BUTTON_IDS.QUICK_START)
+      .setLabel('⚡ Quero jogar agora')
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
       .setCustomId(ONBOARDING_BUTTON_IDS.NON_PLAYER)
       .setLabel('Nao jogo LoL')
       .setStyle(ButtonStyle.Secondary)
@@ -1113,6 +1504,168 @@ client.on('guildMemberAdd', async (member) => {
   }).catch((err) => console.error('[BOAS-VINDAS] Erro ao enviar mensagem:', err));
 });
 
+// ─── Convites com recompensa: snapshot de usos p/ atribuir quem convidou ─────
+const inviteUseCache = new Map(); // guildId -> Map(code, uses)
+
+async function snapshotGuildInvites(guild) {
+  try {
+    const invites = await guild.invites.fetch().catch(() => null);
+    if (!invites) return;
+    const map = new Map();
+    for (const inv of invites.values()) map.set(inv.code, inv.uses || 0);
+    inviteUseCache.set(guild.id, map);
+  } catch (error) {
+    console.error('[CONVITE] Erro ao fotografar convites:', error.message);
+  }
+}
+
+client.on('inviteCreate', (invite) => {
+  const map = inviteUseCache.get(invite.guild?.id) || new Map();
+  map.set(invite.code, invite.uses || 0);
+  if (invite.guild?.id) inviteUseCache.set(invite.guild.id, map);
+});
+
+client.on('inviteDelete', (invite) => {
+  inviteUseCache.get(invite.guild?.id)?.delete(invite.code);
+});
+
+async function grantRecruitRewards(guild, inviterId, lifetime, unlocked) {
+  try {
+    const inviter = await guild.members.fetch(inviterId).catch(() => null);
+    if (!inviter) return;
+    const findOrCreateRole = async (name) => {
+      let role = guild.roles.cache.find((r) => r.name === name);
+      if (!role) role = await guild.roles.create({ name, reason: 'Recompensa de convites' }).catch(() => null);
+      return role;
+    };
+    if (unlocked.includes(3)) {
+      const role = await findOrCreateRole('🌱 Recrutador');
+      if (role) await inviter.roles.add(role, 'Meta de 3 convites').catch(() => null);
+    }
+    if (unlocked.includes(5)) {
+      const destaque = await findOrCreateRole('⭐ Destaque');
+      if (destaque) {
+        for (const [, m] of destaque.members) await m.roles.remove(destaque, 'Novo destaque de recrutamento').catch(() => null);
+        await inviter.roles.add(destaque, 'Meta de 5 convites').catch(() => null);
+      }
+      const news = guild.channels.cache.find((c) => c.name === '📢┃comunicados' && c.isTextBased?.())
+        || (config.textChannels?.welcomeChannelId ? await guild.channels.fetch(config.textChannels.welcomeChannelId).catch(() => null) : null);
+      if (news?.isTextBased?.()) {
+        await news.send(`🌟 ${inviter} é o novo **destaque de recrutamento** com **${lifetime} convites**! Traga gente com \`!convite\` e tome o lugar.`).catch(() => null);
+      }
+    }
+    if (unlocked.includes(10)) {
+      const vipRole = guild.roles.cache.find((r) => r.name === '⭐ VIP');
+      if (vipRole) await inviter.roles.add(vipRole, 'Meta de 10 convites: 7 dias de VIP').catch(() => null);
+      const { loadVipSubscriptions, saveVipSubscriptions } = require('./services/dataService');
+      const { subscriptions } = await loadVipSubscriptions();
+      const now = Date.now();
+      subscriptions.push({
+        paymentId: `free-recruta:${guild.id}:${inviterId}:${now}`,
+        guildId: guild.id,
+        discordId: inviterId,
+        tierKey: 'vip',
+        status: 'active',
+        startedAt: new Date(now).toISOString(),
+        expiresAt: new Date(now + 7 * 24 * 3600 * 1000).toISOString(),
+        free: true
+      });
+      await saveVipSubscriptions({ subscriptions });
+    }
+    const festa = unlocked.includes(10)
+      ? '\n🏆 **7 dias de ⭐ VIP ativos!** Aproveite!'
+      : unlocked.includes(5)
+        ? `\n🌟 Você é o **DESTAQUE** da Arena! Faltam **${10 - lifetime}** para os 7 dias de VIP.`
+        : unlocked.includes(3)
+          ? `\n🌱 Cargo **Recrutador** garantido! Faltam **${5 - lifetime}** para o destaque.`
+          : '';
+    await inviter.send(
+      `🔗 **Recrutamento CAPS Arena**\nVocê já trouxe **${lifetime} pessoa(s)**! Metas: 3 = 🌱 Recrutador • 5 = destaque • 10 = 7 dias de ⭐ VIP grátis.${festa}`
+    ).catch(() => null);
+  } catch (error) {
+    console.error('[CONVITE] Erro nas recompensas:', error.message);
+  }
+}
+
+client.on('guildMemberAdd', async (member) => {
+  try {
+    const { ensureInvitesStore, recordInviteUse, checkThresholdRewards } = require('./services/convitesService');
+    const { loadSystemMeta, saveSystemMeta } = require('./services/dataService');
+    const guild = member.guild;
+    let before = inviteUseCache.get(guild.id);
+    if (!before) {
+      await snapshotGuildInvites(guild);
+      before = inviteUseCache.get(guild.id) || new Map();
+    }
+    const after = await guild.invites.fetch().catch(() => null);
+    let usedCode = null;
+    let inviterId = null;
+    if (after) {
+      const afterMap = new Map();
+      for (const inv of after.values()) {
+        afterMap.set(inv.code, inv.uses || 0);
+        if ((inv.uses || 0) > (before.get(inv.code) || 0) && !usedCode) {
+          usedCode = inv.code;
+          inviterId = inv.inviterId || inv.inviter?.id || null;
+        }
+      }
+      inviteUseCache.set(guild.id, afterMap);
+    }
+    if (!inviterId) return;
+    const systemMeta = await loadSystemMeta();
+    const store = ensureInvitesStore(systemMeta);
+    const result = recordInviteUse(store, {
+      code: usedCode,
+      inviterId,
+      newMemberId: member.id,
+      memberCreatedAtMs: member.user?.createdAt,
+      nowMs: Date.now()
+    });
+    if (!result.counted) {
+      await saveSystemMeta(systemMeta).catch(() => null);
+      return;
+    }
+    const { lifetime, unlocked } = checkThresholdRewards(store, inviterId);
+    await saveSystemMeta(systemMeta);
+    await grantRecruitRewards(guild, inviterId, lifetime, unlocked);
+  } catch (error) {
+    console.error('[CONVITE] Erro ao atribuir convite:', error.message);
+  }
+});
+
+client.on('guildMemberRemove', async (member) => {
+  try {
+    const { ensureInvitesStore, handleMemberLeave } = require('./services/convitesService');
+    const { loadSystemMeta, saveSystemMeta } = require('./services/dataService');
+    const systemMeta = await loadSystemMeta();
+    const store = ensureInvitesStore(systemMeta);
+    const { reverted } = handleMemberLeave(store, { newMemberId: member.id, nowMs: Date.now() });
+    if (reverted.length > 0) await saveSystemMeta(systemMeta);
+  } catch (error) {
+    console.error('[CONVITE] Erro ao estornar convite:', error.message);
+  }
+});
+
+// Anti-duplicação do anúncio de entrada no clube: o Discord pode emitir
+// guildMemberUpdate mais de uma vez para a mesma mudança de cargo.
+const recentClubeAnnouncements = new Map();
+const CLUBE_ANNOUNCE_DEDUPE_MS = 5 * 60 * 1000;
+
+function alreadyAnnouncedClubeJoin(guildId, userId, tierName) {
+  const key = `${guildId}:${userId}:${tierName}`;
+  const now = Date.now();
+  const last = recentClubeAnnouncements.get(key) || 0;
+  if (now - last < CLUBE_ANNOUNCE_DEDUPE_MS) return true;
+  recentClubeAnnouncements.set(key, now);
+  if (recentClubeAnnouncements.size > 500) {
+    for (const [k, ts] of recentClubeAnnouncements) {
+      if (now - ts > CLUBE_ANNOUNCE_DEDUPE_MS) recentClubeAnnouncements.delete(k);
+      if (recentClubeAnnouncements.size <= 300) break;
+    }
+  }
+  return false;
+}
+
 // Anúncio de entrada no clube VIP: quando um membro GANHA um tier, posta em
 // #comunicados (ou boas-vindas). Puro status — sem vantagem competitiva.
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
@@ -1123,6 +1676,9 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
       return !had && has;
     });
     if (!gained) return;
+
+    // Mesmo ganho anunciado há pouco (evento duplicado): ignora.
+    if (alreadyAnnouncedClubeJoin(newMember.guild?.id, newMember.id, gained)) return;
 
     // Assinatura recém-criada pelo webhook (que já anunciou): não duplicar.
     try {

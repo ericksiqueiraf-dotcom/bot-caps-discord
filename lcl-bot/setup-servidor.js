@@ -228,7 +228,7 @@ async function main() {
 
   // Nomes anteriores ao padrão com emoticons: o setup nao apaga cargos sozinho,
   // entao avisa para remocao manual e evita duplicidade funcional.
-  for (const legacy of ['Jogador Ativo', 'Capitão']) {
+  for (const legacy of ['Jogador Ativo', 'Capitão', 'Staff', '👑 Capitão de Customs']) {
     const found = guild.roles.cache.find((r) => r.name === legacy);
     if (found) console.log(`   ! cargo legado "${legacy}" ainda existe (${found.id}) — remova manualmente após migrar os membros`);
   }
@@ -242,7 +242,7 @@ async function main() {
   const modRole = guild.roles.cache.find((r) => r.name === '🛠️ Moderador') || null;
   if (!adminRole) console.log('     ⚠ cargo "👑 Admin" nao encontrado — VIP sem ele por enquanto');
   if (!modRole) console.log('     ⚠ cargo "🛠️ Moderador" nao encontrado — VIP sem ele por enquanto');
-  const vipManagerIds = [adminRole?.id, modRole?.id, get('Staff')?.id].filter(Boolean);
+  const vipManagerIds = [adminRole?.id, modRole?.id, get('🛠️ Staff')?.id].filter(Boolean);
 
   // Descarta overwrites com ID fora do cache (ex. IDs antigos de outro servidor no config).
   function keepResolvable(overwrites) {
@@ -369,12 +369,12 @@ async function main() {
     const overwrites = spec.vip
       ? vipOverwrites
       : spec.open
-      ? buildOpenTextOverwrites({ everyoneId: everyone.id, staffId: get('Staff')?.id, talk: Boolean(spec.talk) })
+      ? buildOpenTextOverwrites({ everyoneId: everyone.id, staffId: get('🛠️ Staff')?.id, talk: Boolean(spec.talk) })
       : [
           { id: everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
           { id: get('Jogador').id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.AddReactions], deny: spec.talk ? [] : [PermissionFlagsBits.SendMessages] },
-          { id: get('👑 Capitão de Customs').id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.AddReactions] },
-          { id: get('Staff').id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.AddReactions] }
+          { id: get('👑 Capitão LCL').id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.AddReactions] },
+          { id: get('🛠️ Staff').id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.AddReactions] }
         ];
     const channel = await ensureChannel({
       kind: ChannelType.GuildText,
@@ -404,12 +404,12 @@ async function main() {
       : spec.vip
       ? buildVipVoiceOverwrites({ everyoneId: everyone.id, memberIds: paidVipIds, managerIds: vipManagerIds })
       : spec.hidden
-      ? buildHiddenVoiceOverwrites({ everyoneId: everyone.id, jogId: get('Jogador')?.id, capId: get('👑 Capitão de Customs')?.id, staffId: get('Staff')?.id })
+      ? buildHiddenVoiceOverwrites({ everyoneId: everyone.id, jogId: get('Jogador')?.id, capId: get('👑 Capitão LCL')?.id, staffId: get('🛠️ Staff')?.id })
       : [
       { id: everyone.id, allow: [PermissionFlagsBits.ViewChannel], deny: [PermissionFlagsBits.Connect] },
       { id: get('Jogador').id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak] },
-      { id: get('👑 Capitão de Customs').id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak, PermissionFlagsBits.MoveMembers] },
-      { id: get('Staff').id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak, PermissionFlagsBits.MoveMembers, PermissionFlagsBits.MuteMembers] }
+      { id: get('👑 Capitão LCL').id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak, PermissionFlagsBits.MoveMembers] },
+      { id: get('🛠️ Staff').id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak, PermissionFlagsBits.MoveMembers, PermissionFlagsBits.MuteMembers] }
     ];
     const channel = await ensureChannel({
       kind: ChannelType.GuildVoice,
@@ -436,7 +436,7 @@ async function main() {
     const backupPath = path.join(__dirname, `config.json.bak-${Date.now()}`);
     fs.copyFileSync(configPath, backupPath);
     console.log(`💾 Backup do config atual: ${path.basename(backupPath)}`);
-    config.roles = { ...config.roles, registeredPlayerRoleId: roles.Jogador.id, visitanteRoleId: roles.Visitante?.id || config.roles?.visitanteRoleId || '', captainRoleId: roles['👑 Capitão de Customs'].id };
+    config.roles = { ...config.roles, registeredPlayerRoleId: roles.Jogador.id, visitanteRoleId: roles.Visitante?.id || config.roles?.visitanteRoleId || '', captainRoleId: roles['👑 Capitão LCL'].id };
     config.voiceChannels = { ...config.voiceChannels, ...voiceIds };
     config.textChannels = { ...config.textChannels, ...textIds };
     // inter aponta p/ os canais LCL (arenaGuildId e pontos preservados)
@@ -450,7 +450,7 @@ async function main() {
   }
 
   console.log('\n✅ Setup LCL concluído! Próximos passos:');
-  console.log('   1. Confira os cargos: dê "Staff" e "👑 Capitão de Customs" para quem é da equipe.');
+  console.log('   1. Confira os cargos: dê "🛠️ Staff" e "👑 Capitão LCL" para quem é da equipe.');
   console.log('   2. Confira o padrão: 🔥・lobby-clandestino LCL na FILA + textos 🔥・LCL separados.');
   console.log('   3. Confira `inter.arenaGuildId` no config.json (não é alterado pelo setup).');
   console.log('   4. Reinicie o bot (pm2 restart lcl-bot --update-env).');

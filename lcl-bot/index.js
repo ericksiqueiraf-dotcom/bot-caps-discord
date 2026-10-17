@@ -22,7 +22,7 @@ const config = require('./config.json');
 const { isInterOnlyMode, isInterCommand, INTER_ONLY_REPLY } = require('./commands/interOnly');
 const INTER_ONLY_SLASH = new Set([
   'desafiar', 'desafiar-cancelar', 'resultado-inter', 'wo-inter',
-  'inter-ranking', 'inter-historico', 'ajuda', 'regras', 'regrasdesafio', 'ping'
+  'inter-ranking', 'inter-historico', 'ajuda', 'ajudalcl', 'regras', 'regrasdesafio', 'ping'
 ]);
 const { createRiotService } = require('./services/riotService');
 const {
@@ -125,6 +125,7 @@ function buildSlashCommands() {
   return [
     new SlashCommandBuilder().setName('ping').setDescription('Verifica se o bot esta online.'),
     new SlashCommandBuilder().setName('ajuda').setDescription('Mostra a lista de comandos.'),
+    new SlashCommandBuilder().setName('ajudalcl').setDescription('Guia dos comandos do LCL (desafio inter-servidores).'),
     new SlashCommandBuilder().setName('regras').setDescription('Mostra o regulamento da CAPS Arena.'),
     new SlashCommandBuilder().setName('regrasdesafio').setDescription('Mostra as regras do desafio LCL.'),
     new SlashCommandBuilder().setName('staff').setDescription('Guia de comandos da staff.'),
@@ -576,6 +577,10 @@ async function processCommand(message, rawContent) {
       case 'ajuda':
         await handlers.handleHelpCommand(message);
         break;
+      case 'ajudalcl':
+      case 'ajuda-lcl':
+        await handlers.handleAjudaLclCommand(message);
+        break;
       case 'entrar':
       case 'entra':
         await handlers.handleEnterCommand(message, args);
@@ -797,6 +802,12 @@ client.on('messageCreate', async (message) => {
     return;
   }
 
+  // Modo desafio: responde apenas na categoria 🔥・LCL (nao duplica o bot CAPS).
+  const commandCategoryIds = config.commandCategoryIds || [];
+  if (isInterOnlyMode() && commandCategoryIds.length && message.channel?.parentId && !commandCategoryIds.includes(message.channel.parentId)) {
+    return;
+  }
+
   const lines = message.content
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -993,6 +1004,9 @@ client.on('interactionCreate', async (interaction) => {
         break;
       case 'ajuda':
         await handlers.handleHelpCommand(context);
+        break;
+      case 'ajudalcl':
+        await handlers.handleAjudaLclCommand(context);
         break;
       case 'entrar': {
         const selectedMode = interaction.options.getString('modo') || QUEUE_MODES.CLASSIC;

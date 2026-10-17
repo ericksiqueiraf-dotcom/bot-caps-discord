@@ -9,7 +9,7 @@ const INTER_COMMANDS = new Set([
   'inter-ranking', 'interranking',
   'inter-historico', 'interhistorico',
   // utilidades liberadas
-  'ping', 'ajuda', 'regras', 'regrasdesafio'
+  'ping', 'ajuda', 'ajudalcl', 'ajuda-lcl', 'regras', 'regrasdesafio'
 ]);
 
 function isInterOnlyMode() {
@@ -21,7 +21,7 @@ function isInterCommand(command) {
 }
 
 const INTER_ONLY_REPLY = '⚔️ Aqui é a **LCL — Liga Clandestina de LoL** (só modo desafio).\n' +
-  '`!desafiar <nome> MD1 @j1 @j2 @j3 @j4 @j5` • `!resultado-inter 1 AZUL` • `!wo` • `!inter-ranking` • `!inter-historico`';
+  '`!desafiar <nome> MD1 @j1 @j2 @j3 @j4 @j5` • `!resultado-inter 1 AZUL` • `!wo` • `!inter-ranking` • `!inter-historico` • `!ajudalcl`';
 
 module.exports = {
   INTER_COMMANDS,

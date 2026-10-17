@@ -113,27 +113,72 @@ function calculateEloDelta(currentRating, opponentRating, actualScore, totalGame
   return Math.round(kFactor * (actualScore - expectedScore));
 }
 
+// PDL por TIME (igual para os 10 da partida): expectativa pela soma dos elos,
+// piso +8 na vitória e teto -15 na derrota. K individual por jogos (50/35/24).
+const PDL_WIN_FLOOR = 8;
+const PDL_LOSS_CAP = -15;
+
+function calculateTeamPdlDelta({ teamTotal, oppTotal, games = 0, won = true, weight = 1 } = {}) {
+  const expected = calculateExpectedScore(Number(teamTotal) || 0, Number(oppTotal) || 0);
+  const kFactor = getKFactor(games);
+  if (won) {
+    return Math.max(PDL_WIN_FLOOR, Math.round(kFactor * (1 - expected) * weight));
+  }
+  return Math.max(PDL_LOSS_CAP, Math.round(-kFactor * expected * weight));
+}
+
 function createBalancedTeams(players) {
   if (!Array.isArray(players) || players.length < 2 || players.length % 2 !== 0) {
     throw new Error('O balanceamento exige uma quantidade par de jogadores.');
   }
 
   const sortedPlayers = [...players].sort((a, b) => getBalanceWeight(b) - getBalanceWeight(a));
-  const bestCombination = findBestSnakeArrangement(sortedPlayers);
+  const bestSplit = findBestTeamSplit(sortedPlayers);
 
-  if (!bestCombination) {
+  if (!bestSplit) {
     throw new Error('Nao foi possivel criar times equilibrados.');
   }
 
-  const teams = applySnakeDraft(bestCombination);
-
   return {
-    teamOne: teams.teamOne,
-    teamTwo: teams.teamTwo,
-    teamOneMmr: calculateTeamMmr(teams.teamOne),
-    teamTwoMmr: calculateTeamMmr(teams.teamTwo),
-    difference: Math.abs(calculateTeamMmr(teams.teamOne) - calculateTeamMmr(teams.teamTwo))
+    teamOne: bestSplit.teamOne,
+    teamTwo: bestSplit.teamTwo,
+    teamOneMmr: calculateTeamMmr(bestSplit.teamOne),
+    teamTwoMmr: calculateTeamMmr(bestSplit.teamTwo),
+    difference: Math.abs(calculateTeamMmr(bestSplit.teamOne) - calculateTeamMmr(bestSplit.teamTwo))
   };
+}
+
+// Busca exaustiva: testa todas as metades possíveis (fixando o 1º jogador
+// num time para não avaliar espelhos) e fica com a menor diferença de elo.
+// 5x5 = 126 combinações; 4x4 = 35; 1x1 = 1. Barato e ótimo garantido.
+function findBestTeamSplit(sortedPlayers) {
+  const half = sortedPlayers.length / 2;
+  let best = null;
+  let smallestDifference = Number.POSITIVE_INFINITY;
+
+  function explore(index, teamOne) {
+    if (teamOne.length === half) {
+      const inOne = new Set(teamOne);
+      const teamTwo = sortedPlayers.filter((p) => !inOne.has(p));
+      const difference = Math.abs(calculateTeamMmr(teamOne) - calculateTeamMmr(teamTwo));
+      if (difference < smallestDifference) {
+        smallestDifference = difference;
+        best = { teamOne: [...teamOne], teamTwo };
+      }
+      return;
+    }
+    if (index >= sortedPlayers.length) return;
+    // Poda: ainda dá para completar o time?
+    if (teamOne.length + (sortedPlayers.length - index) < half) return;
+    teamOne.push(sortedPlayers[index]);
+    explore(index + 1, teamOne);
+    teamOne.pop();
+    // O 1º jogador (maior elo) fica sempre no time 1: corta espelhos pela metade.
+    if (index > 0) explore(index + 1, teamOne);
+  }
+
+  explore(0, []);
+  return best;
 }
 
 function findBestSnakeArrangement(players) {
@@ -202,6 +247,11 @@ module.exports = {
   calculateHybridMmr,
   calculateSeedRating,
   calculateEloDelta,
+  calculateExpectedScore,
+  getKFactor,
+  calculateTeamPdlDelta,
+  PDL_WIN_FLOOR,
+  PDL_LOSS_CAP,
   getExperienceWeight,
   migrateInternalRating,
   applyLeagueMmrChange

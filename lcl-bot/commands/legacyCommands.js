@@ -921,6 +921,39 @@ async function handleHelpCommand(message) {
   }
 }
 
+function buildAjudaLclEmbed() {
+  const pts = config.inter || {};
+  const md1 = Number(pts.md1WinPoints ?? 2);
+  const w20 = Number(pts.md3Win20Points ?? 5);
+  const w21 = Number(pts.md3Win21Points ?? 4);
+  return new EmbedBuilder()
+    .setColor(THEME.INFO)
+    .setTitle('⚔️ LCL — Guia de Comandos (Desafio Inter-servidores)')
+    .setDescription('A LCL roda **só o modo desafio** (N × J na ARENA). Reúna os 5 no **Lobby Clandestino** e desafie.\n🔒 Desafiar, resultado e W.O. exigem cargo **Capitão/Staff** — as consultas são livres.')
+    .addFields(
+      { name: '🥊 Desafiar (Capitão/Staff)', value: '`!desafiar [MD1|MD3] <nome do time> [@j2 @j3 @j4 @j5]`\n• **Com menções:** você + 4 marcados = 5 fixos\n• **Sem menções:** os **5 na call** do Lobby Clandestino (a sala vira o time)\n• `MD1` = jogo único • `MD3` = melhor de 3\nSlash: `/desafiar nome:… jogador2..5:@… serie:MD1|MD3`' },
+      { name: '🚫 Cancelar a busca (Capitão/Staff)', value: '`!desafiar-cancelar` • sai da busca antes de formar o match\nSlash: `/desafiar-cancelar`' },
+      { name: '🏆 Resultado e W.O. (Capitão/Staff)', value: '`!resultado-inter [jogo] AZUL|VERM` • ex.: `!resultado-inter 1 AZUL` (sem número = próximo jogo)\n`!wo [A|B]` • W.O. (sem letra = o ausente é o time que **não** contém você)\nSlash: `/resultado-inter`, `/wo-inter`' },
+      { name: '📊 Consultas (todos)', value: '`!inter-ranking` • top 10 (pontos, MD1 V/D, MD3 V/D, jogos, WOs)\n`!inter-historico` • últimas 8 séries fechadas\nSlash: `/inter-ranking`, `/inter-historico`' },
+      { name: '💡 Regras rápidas', value: `• **MD3:** o jogo 2 tem lados invertidos; o jogo 3 só acontece em **1-1** (lados sorteados na hora)\n• **Pontos:** MD1 vencida **${md1}** • MD3 vencida 2-0 **${w20}** • MD3 vencida 2-1 **${w21}**\n• Série fechada: anuncia o campeão, pontua e apaga as salas\n• W.O. conta como série vencida` },
+      { name: '⚙️ Outros', value: '`!ping` • `!ajuda` • `!ajudalcl` • `!regras` • `!regrasdesafio`' }
+    )
+    .setFooter({ text: `${FOOTER_PREFIX} • LCL • Ajuda Atualizada` })
+    .setTimestamp();
+}
+
+async function handleAjudaLclCommand(message) {
+  try {
+    const sent = await sendToMessageChannel(message, { embeds: [buildAjudaLclEmbed()] });
+    if (!sent) {
+      await replyToMessage(message, '⚔️ LCL (desafio): `!desafiar [MD1|MD3] <nome> @j2 @j3 @j4 @j5` • `!desafiar-cancelar` • `!resultado-inter 1 AZUL` • `!wo` • `!inter-ranking` • `!inter-historico`');
+    }
+  } catch (error) {
+    console.error('[ERRO] !ajudalcl:', error);
+    await replyToMessage(message, '❌ Erro ao mostrar a ajuda do LCL. Tente novamente.').catch(() => null);
+  }
+}
+
 async function handleLeaveCommand(message) {
   try {
     let leftWaitingList = false;
@@ -2059,7 +2092,7 @@ async function handleSharedCommand(message, args) {
 
 module.exports = {
   handleEnterCommand, handleListCommand, handleWaitingListCommand, handleTierSWaitingListCommand, handleClearWaitingListsCommand, handleStatsCommand, handlePingCommand, handleLeaderboardCommand, handleTopTenCommand, handleTopInfernalCommand,
-  handleTopStreakCommand, handleSeasonHistoryCommand, handlePlayerCardCommand, handleHelpCommand, handleLeaveCommand, handleRemoveCommand,
+  handleTopStreakCommand, handleSeasonHistoryCommand, handlePlayerCardCommand, handleHelpCommand, handleAjudaLclCommand, handleLeaveCommand, handleRemoveCommand,
   handleResetCommand, handleCleanupRoomsCommand, handleSeasonResetCommand, handleOfficialSeasonStartCommand,
   handleUndoSeasonResetCommand, handleRestoreArchivedPeriodCommand, handleCancelStartCommand, handleStartCommand,
   handleSyncAllRolesCommand, handleSyncAllPlayersEloCommand, handleVictoryCommand, handleOnboardingCommand, handleClearCommand,

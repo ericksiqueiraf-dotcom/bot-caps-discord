@@ -6,8 +6,8 @@
     "FILA": ["voz", "filas"]
   },
   "roles": [
-    { "name": "Staff", "color": "#E74C3C", "reason": "Equipe do servidor" },
-    { "name": "👑 Capitão de Customs", "color": "#F1C40F", "reason": "Pode !start / !vitoria" },
+    { "name": "🛠️ Staff", "color": "#E74C3C", "reason": "Equipe do servidor" },
+    { "name": "👑 Capitão LCL", "color": "#F1C40F", "reason": "Pode !start / !vitoria" },
     { "name": "Jogador", "color": "#3498DB", "reason": "Recebe apos validar Nick#TAG + aceitar regras" },
     { "name": "🔥 INFERNAL", "color": "#FF6B00", "reason": "Bot dá/remove sozinho (5 wins)" },
     { "name": "⭐ MVP", "color": "#9B59B6", "reason": "Bot dá/remove sozinho (MVP)" },
@@ -49,7 +49,8 @@
     { "name": "⏳・sala-de-espera-tier-s", "category": "FILA", "configKey": "postMatchTierSWaitingChannelId", "hidden": true, "aliases": ["⏳ Sala de Espera Tier S", "Sala de Espera Tier S"] },
     { "name": "⚒️ FLEX", "category": "💬・COMUNIDADE", "configKey": null, "hidden": true },
     { "name": "☠️ SoloQ", "category": "💬・COMUNIDADE", "configKey": null, "hidden": true },
-    { "name": "HUB", "category": "FILA", "tempVoiceKey": "hubChannelId", "aliases": ["➕ Criar sala", "Criar sala"] },
+    { "name": "🥱Ausente", "category": "💬・COMUNIDADE", "configKey": null, "preserve": true },
+    { "name": "HUB", "category": "💎・CLUBE VIP", "tempVoiceKey": "hubChannelId", "aliases": ["➕ Criar sala", "Criar sala"] },
     { "name": "🔥・lobby-clandestino LCL", "category": "FILA", "configKey": null, "userLimit": 5, "preserve": true },
     { "name": "👑 Lounge VIP", "category": "💎・CLUBE VIP", "configKey": null, "vip": true }
   ],

@@ -101,16 +101,23 @@ describe('feed automatico do canal #fila', () => {
       mode: 'aram',
       args: ['aram']
     });
+    assert.deepEqual(parseQueueJoinButtonId(QUEUE_JOIN_BUTTON_IDS.TIERS), { mode: 'tiers', args: [] });
+    assert.deepEqual(parseQueueJoinButtonId(QUEUE_JOIN_BUTTON_IDS.ESPERA), { mode: 'espera', args: [] });
+    assert.deepEqual(parseQueueJoinButtonId(QUEUE_JOIN_BUTTON_IDS.LEAVE), { mode: 'leave', args: [] });
     assert.equal(parseQueueJoinButtonId('queue:x:join'), null);
   });
 
-  it('linha de botoes da fila tem Queue CAPS e ARAM', () => {
+  it('linha de botoes da fila tem CAPS, ARAM, TIERS, Esperar e Sair', () => {
     const row = buildQueueJoinActionRow();
     const json = row.toJSON();
-    assert.equal(json.components.length, 2);
-    assert.equal(json.components[0].custom_id, QUEUE_JOIN_BUTTON_IDS.CLASSIC);
-    assert.equal(json.components[0].label, 'Entrar Queue CAPS');
-    assert.equal(json.components[1].custom_id, QUEUE_JOIN_BUTTON_IDS.ARAM);
-    assert.equal(json.components[1].label, 'Entrar Queue ARAM');
+    assert.equal(json.components.length, 5);
+    assert.deepEqual(
+      json.components.map((c) => c.custom_id),
+      [QUEUE_JOIN_BUTTON_IDS.CLASSIC, QUEUE_JOIN_BUTTON_IDS.ARAM, QUEUE_JOIN_BUTTON_IDS.TIERS, QUEUE_JOIN_BUTTON_IDS.ESPERA, QUEUE_JOIN_BUTTON_IDS.LEAVE]
+    );
+    assert.deepEqual(
+      json.components.map((c) => c.label),
+      ['Entrar Queue CAPS', 'Entrar Queue ARAM', 'Entrar Queue TIERS', 'Esperar Fila', 'Sair da Fila']
+    );
   });
 });

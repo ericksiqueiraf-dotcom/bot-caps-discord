@@ -20,7 +20,11 @@ async function registerVictory({
     shouldMirrorAramGroupedStats,
     calculateEloDelta,
     getAramWeightByTeamSize,
-    formatCustomRecord
+    formatCustomRecord,
+    calculateTeamMmr,
+    calculateTeamPdlDelta,
+    getPdlMultiplier,
+    onVictoryPdlApplied
   } = deps;
 
   const winningPlayers = winningTeam === '1' ? match.teamOne : match.teamTwo;
@@ -45,16 +49,29 @@ async function registerVictory({
     const statsData = await loadPlayerStats();
     const winners = [];
     const losers = [];
+    const pdlMultiplier = typeof getPdlMultiplier === 'function' ? Number(getPdlMultiplier()) || 1 : 1;
+    const hojeSP = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    // Expectativa por TIME (soma dos elos, igual p/ os 10): time equilibrado = ±parelho.
+    const teamOneTotal = calculateTeamMmr(match.teamOne || []);
+    const teamTwoTotal = calculateTeamMmr(match.teamTwo || []);
 
     for (const player of winningPlayers) {
       const storedStats = getStoredPlayerStats(statsData, player);
       const modeStats = getModeStats(storedStats, match.mode, match.format);
       const beforeRank = modeStats.internalRating || 0;
       const beforeRecord = formatCustomRecord(modeStats);
+      const gamesPlayed = (modeStats.customWins || 0) + (modeStats.customLosses || 0);
+      const myTotal = winningTeam === '1' ? teamOneTotal : teamTwoTotal;
+      const oppTotal = winningTeam === '1' ? teamTwoTotal : teamOneTotal;
       const delta = Math.round(
-        calculateEloDelta(beforeRank, avgWinnerOppMmr, 1, (modeStats.customWins || 0) + (modeStats.customLosses || 0)) * mmrWeight
+        calculateTeamPdlDelta({ teamTotal: myTotal, oppTotal, games: gamesPlayed, won: true, weight: mmrWeight }) * pdlMultiplier
       );
-      const afterRank = beforeRank + delta;
+      // Bônus primeira vitória do dia (+50%).
+      let firstWinBonus = 0;
+      if (storedStats?.ultimaVitoriaEm !== hojeSP) {
+        firstWinBonus = Math.round(delta * 0.5);
+      }
+      const afterRank = beforeRank + delta + firstWinBonus;
       const bucketKey = getStatsBucketKey(match.mode, match.format);
       const updatedModes = {
         ...normalizePlayerModes(storedStats),
@@ -76,14 +93,15 @@ async function registerVictory({
         };
       }
 
-      upsertPlayerStats(statsData, player, { modes: updatedModes });
+      upsertPlayerStats(statsData, player, { modes: updatedModes, ultimaVitoriaEm: hojeSP });
       winners.push({
         ...player,
         beforeRank,
         afterRank,
         beforeRecord,
         afterRecord: formatCustomRecord(updatedModes[bucketKey]),
-        ratingDelta: delta,
+        ratingDelta: delta + firstWinBonus,
+        firstWinBonus,
         winStreak: (modeStats.winStreak || 0) + 1
       });
     }
@@ -93,8 +111,11 @@ async function registerVictory({
       const modeStats = getModeStats(storedStats, match.mode, match.format);
       const beforeRank = modeStats.internalRating || 0;
       const beforeRecord = formatCustomRecord(modeStats);
+      const gamesPlayed = (modeStats.customWins || 0) + (modeStats.customLosses || 0);
+      const myTotal = winningTeam === '1' ? teamTwoTotal : teamOneTotal;
+      const oppTotal = winningTeam === '1' ? teamOneTotal : teamTwoTotal;
       const delta = Math.round(
-        calculateEloDelta(beforeRank, avgLoserOppMmr, 0, (modeStats.customWins || 0) + (modeStats.customLosses || 0)) * mmrWeight
+        calculateTeamPdlDelta({ teamTotal: myTotal, oppTotal, games: gamesPlayed, won: false, weight: mmrWeight })
       );
       const afterRank = Math.max(0, beforeRank + delta);
       const bucketKey = getStatsBucketKey(match.mode, match.format);
@@ -129,9 +150,42 @@ async function registerVictory({
       });
     }
 
+    // Bolão: quem apostou no time vencedor divide o bolo proporcionalmente.
+    // (A aposta foi debitada na hora do !palpite; aqui só credita os ganhadores.)
+    const payouts = [];
+    const palpites = currentEntry.palpites || {};
+    const bettorIds = Object.keys(palpites);
+    const allMatchPlayers = [...winningPlayers, ...losingPlayers];
+    if (bettorIds.length > 0) {
+      const pool = bettorIds.reduce((s, id) => s + Number(palpites[id]?.pontos || 0), 0);
+      const winPool = bettorIds
+        .filter((id) => String(palpites[id]?.time) === String(winningTeam))
+        .reduce((s, id) => s + Number(palpites[id]?.pontos || 0), 0);
+      if (pool > 0 && winPool > 0) {
+        for (const id of bettorIds) {
+          if (String(palpites[id]?.time) !== String(winningTeam)) continue;
+          const credit = Math.floor(Number(palpites[id].pontos) * pool / winPool);
+          if (credit <= 0) continue;
+          const bPlayer = allMatchPlayers.find((p) => p.discordId === id) || { discordId: id };
+          const bStored = getStoredPlayerStats(statsData, bPlayer);
+          if (!bStored) continue;
+          const bModes = getModeStats(bStored, match.mode, match.format);
+          const bKey = getStatsBucketKey(match.mode, match.format);
+          upsertPlayerStats(statsData, bPlayer, {
+            modes: { ...normalizePlayerModes(bStored), [bKey]: { ...bModes, internalRating: Number(bModes.internalRating || 0) + credit } }
+          });
+          payouts.push({ discordId: id, valor: credit });
+        }
+      }
+    }
+
     await savePlayerStats(statsData);
     delete currentMatchData.matches[matchId];
     await saveCurrentMatch(currentMatchData);
+
+    if (typeof onVictoryPdlApplied === 'function') {
+      await onVictoryPdlApplied({ guildId, matchId, match, winners, winningTeam, pdlMultiplier }).catch(() => null);
+    }
 
     return {
       winners,
@@ -139,6 +193,8 @@ async function registerVictory({
       winningPlayers,
       losingPlayers,
       mmrWeight,
+      pdlMultiplier,
+      payouts,
       avgWinnerOppMmr,
       avgLoserOppMmr
     };

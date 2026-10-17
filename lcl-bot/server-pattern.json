@@ -6,8 +6,8 @@
     "FILA": ["voz", "filas"]
   },
   "roles": [
-    { "name": "Staff", "color": "#E74C3C", "reason": "Equipe do servidor — opera !desafiar / !resultado-inter / !wo" },
-    { "name": "👑 Capitão de Customs", "color": "#F1C40F", "reason": "Opera o !desafiar / !resultado-inter" },
+    { "name": "🛠️ Staff", "color": "#E74C3C", "reason": "Equipe do servidor — opera !desafiar / !resultado-inter / !wo" },
+    { "name": "👑 Capitão LCL", "color": "#F1C40F", "reason": "Opera o !desafiar / !resultado-inter" },
     { "name": "Jogador", "color": "#3498DB", "reason": "Enxerga e digita nos canais 🔥・LCL e na call clandestina" }
   ],
   "vipRoleNames": [],

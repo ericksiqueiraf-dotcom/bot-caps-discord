@@ -6,7 +6,7 @@
 ## 0. Pré-requisitos (checklist)
 
 - [ ] `lcl-bot` online no PM2 (`Bot conectado como LCL - LIGA CLANDESTINA DE LOL#8184`)
-- [ ] Você com cargo **👑 Capitão de Customs** ou **Staff** (só eles operam `!desafiar`, `!resultado-inter`, `!wo`)
+- [ ] Você com cargo **🛠️ Staff** ou **👑 Capitão LCL** (variações sem emoji valem: `Staff`, `Capitão`, `Capitão LCL`) — só eles operam `!desafiar`, `!resultado-inter`, `!wo`
 - [ ] Canais existem: `🔥・fila-lcl` · `⚔️・partidas-lcl` · `📋・resultados-lcl` · `🥇・ranking-lcl` + voz `🔥・lobby-clandestino LCL`
 - [ ] 5 pessoas na call clandestina (ou use menções `@` p/ simular o elenco)
 
