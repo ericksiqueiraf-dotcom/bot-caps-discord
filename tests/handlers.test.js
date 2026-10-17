@@ -237,3 +237,38 @@ describe('handler: comandos só de Staff (Capitão fora, Admin/Administrador ent
     });
   }
 });
+
+describe('handler !staff: guia restrito à Staff', () => {
+  async function runStaff(member) {
+    setup({});
+    const message = mkMessage({ member: mkMember(member) });
+    const sent = [];
+    message.channel = { id: 'c1', isTextBased: () => true, send: async (p) => { sent.push(p); } };
+    await legacy.handleStaffCommand(message);
+    return { replies: message.replies.map(textOf).join('\n'), sent };
+  }
+
+  it('Capitão é bloqueado', async () => {
+    const { replies, sent } = await runStaff(ROLE_CAPITAO);
+    assert.match(replies, /Guia restrito à staff/);
+    assert.equal(sent.length, 0, 'não pode receber o guia');
+  });
+
+  it('jogador comum é bloqueado', async () => {
+    const { replies, sent } = await runStaff(ROLE_JOGADOR);
+    assert.match(replies, /Guia restrito à staff/);
+    assert.equal(sent.length, 0);
+  });
+
+  it('Staff recebe o guia no canal', async () => {
+    const { replies, sent } = await runStaff(ROLE_STAFF);
+    assert.doesNotMatch(replies, /restrito/i);
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].embeds?.length, 1);
+  });
+
+  it('Administrador recebe o guia mesmo sem cargo de Staff', async () => {
+    const { sent } = await runStaff({ roleNames: ['Jogador'], perms: ['Administrator'] });
+    assert.equal(sent.length, 1);
+  });
+});

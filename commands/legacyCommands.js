@@ -2614,14 +2614,6 @@ async function handleRulesCommand(message) {
   }
 }
 
-function isStaffViewer(member) {
-  if (!member) return false;
-  try {
-    if (member.permissions?.has('ManageMessages') || member.permissions?.has('Administrator')) return true;
-  } catch { /* noop */ }
-  return Boolean(config.roles?.captainRoleId && member.roles?.cache?.has(config.roles.captainRoleId));
-}
-
 // Staff "de verdade" (🛠️ Staff / Moderador / Admin) — SEM o cargo de Capitão.
 // Regra ÚNICA para todo comando de staff do qual o Capitão não participa.
 // Admin/Administrador sempre entra (Administrator implica ManageMessages).
@@ -2643,7 +2635,7 @@ const isTournamentStaff = isStaffOnly;
 
 async function handleStaffCommand(message) {
   try {
-    if (!isStaffViewer(message.member)) {
+    if (!isStaffOnly(message.member)) {
       return await replyToMessage(message, '❌ Guia restrito à staff. Jogadores: usem `!regras`.');
     }
     await sendToMessageChannel(message, { embeds: [buildStaffEmbed()] });

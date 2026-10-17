@@ -9,7 +9,7 @@
 
 - **Data:** 2026-10-17
 - **Foco:** Torneio — `!torneioon`/`!torneiooff`/`!torneioagenda` (staff) + janela de inscrição de 7 dias; base no merge `pr/local-into-main`
-- **Status:** ✅ CAPS **220/220** (41 suites) e LCL **108/108**. `caps-bot` (PROD, branch `feat/torneio-onoff`) e `lcl-bot` reiniciados e **online** (`CAPS BOT LOL#6241`, `LCL - LIGA CLANDESTINA DE LOL#8184`). Torneio segue **desativado** (default) até a staff rodar `!torneioon`. PR manual ainda pendente.
+- **Status:** ✅ CAPS **224/224** (42 suites) e LCL **108/108**. `caps-bot` (PROD, branch `feat/torneio-onoff`) e `lcl-bot` reiniciados e **online** (`CAPS BOT LOL#6241`, `LCL - LIGA CLANDESTINA DE LOL#8184`). Torneio segue **desativado** (default) até a staff rodar `!torneioon`. PR manual ainda pendente.
 
 ---
 
@@ -427,8 +427,10 @@ database/                    ← fallback JSON local
 - **Aplicado em:** `handleClubeFixarCommand` (`legacyCommands.js:936`), `handleAjudaFixarCommand` (`:968`), `handleClubeAdminCommand` (`:1144`) e na gestão do `!torneio` (`:1294`). Antes usavam `isStaffViewer` (que inclui o Capitão) → o `👑 Capitão` conseguia fixar os guias e listar as assinaturas do clube.
 - **Admin/Administrador sempre liberado:** o check é por permissão (`ManageMessages`, e `Administrator` implica ManageMessages no discord.js), então qualquer comando de staff é acessível a Admins mesmo sem cargo `staff`. Confirmado também no LCL (`isCapitaoOuStaff` checa `Administrator`, `interCommandHandlers.js:33-34`).
 - **Testes:** novo bloco em `tests/handlers.test.js` — para cada um dos 3 comandos: **Capitão e jogador bloqueados**; **Staff / Moderador / `ManageMessages` / `Administrator` passam** (18 casos). `tests/torneio.test.js` passou a testar `isStaffOnly` (+ alias).
-- **Não mudado (decisão pendente):** `!staff` (o guia) continua em `isStaffViewer` — o Capitão ainda consegue ler; `!limparespera`/`!limparsalas` continuam aceitando o Capitão (`hasCaptainRole`).
-- Validação: CAPS **220/220** (41 suites), LCL **108/108**.
+- **Não mudado (decisão do usuário):** `!limparespera`/`!limparsalas` **continuam** aceitando o Capitão (`hasCaptainRole` = `ManageMessages` ou `👑 Capitão`) — é operação do dia a dia, não gestão.
+- **`!staff` (guia interno) também virou só-Staff:** `handleStaffCommand` (`:2644`) passou de `isStaffViewer` para `isStaffOnly`. Com isso **`isStaffViewer` foi removida** (ficou sem uso no CAPS). No **LCL** ela permanece na definição (`lcl-bot/commands/legacyCommands.js:1865`) guardando o `!staff` de lá — inalcançável por causa do `INTER_ONLY` (não mudou comportamento; deixei para não adicionar código morto).
+- **Testes do `!staff`:** Capitão ❌ (não recebe o embed), jogador ❌, Staff ✅, Administrador ✅ (mesmo sem cargo de Staff).
+- Validação final: CAPS **224/224** (42 suites), LCL **108/108**.
 
 ### 2026-10-14 — Deploy clube VIP na ARENA oficial
 - `MP_ACCESS_TOKEN` (prod, mesmo validado na TESTE) copiado para `.env` do CAPS; `clubePagamentos` já estava no `config.json`.
