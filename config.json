@@ -51,6 +51,9 @@
     "dailyRankUpdatesHour": 8,
     "dailyRankUpdatesMinute": 0
   },
+  "cadastro": {
+    "minSummonerLevel": 30
+  },
   "clubePagamentos": {
     "apoiador": { "preco": 9.99, "dias": 30 },
     "vip": { "preco": 19.99, "dias": 30 },

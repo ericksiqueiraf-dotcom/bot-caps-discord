@@ -420,8 +420,6 @@ function getQueueChannel(guild) {
     aramQueueChannel: guild.channels.cache.get(config.voiceChannels.aramQueueChannelId)
   };
 }
-
-
 const TIER_S_MIN_MMR = Number(config.tierS?.minBaseMmr || 2000);
 const TIER_S_TIERS = (config.tierS?.tiers || ['EMERALD', 'DIAMOND', 'MASTER', 'GRANDMASTER', 'CHALLENGER'])
   .map((tier) => String(tier || '').toUpperCase());

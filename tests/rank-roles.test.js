@@ -1,5 +1,22 @@
-const { describe, it } = require('node:test');
+const { describe, it, after } = require('node:test');
 const assert = require('node:assert/strict');
+
+// O codigo le o config global (utils/lobbyUtils -> require('../config.json')),
+// e o config real atual NAO tem roles.rankRoleIds. Para testar a via por ID
+// sem depender de IDs mutaveis do config real, injetamos IDs fake em memoria
+// (nao altera config.json em disco; node --test isola por processo/arquivo).
+const config = require('../config.json');
+config.roles = config.roles || {};
+const hadOwnRankRoleIds = Object.prototype.hasOwnProperty.call(config.roles, 'rankRoleIds');
+const originalRankRoleIds = config.roles.rankRoleIds;
+const FAKE_PRATA_ID = 'id-prata-fake';
+config.roles.rankRoleIds = { Prata: FAKE_PRATA_ID };
+
+after(() => {
+  if (hadOwnRankRoleIds) config.roles.rankRoleIds = originalRankRoleIds;
+  else delete config.roles.rankRoleIds;
+});
+
 const {
   findRankRole,
   isRankRole,
@@ -20,18 +37,19 @@ function fakeGuild(roles) {
 }
 
 describe('cargo de elo por ID (rankRoleIds)', () => {
-  it('config tem o ID do Prata', () => {
-    assert.equal(getConfiguredRankRoleId('Prata'), '1552537451388608602');
+  it('getConfiguredRankRoleId le o ID injetado (via por ID)', () => {
+    assert.equal(getConfiguredRankRoleId('Prata'), FAKE_PRATA_ID);
+    assert.equal(getConfiguredRankRoleId('Ouro'), null);
   });
 
   it('findRankRole acha o Prata pelo ID mesmo com nome fora do padrao', () => {
     const guild = fakeGuild([
-      { id: '1552537451388608602', name: '🥈 Prata Diferente' },
+      { id: FAKE_PRATA_ID, name: 'Nome Totalmente Diferente' },
       { id: 'x-ouro', name: '🥇Ouro' }
     ]);
     const role = findRankRole(guild, 'Prata');
     assert.ok(role, 'deveria achar o cargo');
-    assert.equal(role.id, '1552537451388608602');
+    assert.equal(role.id, FAKE_PRATA_ID);
   });
 
   it('findRankRole cai no match por nome quando nao ha ID configurado', () => {
@@ -47,7 +65,7 @@ describe('cargo de elo por ID (rankRoleIds)', () => {
   });
 
   it('isRankRole reconhece o cargo fixado por ID', () => {
-    assert.equal(isRankRole({ id: '1552537451388608602', name: 'Qualquer Nome' }), true);
+    assert.equal(isRankRole({ id: FAKE_PRATA_ID, name: 'Qualquer Nome' }), true);
     assert.equal(isRankRole({ id: 'x-ouro', name: '🥇Ouro' }), true);
     assert.equal(isRankRole({ id: 'x-nada', name: 'Cargo Qualquer' }), false);
     assert.equal(isRankRole(null), false);

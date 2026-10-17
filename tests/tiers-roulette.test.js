@@ -54,6 +54,21 @@ describe('top10 tiers (mesmo PDL, filtro)', () => {
     assert.equal(tiers[0].nickname, 'high#br1');
   });
 
+  it('excludeTierS tira Tier S do Classic (fica só no próprio ranking)', () => {
+    const statsData = {
+      players: {
+        k1: { discordId: 'd1', nickname: 'low#br1', baseMmr: 1200, modes: { classic: { customWins: 20, customLosses: 0, baseMmr: 1200, internalRating: 2400, winStreak: 0, ratingVersion: 2 } } },
+        k2: { discordId: 'd2', nickname: 'high#br1', baseMmr: 2400, modes: { classic: { customWins: 6, customLosses: 0, baseMmr: 2400, internalRating: 3500, winStreak: 0, ratingVersion: 2 } } }
+      }
+    };
+    const semTiers = getRankedPlayersByMode(statsData, 'classic', null, { phase: 'testing' }, { excludeTierS: true });
+    assert.equal(semTiers.length, 1);
+    assert.equal(semTiers[0].nickname, 'low#br1');
+    const tiers = getRankedPlayersByMode(statsData, 'classic', null, { phase: 'testing' }, { tierSOnly: true });
+    assert.equal(tiers.length, 1);
+    assert.equal(tiers[0].nickname, 'high#br1');
+  });
+
   it('parse aceita tiers', () => {
     assert.equal(parseModeAndFormatArgs(['tiers']).tierSOnly, true);
     assert.equal(parseModeAndFormatArgs(['top10']).tierSOnly, false);

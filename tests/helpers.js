@@ -102,6 +102,8 @@ function makeRegisterVictoryDeps(state) {
     upsertPlayerStats: L.upsertPlayerStats,
     shouldMirrorAramGroupedStats,
     calculateEloDelta: B.calculateEloDelta,
+    calculateTeamMmr: B.calculateTeamMmr,
+    calculateTeamPdlDelta: B.calculateTeamPdlDelta,
     getAramWeightByTeamSize: B.getAramWeightByTeamSize,
     formatCustomRecord: L.formatCustomRecord,
     calculateTeamMmr: B.calculateTeamMmr,

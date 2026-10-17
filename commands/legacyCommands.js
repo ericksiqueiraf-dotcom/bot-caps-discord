@@ -1264,69 +1264,253 @@ async function resolveTorneioPool(guild, ids) {
   return out;
 }
 
+function formatTorneioGames(games) {
+  return games.map((g) => {
+    const t1 = g.teamOne.map((p) => `<@${p.discordId}>`).join(' ');
+    const t2 = g.teamTwo.map((p) => `<@${p.discordId}>`).join(' ');
+    const placar = g.winner ? ` — **venceu time ${g.winner}**` : '';
+    return `**${g.id}**: ${t1} 🆚 ${t2}${placar}`;
+  }).join('\n');
+}
+
 async function handleTorneioCommand(message, args = []) {
+  const T = require('../services/torneioService');
+  const { createBalancedTeams } = require('../services/balanceService');
+  const sub = String(args[0] || 'info').toLowerCase();
+  const rest = args.slice(1);
   try {
-    const Torneio = require('../services/torneioService');
-    const sub = String(args[0] || '').toLowerCase();
     const systemMeta = await loadSystemMeta();
+    systemMeta.torneio ||= null;
     const t = systemMeta.torneio;
+    const save = async () => { await saveSystemMeta(systemMeta); };
 
-    if (!sub || ['info', 'regras', 'regra', 'ajuda', 'como'].includes(sub)) {
-      return await replyToMessage(message, Torneio.TORNEIO_INFO);
+    if (sub === 'info') {
+      return await replyToMessage(message, T.TORNEIO_INFO);
     }
 
-    if (['entrar', 'inscrever', 'join', 'in'].includes(sub)) {
-      if (!t) return await replyToMessage(message, '📭 Nenhum torneio aberto agora. Aguarde o próximo!');
-      const r = Torneio.joinTournament(t, message.author.id);
+    if (sub === 'entrar') {
+      if (!t?.active) return await replyToMessage(message, '❌ Nenhum torneio aberto. Aguarde o anúncio da staff.');
+      const r = T.joinTournament(t, message.author.id);
+      await save();
+      return await replyToMessage(message, r.ok ? `✅ Inscrito no **Torneio #${t.edition}**! (${r.count} inscritos)` : `❌ ${r.message}`);
+    }
+
+    if (sub === 'sair') {
+      if (!t?.active) return await replyToMessage(message, '❌ Nenhum torneio aberto.');
+      const r = T.leaveTournament(t, message.author.id);
+      await save();
+      return await replyToMessage(message, r.ok ? `Inscrição removida. (${r.count} inscritos)` : `❌ ${r.message}`);
+    }
+
+    if (sub === 'lista') {
+      if (!t?.active || t.players.length === 0) return await replyToMessage(message, '📭 Nenhum inscrito ainda. Use `!torneio entrar`.');
+      const mentions = t.players.map((id) => `<@${id}>`).join(' ');
+      return await replyToMessage(message, `🏆 **Torneio #${t.edition}** — ${t.players.length} inscrito(s):\n${mentions}`);
+    }
+
+    if (sub === 'status') {
+      if (!t?.active) return await replyToMessage(message, '📭 Nenhum torneio ativo.');
+      const st = T.getStatus(t);
+      const lines = [`🏆 **Torneio #${st.edition}** — ${st.inscritos} inscrito(s)`, `Rodada atual: ${st.rodada || 'ainda não sorteada'}`];
+      if (st.final) lines.push(`🔥 FINAL MD3: **${st.placarFinal}**`);
+      if (st.jogosPendentes.length) lines.push(`⏳ Aguardando: ${st.jogosPendentes.join(', ')}`);
+      if (st.champion) lines.push(`👑 Campeões: ${st.champion.team.map((id) => `<@${id}>`).join(' ')} (${st.champion.placar})`);
+      return await replyToMessage(message, lines.join('\n'));
+    }
+
+    // ---- staff ----
+    if (!isStaffViewer(message.member)) {
+      return await replyToMessage(message, '❌ Esse subcomando é da staff. Jogadores: `!torneio entrar | sair | lista | info | status`.');
+    }
+
+    if (sub === 'novo') {
+      if (t?.active && (t.players.length > 0 || t.rounds.length > 0) && !t.champion) {
+        return await replyToMessage(message, '❌ Já há torneio em andamento. Use `!torneio encerrar` primeiro.');
+      }
+      const edition = Number(rest[0]) > 0 ? Number(rest[0]) : ((t?.edition || 0) + 1);
+      systemMeta.torneio = T.newTournament(edition);
+      await save();
+      return await replyToMessage(message, `🏆 **Torneio #${edition} aberto!** Inscrevam-se com \`!torneio entrar\` (mínimo 20, múltiplo de 10).`);
+    }
+
+    if (sub === 'encerrar') {
+      if (!t?.active) return await replyToMessage(message, '📭 Nenhum torneio ativo.');
+      t.active = false;
+      await save();
+      return await replyToMessage(message, `Torneio #${t.edition} encerrado.`);
+    }
+
+    if (sub === 'sortear') {
+      if (!t?.active) return await replyToMessage(message, '❌ Nenhum torneio ativo.');
+      if (t.final) return await replyToMessage(message, '🔥 A final já está rolando. Use `!torneio resultado FINAL <1|2>`.');
+      if (t.rounds.length === 0) {
+        const req = T.startRequirement(t);
+        if (!req.ok) return await replyToMessage(message, `❌ ${req.message}`);
+        const pool = await resolveTorneioPool(message.guild, t.players);
+        const games = T.drawGames(pool, (g) => createBalancedTeams(g), 'R1');
+        t.rounds.push({ n: 1, games });
+        await save();
+        return await replyToMessage(message, `🎲 **Rodada 1 sorteada!**\n${formatTorneioGames(games)}\n\nStaff: \`!torneio resultado <jogo> <1|2>\``);
+      }
+      const adv = T.advanceTournament(t, (g) => createBalancedTeams(g));
+      if (!adv.ok) return await replyToMessage(message, `❌ ${adv.message}`);
+      await save();
+      if (adv.type === 'final') {
+        return await replyToMessage(message,
+          `🔥 **FINAL MD3!** Mesmos times, melhor de 3:\n${formatTorneioGames([{ id: 'FINAL', teamOne: t.final.teamOne, teamTwo: t.final.teamTwo, winner: null }])}\n\nStaff: \`!torneio resultado FINAL <1|2>\``);
+      }
+      const rep = adv.repechage?.length ? `\n🍀 Repescagem: ${adv.repechage.map((p) => `<@${p.discordId}>`).join(' ')}` : '';
+      return await replyToMessage(message, `🎲 **Rodada ${adv.round} sorteada!**${rep}\n${formatTorneioGames(adv.games)}\n\nStaff: \`!torneio resultado <jogo> <1|2>\``);
+    }
+
+    if (sub === 'resultado') {
+      if (!t?.active) return await replyToMessage(message, '❌ Nenhum torneio ativo.');
+      const [jogo, time] = rest;
+      if (!jogo || !time) return await replyToMessage(message, '❌ Use: `!torneio resultado <jogo> <1|2>` ou `!torneio resultado FINAL <1|2>`.');
+      if (String(jogo).toUpperCase() === 'FINAL') {
+        const r = T.recordFinalGame(t, time);
+        if (!r.ok) return await replyToMessage(message, `❌ ${r.message}`);
+        await save();
+        if (!r.champion) {
+          return await replyToMessage(message, `📝 Final: **${r.final.wins1}x${r.final.wins2}**. Faltam ${2 - Math.max(r.final.wins1, r.final.wins2)} vitória(s) para fechar!`);
+        }
+        const guild = message.guild;
+        let cargo = guild.roles.cache.find((r_) => r_.name === T.TORNEIO_CARGO_NOME);
+        if (!cargo) cargo = await guild.roles.create({ name: T.TORNEIO_CARGO_NOME, reason: 'Cargo de campeão do torneio' }).catch(() => null);
+        if (cargo) {
+          for (const [, m] of cargo.members) await m.roles.remove(cargo, 'Novo campeão do torneio').catch(() => null);
+          for (const id of t.champion.team) {
+            const m = await guild.members.fetch(id).catch(() => null);
+            if (m) await m.roles.add(cargo, 'Campeão do torneio').catch(() => null);
+          }
+        }
+        return await replyToMessage(message,
+          `🏆 **CAMPEÕES DO TORNEIO #${t.edition}** (${t.champion.placar})!\n` +
+          `${t.champion.team.map((id) => `<@${id}>`).join(' ')}\nParabéns!`);
+      }
+      const r = T.recordGameResult(t, jogo, time);
       if (!r.ok) return await replyToMessage(message, `❌ ${r.message}`);
-      await saveSystemMeta(systemMeta);
-      const req = Torneio.startRequirement(t);
-      return await replyToMessage(message, `🏆 <@${message.author.id}> inscrito! Total: **${r.count}**. ${req.ok ? '✅ Inscrições completas — aguardem o sorteio da staff.' : `ℹ️ ${req.message}`}`);
+      await save();
+      return await replyToMessage(message, `✅ ${r.game.id}: venceu o **time ${r.game.winner}**.`);
     }
 
-    if (['sair', 'leave', 'out'].includes(sub)) {
-      if (!t) return await replyToMessage(message, '📭 Nenhum torneio ativo.');
-      const r = Torneio.leaveTournament(t, message.author.id);
-      if (!r.ok) return await replyToMessage(message, `❌ ${r.message}`);
-      await saveSystemMeta(systemMeta);
-      return await replyToMessage(message, `👋 <@${message.author.id}> saiu do torneio. Total: **${r.count}**.`);
-    }
-
-    if (['lista', 'list', 'inscritos'].includes(sub)) {
-      if (!t?.players?.length) return await replyToMessage(message, '📭 Ninguém inscrito ainda. Use `!torneio entrar`.');
-      const linhas = t.players.map((id, i) => `**${i + 1}º** <@${id}>`);
-      const embed = new EmbedBuilder()
-        .setColor(THEME?.INFO ?? '#5865F2')
-        .setTitle(`🏆 Inscritos — Torneio #${t.edition} (${t.players.length})`)
-        .setDescription(linhas.join('\n').slice(0, 4000))
-        .setFooter({ text: `${FOOTER_PREFIX} • mínimo ${Torneio.MIN_PLAYERS}, múltiplo de ${Torneio.FINAL_SIZE}` })
-        .setTimestamp();
-      return await replyToMessage(message, { embeds: [embed] });
-    }
-
-    if (['status', 'situacao'].includes(sub)) {
-      const s = Torneio.getStatus(t);
-      if (!s.active) return await replyToMessage(message, '📭 Nenhum torneio ativo agora.');
-      const embed = new EmbedBuilder()
-        .setColor(THEME?.RANK ?? '#FFD700')
-        .setTitle(`🏆 Torneio #${s.edition} — status`)
-        .addFields(
-          { name: 'Inscritos', value: String(s.inscritos), inline: true },
-          { name: 'Rodada', value: String(s.rodada || 0), inline: true },
-          { name: 'Final', value: s.final ? (s.placarFinal || 'em andamento') : 'não iniciada', inline: true },
-          { name: 'Jogos pendentes', value: s.jogosPendentes?.length ? s.jogosPendentes.join(', ') : 'nenhum' }
-        )
-        .setFooter({ text: FOOTER_PREFIX })
-        .setTimestamp();
-      if (s.champion) embed.setDescription(`🏆 Campeão: ${s.champion.team.map((id) => `<@${id}>`).join(', ')} (${s.champion.placar})`);
-      return await replyToMessage(message, { embeds: [embed] });
-    }
-
-    return await replyToMessage(message, '❌ Use: `!torneio entrar` • `!torneio sair` • `!torneio lista` • `!torneio status` • `!torneio info`.');
+    return await replyToMessage(message, '❌ Use: `!torneio entrar | sair | lista | info | status` (staff: `novo | sortear | resultado | encerrar`).');
   } catch (error) {
     console.error('[ERRO] !torneio:', error);
     await replyToMessage(message, `❌ Erro no torneio: \`${error.message}\``);
   }
+}
+
+const TEMPO_RANK_COLORS = {
+  '🎙️ Viciado em Call': '#FFD700',
+  '🎙️ Frequente': '#9B59B6',
+  '🎙️ Ativo': '#2ECC71'
+};
+
+function buildTempoEmbed({ displayName = '', avatarURL = null, times, rank }) {
+  const { EmbedBuilder } = require('discord.js');
+  const vt = require('../services/voiceTimeService');
+  const color = (rank.current && TEMPO_RANK_COLORS[rank.current.name]) || '#95A5A6';
+  const falta = rank.next ? vt.formatTempo(rank.next.hours * 3600000 - times.monthMs) : null;
+  const daysElapsed = Math.max(1, new Date().getUTCDate());
+  const dailyAvg = times.monthMs / daysElapsed;
+  const ritmo = !rank.next
+    ? 'Máximo alcançado! 🎉'
+    : dailyAvg <= 0
+      ? 'Entre em call para começar o ritmo!'
+      : `~${vt.formatTempo(dailyAvg)}/dia → cargo em ~${Math.ceil((rank.next.hours * 3600000 - times.monthMs) / dailyAvg)} dia(s)`;
+  const embed = new EmbedBuilder()
+    .setColor(color)
+    .setTitle('🎙️ Seu tempo em call')
+    .setDescription(`Estatísticas de **${displayName || 'você'}**`)
+    .addFields(
+      { name: '⏱️ Geral', value: vt.formatTempo(times.totalMs), inline: true },
+      { name: '📅 Semana', value: vt.formatTempo(times.weekMs), inline: true },
+      { name: '🗓️ Mês', value: vt.formatTempo(times.monthMs), inline: true },
+      { name: '🎖️ Cargo atual', value: rank.current ? rank.current.name : 'Cinzas', inline: true },
+      { name: '🎯 Próximo cargo', value: rank.next ? `${rank.next.name} — faltam ${falta}` : 'Máximo alcançado 🎉', inline: true },
+      { name: '📊 Progresso', value: vt.progressBar(times.monthMs, rank.next).replace(/█/g, '▰').replace(/□/g, '▱'), inline: false },
+      { name: '💡 Ritmo', value: ritmo, inline: false }
+    )
+    .setFooter({ text: 'Conta o tempo em call, mesmo sozinho • Pausa mudo, ensurdecido ou AFK' })
+    .setTimestamp();
+  if (avatarURL) embed.setThumbnail(avatarURL);
+  return embed;
+}
+
+async function handleTempoCommand(message) {
+  try {
+    const vt = require('../services/voiceTimeService');
+    const systemMeta = await loadSystemMeta();
+    const store = vt.ensureVoiceStore(systemMeta);
+    const t = vt.getUserTime(store, message.author.id);
+    const rank = vt.rankForMonth(t.monthMs);
+    await replyToMessage(message, {
+      embeds: [buildTempoEmbed({
+        displayName: message.member?.displayName || message.author?.username || '',
+        avatarURL: message.author?.displayAvatarURL?.(),
+        times: t,
+        rank
+      })]
+    });
+  } catch (error) {
+    console.error('[ERRO] !tempo:', error);
+    await replyToMessage(message, `❌ Erro ao ver tempo: \`${error.message}\``);
+  }
+}
+
+async function handleTopVozCommand(message) {
+  try {
+    const vt = require('../services/voiceTimeService');
+    const systemMeta = await loadSystemMeta();
+    const store = vt.ensureVoiceStore(systemMeta);
+    const top = vt.getMonthlyTop(store, vt.monthKey(), 10);
+    if (top.length === 0) {
+      return await replyToMessage(message, '📭 Ninguém pontuou tempo em call este mês ainda. Entre em voz!');
+    }
+    const lines = top.map((t) => `**${t.position}º** <@${t.userId}> — ${vt.formatTempo(t.ms)}`);
+    const { EmbedBuilder } = require('discord.js');
+    const embed = new EmbedBuilder()
+      .setColor(THEME?.RANK ?? '#FFD700')
+      .setTitle('🎙️ Top tempo em call do mês')
+      .setDescription(lines.join('\n'))
+      .setFooter({ text: `${FOOTER_PREFIX} • 5h Ativo • 15h Frequente (+Lounge) • 30h Viciado` })
+      .setTimestamp();
+    await replyToMessage(message, { embeds: [embed] });
+  } catch (error) {
+    console.error('[ERRO] !topvoz:', error);
+    await replyToMessage(message, `❌ Erro no ranking: \`${error.message}\``);
+  }
+}
+
+function buildAjudaEmbed(page = 1) {
+  const embed = new EmbedBuilder()
+  .setColor(THEME.INFO);
+  if (Number(page) === 2) {
+      embed
+      .setTitle('📚 Guia de Comandos (2/2) — Ranking e extras')
+      .setDescription('Ranking, clube VIP, salas temporárias e extras. Página 1 no `!ajuda`.')
+      .addFields(
+        { name: '🏆 Ranking e pós-jogo', value: '`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!palpite <1|2> <10-100>` • Aposta pontos no vencedor da sua partida\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking geral (CLASSIC = pontos custom)\n`!placar tiers` • Só Esmeralda+\n`!top10` • Top 10 CLASSIC por pontos custom, desempate por winrate\n`!top10 tiers` • Top 10 só Esmeralda+\n`!topstreak` • Ranking Streak 🔥\n`!toprankinfernal` • Quem mais pegou INFERNAL na temporada 🔥\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
+        { name: '💎 Clube VIP', value: '`!clube` • Tiers, assinatura PIX e renovação -10%\n`!querolive` • Entrar/sair do ping 🔴 Ao Vivo\n`!live <link>` • Divulgar live Twitch/YouTube/Kick (Lendário 6h, VIP 12h, Apoiador 24h)' },
+        { name: '🔊 Salas temporárias (dono da sala)', value: 'Entre no ➕・criar-sala para ganhar sua sala\n`!salahub` • Lista as salas ativas\n`!sala` • Mostra sua sala • `!sala <nome>` renomeia\n`!convidar @u` • Chama alguém p/ sua sala\n`!salalock` • Tranca (`!salalock abrir` destranca)\n`!salalimit <0-99>` • Limite de usuários (0 = sem limite)\n`!salaexpulsar @u` • Remove alguém da sala\n`!limparvoz` • Apaga sua sala (dentro dela)' },
+        { name: '🎁 Extras', value: '`!convite` • Seu link pessoal (traga gente e ganhe recompensas)\n`!topconvites` • Ranking de quem mais trouxe gente\n`!torneio` • Torneio mata-mata (entrar, lista, status)\n`!tempo` • Seu tempo em call • `!topvoz` • Ranking de call\n`!palpite <1|2> <10-100>` • Bolão da partida • `!missoes` • Missões da semana • `!duelo @u` • Duelo de PDL\n🌅 Primeira vitória do dia vale +50% PDL (automático)\n`!regras` • Regulamento completo' },
+        { name: '⬅️ Página 1', value: '`!ajuda` • Cadastro, fila e voto\n`!staff` • Guia da staff (restrito)' }
+      );
+    } else {
+    embed
+    .setTitle('📚 Guia de Comandos (1/2) — O essencial')
+    .setDescription('O básico para jogar na CAPS Arena. O resto está no `!ajuda2`.')
+    .addFields(
+      { name: '🕹️ Cadastro (1x)', value: '`!cadastrar Nick#TAG` • Vincula sua conta Riot\n`!nick Nick#TAG` • Atualiza seu nick' },
+      { name: '🎮 Fila e voto', value: '`!entrar` • Fila Classic (no canal Lobby Classic ou Lobby TIER S)\n`!entrar aram` • Fila ARAM\n`!entrar aram 2x2` • ARAM formato (1x1 até 5x5)\n`!fila` • Mostra jogadores em sala\n`!espera` • Entra na espera (🔥 INFERNAL entra na posição 5)\n`!esperatiers` • Espera do Lobby TIER S (só Esmeralda+)\n`!espera ver` • Mostra a ordem • `!espera sair` • Sai da espera\n`!sair` • Sai da sala\n`!votar 1/2` • Vota no vencedor (abre painel com botões p/ os 10 votarem)\n`!votar` • Reabre o painel de votação' },
+      { name: '➡️ Página 2', value: '`!ajuda2` • Ranking, clube VIP, salas temporárias, torneio, convites e tempo em call\n`!staff` • Guia da staff (restrito)' }
+    );
+    }
+    embed
+    .setFooter({ text: `${FOOTER_PREFIX} • Ajuda Atualizada` })
+    .setTimestamp();
+  return embed;
 }
 
 async function handlePalpiteCommand(message, args = []) {
@@ -1449,120 +1633,18 @@ async function handleDueloCommand(message, args = [], targetUserOverride = null)
   }
 }
 
-function buildTempoEmbed({ displayName = '', avatarURL = null, times = {}, rank = {} } = {}) {
-  const vt = require('../services/voiceTimeService');
-  const { totalMs = 0, weekMs = 0, monthMs = 0 } = times || {};
-  const { current = null, next = null } = rank || {};
-  const cargos = vt.VOICE_RANKS
-    .map((r) => `${current?.name === r.name ? '✅' : '▫️'} ${r.name} — ${r.hours}h`)
-    .join('\n');
-  const faltaMs = next ? Math.max(0, next.hours * 3600000 - Number(monthMs || 0)) : 0;
-  const progresso = next
-    ? `${vt.progressBar(monthMs, next)}\nFaltam **${vt.formatTempo(faltaMs)}** p/ ${next.name}`
-    : 'Você está no topo dos cargos de call! 🎉';
-  const embed = new EmbedBuilder()
-    .setColor(THEME?.RANK ?? '#FFD700')
-    .setTitle(`🎙️ Tempo em call — ${displayName || 'Jogador'}`)
-    .addFields(
-      { name: '📅 Mês', value: vt.formatTempo(monthMs), inline: true },
-      { name: '🗓️ Semana', value: vt.formatTempo(weekMs), inline: true },
-      { name: '⏱️ Total', value: vt.formatTempo(totalMs), inline: true },
-      { name: '🏅 Cargos de call', value: cargos },
-      { name: next ? `📈 Progresso p/ ${next.name} (${next.hours}h)` : '📈 Progresso', value: progresso }
-    )
-    .setFooter({ text: `${FOOTER_PREFIX} • 5h Ativo • 15h Frequente (+Lounge) • 30h Viciado` })
-    .setTimestamp();
-  if (avatarURL) embed.setThumbnail(avatarURL);
-  return embed;
-}
-
-async function handleTempoCommand(message) {
-  try {
-    const vt = require('../services/voiceTimeService');
-    const systemMeta = await loadSystemMeta();
-    const store = vt.ensureVoiceStore(systemMeta);
-    const t = vt.getUserTime(store, message.author.id);
-    const rank = vt.rankForMonth(t.monthMs);
-    await replyToMessage(message, {
-      embeds: [buildTempoEmbed({
-        displayName: message.member?.displayName || message.author?.username || '',
-        avatarURL: message.author?.displayAvatarURL?.(),
-        times: t,
-        rank
-      })]
-    });
-  } catch (error) {
-    console.error('[ERRO] !tempo:', error);
-    await replyToMessage(message, `❌ Erro ao ver tempo: \`${error.message}\``);
-  }
-}
-
-async function handleTopVozCommand(message) {
-  try {
-    const vt = require('../services/voiceTimeService');
-    const systemMeta = await loadSystemMeta();
-    const store = vt.ensureVoiceStore(systemMeta);
-    const top = vt.getMonthlyTop(store, vt.monthKey(), 10);
-    if (top.length === 0) {
-      return await replyToMessage(message, '📭 Ninguém pontuou tempo em call este mês ainda. Entre em voz!');
-    }
-    const lines = top.map((t) => `**${t.position}º** <@${t.userId}> — ${vt.formatTempo(t.ms)}`);
-    const { EmbedBuilder } = require('discord.js');
-    const embed = new EmbedBuilder()
-      .setColor(THEME?.RANK ?? '#FFD700')
-      .setTitle('🎙️ Top tempo em call do mês')
-      .setDescription(lines.join('\n'))
-      .setFooter({ text: `${FOOTER_PREFIX} • 5h Ativo • 15h Frequente (+Lounge) • 30h Viciado` })
-      .setTimestamp();
-    await replyToMessage(message, { embeds: [embed] });
-  } catch (error) {
-    console.error('[ERRO] !topvoz:', error);
-    await replyToMessage(message, `❌ Erro no ranking: \`${error.message}\``);
-  }
-}
-
-function buildAjudaEmbed(page = 1) {
-  const embed = new EmbedBuilder()
-  .setColor(THEME.INFO);
-  if (Number(page) === 2) {
-      embed
-      .setTitle('📚 Guia de Comandos (2/2) — Ranking e extras')
-      .setDescription('Ranking, clube VIP, salas temporárias e extras. Página 1 no `!ajuda`.')
-      .addFields(
-        { name: '🏆 Ranking e pós-jogo', value: '`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!palpite <1|2> <10-100>` • Aposta pontos no vencedor da sua partida\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking geral (CLASSIC = pontos custom)\n`!placar tiers` • Só Esmeralda+\n`!top10` • Top 10 CLASSIC por pontos custom, desempate por winrate\n`!top10 tiers` • Top 10 só Esmeralda+\n`!topstreak` • Ranking Streak 🔥\n`!toprankinfernal` • Quem mais pegou INFERNAL na temporada 🔥\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
-        { name: '💎 Clube VIP', value: '`!clube` • Tiers, assinatura PIX e renovação -10%\n`!querolive` • Entrar/sair do ping 🔴 Ao Vivo\n`!live <link>` • Divulgar live Twitch/YouTube/Kick (Lendário 6h, VIP 12h, Apoiador 24h)' },
-        { name: '🔊 Salas temporárias (dono da sala)', value: 'Entre no ➕・criar-sala para ganhar sua sala\n`!salahub` • Lista as salas ativas\n`!sala` • Mostra sua sala • `!sala <nome>` renomeia\n`!convidar @u` • Chama alguém p/ sua sala\n`!salalock` • Tranca (`!salalock abrir` destranca)\n`!salalimit <0-99>` • Limite de usuários (0 = sem limite)\n`!salaexpulsar @u` • Remove alguém da sala\n`!limparvoz` • Apaga sua sala (dentro dela)' },
-        { name: '🎁 Extras', value: '`!convite` • Seu link pessoal (traga gente e ganhe recompensas)\n`!topconvites` • Ranking de quem mais trouxe gente\n`!torneio` • Torneio mata-mata (entrar, lista, status)\n`!tempo` • Seu tempo em call • `!topvoz` • Ranking de call\n`!palpite <1|2> <10-100>` • Bolão da partida • `!missoes` • Missões da semana • `!duelo @u` • Duelo de PDL\n🌅 Primeira vitória do dia vale +50% PDL (automático)\n`!regras` • Regulamento completo' },
-        { name: '⬅️ Página 1', value: '`!ajuda` • Cadastro, fila e voto\n`!staff` • Guia da staff (restrito)' }
-      );
-    } else {
-    embed
-    .setTitle('📚 Guia de Comandos (1/2) — O essencial')
-    .setDescription('O básico para jogar na CAPS Arena. O resto está no `!ajuda2`.')
-    .addFields(
-      { name: '🕹️ Cadastro (1x)', value: '`!cadastrar Nick#TAG` • Vincula sua conta Riot\n`!nick Nick#TAG` • Atualiza seu nick' },
-      { name: '🎮 Fila e voto', value: '`!entrar` • Fila Classic (no canal Lobby Classic ou Lobby TIER S)\n`!entrar aram` • Fila ARAM\n`!entrar aram 2x2` • ARAM formato (1x1 até 5x5)\n`!fila` • Mostra jogadores em sala\n`!espera` • Entra na espera (🔥 INFERNAL entra na posição 5)\n`!esperatiers` • Espera do Lobby TIER S (só Esmeralda+)\n`!espera ver` • Mostra a ordem • `!espera sair` • Sai da espera\n`!sair` • Sai da sala\n`!votar 1/2` • Vota no vencedor (abre painel com botões p/ os 10 votarem)\n`!votar` • Reabre o painel de votação' },
-      { name: '➡️ Página 2', value: '`!ajuda2` • Ranking, clube VIP, salas temporárias, torneio, convites e tempo em call\n`!staff` • Guia da staff (restrito)' }
-    );
-    }
-    embed
-    .setFooter({ text: `${FOOTER_PREFIX} • Ajuda Atualizada` })
-    .setTimestamp();
-  return embed;
-}
-
 async function handleHelpCommand(message, page = 1) {
   try {
-    const sent = await sendToMessageChannel(message, { embeds: [buildAjudaEmbed(page)] });
+    const embed = buildAjudaEmbed(page);
+  const sent = await sendToMessageChannel(message, { embeds: [embed] });
     if (!sent) {
-      await replyToMessage(message, '📚 Comandos: `!cadastrar Nick#TAG` • `!entrar` • `!entrar aram` • `!fila` • `!espera` • `!sair` • `!votar 1/2` • `!perfil` • `!placar` • `!top10` • `!topstreak` • `!clube` • `!staff` • `!start` • `!vitoria` • `!temporadas`');
+      await replyToMessage(message, '📚 Comandos: `!cadastrar Nick#TAG` • `!entrar` • `!entrar aram` • `!fila` • `!espera` • `!sair` • `!votar 1/2` • `!perfil` • `!placar` • `!top10` • `!topstreak` • `!clube` • `!querolive` • `!live` • `!staff` • `!start` • `!vitoria` • `!temporadas`');
     }
   } catch (error) {
     console.error('[ERRO] !ajuda:', error);
     await replyToMessage(message, '❌ Erro ao mostrar ajuda. Tente de novo ou use `/ajuda`.').catch(() => null);
   }
 }
-
 
 async function handleLeaveCommand(message) {
   try {

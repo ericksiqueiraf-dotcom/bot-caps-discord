@@ -271,6 +271,130 @@ database/                    ← fallback JSON local
 - **Layout ARENA replicado no TESTRE (2026-10-10):** modelo em `docs/SERVER_LAYOUT_CAPS_ARENA.md`; `setup-servidor.js` com planta ARENA (6 cats, 19 TXT, 11 VOZ, 11 cargos); aplicado em `CAPS BOT TESTE (1558217291123138561)`; `config.json` remapeado (fila/partidas/resultados/destaques/logs/ranking/cadastro + 3 lobbies com limite 10/10/30)
 - Validação: `npm test` 49/49, 13 suites
 
+### 2026-10-15 — Texto do !clube mais atrativo
+- `buildClubeEmbed` com copy de divulgação (TESTRE + prod): chamada "Apoie a Arena, suba de nível...", tiers como "primeiro passo" / "queridinho da galera" / "topo da Arena", `!live` como "divulgar sua stream", renovação -10% no "Como aderir". Preços continuam dinâmicos do config.
+- Testes do clube/regras/embeds verdes (17/17); ambos bots reiniciados e online.
+- Nota: mensagem antiga fixada no `#clube-vip` não atualiza sozinha — rodar `!clube`, apagar a antiga e fixar a nova.
+
+### 2026-10-15 — Bugs reais corrigidos + sala 2.0 (ordem 1→3→2→4)
+- **1) Gate `allowedGuildIds`:** `isGuildAllowed()` novo em `utils/lobbyUtils.js` (exportado); `messageCreate` + `interactionCreate` ignoram guilds fora da lista (lista vazia = libera tudo, como antes). `tests/guild-filter.test.js` reescrito p/ a função real (4/4).
+- **3) Trava level 30:** `riotService.getPlayerRankProfile` agora expõe `summonerLevel`; `getSummonerLevelGate()` (exportado) bloqueia `< config.cadastro.minSummonerLevel` no `!cadastrar` e `!nick`, com fail-open p/ level desconhecido. `tests/cadastro-main.test.js` atualizado (2/2). TESTRE + prod.
+- **2) Embed do `#como-jogar`:** `buildOnboardingGuideEmbed()` + `ONBOARDING_SECTIONS` criados e exportados (TESTRE + prod); setup passa a postar o embed fixo em vez de pular. Teste restaurado p/ intenção original (título + campos + limites + nome do servidor).
+- **4) Sala 2.0 (dono):** `!salalock [abrir]` (tranca Connect dos cargos, dono sempre entra; flag `locked` no registro + 🔒 no `!salahub`), `!salalimit <0-99>`, `!salaexpulsar @u` (só quem está na sala; não expulsa a si/bots). Prefixo + slash (`/salalock`, `/salalimit`, `/salaexpulsar`) + `!ajuda`. TESTRE + prod.
+- Validação: suíte **146/146**; `node --check` nos 8 arquivos; ambos bots reiniciados e online.
+
+### 2026-10-15 — Balance exaustivo (ótimo garantido)
+- `createBalancedTeams` trocou heurística (32 combos) por busca exaustiva (5x5 = 126 divisões, com poda e corte de espelhos). Na partida B auditada: 455 → **375** (ótimo provado por força bruta).
+- Importante: o bot equilibra a **soma dos elos** — com lobby misto (Master + Pratas), algum time sempre fica com o Master + elos baixos. Sensação de injustiça individual é esperada; o PDL compensa (ganhar de time mais forte vale mais).
+- TESTRE + prod; suíte 149/149; ambos bots online.
+
+### 2026-10-16 — Captação: convites, Sexta Ranked, FDS LCL, torneio
+- **Item 1 — convites com recompensa** (`services/convitesService.js` + `!convite`/`!topconvites`, prefixo + slash): link pessoal por membro, atribuição por diff de usos, anti-fraude (conta <7d não conta, saída em 24h estorna, 1 ponto por membro). Metas 3 = 🌱 Recrutador, 5 = destaque, 10 = 7 dias de ⭐ VIP (cargo + assinatura free, expira sozinho). `!topconvites` mensal (zera dia 1º).
+- **Item 4a — SEXTA CAPS ARENA** (`services/eventoService.js`): sex 08h–23h59 SP, `!vitoria` com PDL 2x (hook opcional no `registerVictory`, derrota 1x), top 3 + melhor da noite às 23h59. Scheduler de 30s com flags anti-duplo.
+- **Item 4b — FDS LCL** (mesmo service): sex 08h abre + liga `lcl-bot` (via pm2); dom 23h59 posta ranking do fim de semana (séries inter fechadas na janela, lidas do banco LCL) + desliga o bot. Fecha tardio na segunda se o bot estava fora.
+- **Item 8 — torneio** (`services/torneioService.js` + `!torneio`/`/torneio`): inscrição individual (mín 20, múltiplo de 10), sorteio 5x5 balanceado por rodada, repescagem dos melhores perdedores, final MD3 mesmos times, cargo 🏆 Campeão CAPS rotativo. `!torneio info` explica o formato.
+- Validação: suíte **168/168**; ambos bots reiniciados e online. Incidente: port do handler torneio p/ prod quebrou `handleHelpCommand` (splice em âncora errada) — detectado pelo require, reparado e verificado.
+
+### 2026-10-15 — Boas-vindas que vendem (item 2 do plano)
+- Texto novo de boas-vindas nos defaults (`contentTextService`, TESTRE + prod): título com vaga esperando, chamada 10 jogadores/PDL/roleta/MVP/INFERNAL + "2 minutos". DB vazio nos 2 → defaults mandam.
+- 3º botão **⚡ Quero jogar agora** (verde) abre direto o modal de Nick#TAG; fluxo de cadastro inalterado. TESTRE + prod.
+- Teste atualizado (6/6); ambos bots reiniciados e online. Vale para os próximos que entrarem (mensagem antiga não muda).
+
+### 2026-10-15 — AFK 5min → 🥱Ausente
+- Canal AFK do servidor configurado via API: `🥱Ausente` (estava sem canal, timeout 900s) → timeout **300s**. Quem ficar 5min sem atividade em voz cai no Ausente automaticamente (recurso nativo do Discord).
+- `server-pattern.json` (TESTRE + prod): `🥱Ausente` registrado com `preserve: true` em COMUNIDADE — setup futuro não apaga nem mexe nas permissões.
+- Teste `setup-blueprint` segue verde (16/16).
+
+### 2026-10-15 — Botão Esperar Fila no #fila
+- 5º botão (azul): entra na espera Classic (`!espera`), com resposta privada de posição. TESTRE + prod.
+- Testes atualizados (21/21); ambos bots reiniciados e online — painel do `#fila` reconstruído com os 5 botões.
+
+### 2026-10-15 — Botão Entrar Queue TIERS no #fila
+- 4º botão (cinza): exige estar no `Lobby TIER S` (avisa se não estiver); com o canal certo, chama o fluxo `!entrar` que resolve tier S sozinho (inclui gate Esmeralda IV+). TESTRE + prod.
+- Testes atualizados (20/20); ambos bots reiniciados e online — painel do `#fila` reconstruído com os 4 botões.
+
+### 2026-10-15 — Botão Sair da Fila no #fila
+- `QUEUE_JOIN_BUTTON_IDS.LEAVE` (`queue:leave`) + botão vermelho "Sair da Fila" no `buildQueueJoinActionRow()`; roteado no `interactionCreate` p/ `handleLeaveCommand` (TESTRE + prod). Painel do `#fila` é reconstruído no boot, então o botão aparece sozinho após restart.
+- Testes atualizados (`queue-buttons`, `queue-feed`: 20/20); ambos bots reiniciados e online.
+
+### 2026-10-16 — Visual novo do !tempo
+- Layout próprio (≠ referência): título 🎙️, cor por cargo (cinza/verde/roxo/dourado), avatar do usuário, campos com emoji, barra ▰▱ e linha **💡 Ritmo** (`~45 min/dia → cargo em ~11 dias`).
+- `buildTempoEmbed` extraído e testado; TESTRE + prod; ambos bots online.
+
+### 2026-10-16 — !ajudafixar: ajuda 1+2 fixadas no #infos-lol
+- `!ajudafixar` (só staff, +`/ajudafixar`): posta os 2 embeds no `#💡┃infos-lol`, apaga fixadas antigas iguais e fixa as novas. `buildAjudaEmbed(page)` extraído e exportado (testado: títulos 1/2, ida-e-volta, limites).
+- `!staff` ganhou seção 📌 Fixar guias (`!ajudafixar` + `!clubefixar`).
+- TESTRE + prod (com 2 reparos de port na prod); ambos bots online.
+
+### 2026-10-16 — !ajuda em 2 páginas
+- `!ajuda` (1/2, o essencial): cadastro + fila/voto. `!ajuda2` (2/2): ranking, clube, salas, extras (convite, torneio, tempo) + volta p/ página 1. Slash `/ajuda` e `/ajuda2`.
+- TESTRE + prod; suíte 174/174; ambos bots online.
+
+### 2026-10-16 — Tempo em call + cargos mensais
+- `services/voiceTimeService.js`: conta tempo em voz (mesmo sozinho; pausa mudo/ensurdecido/AFK) em janelas geral/semana/mês (`systemMeta.voiceTime`).
+- `!tempo` (+`/tempo`): embed Geral/Semana/Mês + cargo atual + próximo + barra de progresso. `!topvoz` (+`/topvoz`): ranking do mês.
+- Apuração dia 1º: escada permanente (5h Ativo, 15h Frequente, 30h Viciado — garante o maior, tira menores), acesso ao Lounge VIP do mês p/ 15h+ (overwrite individual, expira), cargo rotativo 👑 Voz do Mês p/ top1 (mín 5h) + anúncio no `#comunicados`.
+- Sessões reabertas no boot (sem retroativo); mutar/desmutar alterna a contagem.
+- Validação: `voice-time.test.js` 6/6, suíte 174/174; ambos bots online.
+
+### 2026-10-16 — PDL por time + Tier S fora do Classic + anti-duplo eventos
+- **PDL por time** (`calculateTeamPdlDelta`): expectativa pela soma dos elos, igual p/ os 10; piso **+8** vitória, teto **−15** derrota; K individual por jogos mantido. Validado: 9389x9371 → +11/−13; favorito → +8; zebra → +22/−2.
+- **Filtro `excludeTierS`**: `!placar`, `!top10` e post diário excluem Tier S do Classic (só no ranking Tier S). Sem migração de dados.
+- **Anti-duplicação dos schedulers**: `runSextaTick`/`runLclTick` com `withQueueOperationLock` (era corrida entre ticks que duplicou o anúncio das 08h).
+- **Palpite 5min**: aposta só nos 5 primeiros minutos após formar os times (`match.createdAt`); `betAt` gravado.
+- Suíte **190/190**; ambos bots online.
+
+### 2026-10-16 — Bolão, first-win, missões, duelo e backup
+- **🎯 Bolão (`!palpite <1|2> <10-100>` + `/palpite`)**: aposta com pontos custom (só da partida, 1 por jogo, debita na hora); liquidação no `registerVictory` (vencedores dividem o bolo proporcional). **Bug pego em teste:** upsert só com `discordId` trocava a chave e apagava a entrada — corrigido usando o objeto completo (handler e liquidação).
+- **🌅 First-win +50%**: primeira vitória do dia ganha metade a mais e carimba `ultimaVitoriaEm`; anunciado no resultado.
+- **🎖️ Missões (`!missoes` + `/missoes`)**: jogar 3 (+20) e vencer 2 (+40) na semana; bônus automático 1x; semana vira sozinha.
+- **⚔️ Duelo (`!duelo @u [pontos]` + `/duelo`)**: desafiar/aceitar/recusar/lista; 10–200 PDL; expira em 7d; liquida quando os dois caem em lados opostos (anuncia no resultado).
+- **📦 Backup diário 07h**: snapshot de todos os docs em `database/backup-AAAA-MM-DD.json`, mantém 7.
+- `!ajuda2` documenta tudo; suíte **187/187**; ambos bots online. Incidente: fragmento duplicado de builder quebrou o boot do teste (loop) — removido e verificado.
+
+### 2026-10-16 — !presentear (só Admin)
+- `!presentear @usuário <apoiador|vip|lendario> [dias]` (+ `/presentear`): dá cargo + assinatura (expira sozinha, entra no `!clubeadmin`). Dias padrão do tier, 1–365. DM avisa o presenteado. Documentado no `!staff`.
+- TESTRE + prod; ambos bots online.
+
+### 2026-10-16 — Estado atual + bug !votar corrigido
+- **Bug crítico:** `!votar` por texto crashava (`ReferenceError: VOTE_THRESHOLD is not defined` 3x no log) — `handleVoteCommand` referenciava const inexistente nas deps. Removido nas 2 bases (o `getVoteThreshold` real continua); botões de voto nunca foram afetados. Bots reiniciados.
+- **Falso alarme schedulers:** flags `sextaAbertaEm/lclAbertoEm` vazias porque são **02h31 de sexta** — janelas abrem às 08h. Ticks rodando, sem erro. Verificar posts às 08h (primeira Sexta + LCL reais).
+- **Temporada:** oficial #1, 252 cadastrados, 0 jogos. Ranking enche jogando (10 jogos p/ aparecer).
+- **Convites:** 1 link pessoal, 0 usos. **Voz:** 0 usuários rastreados. **Torneio:** nenhum aberto.
+- Pendentes seus: premiação do torneio, observar 1ª Sexta/LCL (08h), 1ª compra real do clube.
+
+### 2026-10-16 — Destaque de recrutamento turbinado
+- Meta 5 agora: cargo rotativo **⭐ Destaque** (tira do anterior, passa ao novo) + post no `#📢┃comunicados` desafiando a tomar o lugar.
+- DM comemorativa por meta (3: cargo garantido; 5: destaque + faltam p/ VIP; 10: VIP ativo).
+- `!topconvites` marca o 1º do mês com 👑.
+
+### 2026-10-15 — !clubefixar: benefícios detalhados fixados no #clube-vip
+- `buildClubeDetalEmbed()` novo em `utils/lobbyUtils.js` (TESTRE + prod): embed "benefícios detalhados" com preços dinâmicos do config + comandos de cada tier + PIX e renovação -10%.
+- `!clubefixar` (só staff, prefixo + `/clubefixar`): posta no `#🔰clube-vip`, apaga fixada anterior igual e fixa a nova. `!staff` documenta o comando.
+- Testes: caso novo no `clube-vip.test.js` (título, 4 campos, preços, limites); ambos bots reiniciados e online.
+
+### 2026-10-15 — !ajuda enxuto, !staff completo
+- **`!ajuda` agora é só jogador:** seções `🛠️ Staff`, `⚙️ Partida (Staff)` e `📊 Temporada` viraram 1 linha apontando p/ `!staff`. Mantidas: cadastro, fila/voto, ranking, clube VIP, salas temporárias.
+- **`!staff` (`STAFF_SECTIONS`) ganhou:** `!salahub` na seção de limpeza + nova seção `💎 Clube VIP — assinaturas` (`!clubeadmin` + `!clube`). Testes usam `STAFF_SECTIONS.length` dinâmico — seguem verdes (`rules`, `info-embeds`, `clube-vip`: 15/15).
+- TESTRE + prod; ambos bots reiniciados e online.
+
+### 2026-10-15 — Sugestões aplicadas (ordem 1→4)
+- **1) `!ajuda`:** nova seção `🔊 Salas temporárias` (`!salahub`/`!sala`/`!convidar`/`!limparvoz`) + `!clubeadmin` na seção Staff. TESTRE + prod.
+- **2) Registro sem lixo:** auto-delete agora dá `unregisterTempRoom` (apagou ou sumiu); listener novo `channelDelete` limpa o registro quando a sala é apagada manualmente. TESTRE + prod.
+- **3) Slash da sala:** `/salahub`, `/sala [nome]`, `/convidar @usuário` (obrigatório), `/limparvoz` + `/clubeadmin` registrados no `buildSlashCommands` e no `interactionCreate` (TESTRE + prod). `handleConvidarCommand` aceita `targetUserOverride` (padrão do `/remover`).
+- **4) Suíte verde 140/140** (era 110/138): `temp-voice.test.js` reescrito p/ API real (hub, prefixo, permissões, registro, rename/delete/invite/list, auto-delete com unregister); outras 6 suites adaptadas à API real via subagentes (`queue-buttons`→`parseQueueJoinButtonId`, `guild-filter`, `cadastro-main`, `onboarding`, `info-embeds`→`buildStaffEmbed`, `rank-roles` com ID fake injetado).
+- **Bugs reais achados pelos testes (NÃO corrigidos, fora do escopo):** `allowedGuildIds` do config não é aplicado em lugar nenhum (bot responde em qualquer guild); `cadastro.minSummonerLevel=30` é dead config (`riotService` descarta `summonerLevel`); `setup-servidor.js` importa `buildOnboardingGuideEmbed` inexistente (protegido por `typeof`, só pula o embed do `#como-jogar`).
+- **5) `!clubeadmin` (só staff, prefixo + slash):** embed com assinaturas ativas por tier (`Lendário/VIP/Apoiador`), cada linha `<@user> — vence em N dias / amanhã / hoje`, ordenado por vencimento. TESTRE + prod.
+- Validação: suíte 140/140; `node --check` nos 6 arquivos; ambos bots reiniciados e online.
+
+### 2026-10-15 — Comandos de sala temporária + hub no VIP + preços do clube + anti-duplicação
+- **Comandos novos (`!salahub`, `!sala`, `!convidar`, `!limparvoz`):** `services/tempVoiceService.js` ganhou registro persistente (`database/tempVoiceRooms.json`: dono por sala, sobrevive restart) + `inviteToTempRoom`/`renameTempRoom`/`deleteTempRoom`/`listTempRooms`; handlers em `commands/legacyCommands.js`, cases no `index.js`. Portado p/ produção (`BOT CAPS DISCORD`) + restart `caps-bot`/`caps-bot-teste`.
+- **Bug que travava tudo:** export `handleRoletaSairCommand` vs definição `handleRouletteSairCommand` — ReferenceError em loop (92 restarts no teste, "Comando desconhecido" p/ tudo). Renomeado p/ `handleRoletaSairCommand`; boot limpo nos 2 bots.
+- **Hub padrão no VIP:** `server-pattern.json` (TESTRE + prod): HUB `FILA` → `💎・CLUBE VIP`. Salas temporárias nascem na categoria do hub (`parent: hubChannel.parentId`); hub arrastado manualmente + padrão garantem as próximas no VIP. Setup é idempotente e move sozinho numa próxima rodada.
+- **Preços do clube:** VIP 19,99→16,90, Lendário 29,99→21,90, Apoiador 9,99 (30 dias). `config.json` nos 2 ambientes (na prod a seção `clubePagamentos` nem existia — usava defaults e o embed não mostrava preço). `!clube` (`buildClubeEmbed`) agora mostra preço + benefícios detalhados por tier, lidos do config.
+- **Anti-duplicação do anúncio do clube:** `guildMemberUpdate` dispara 2x p/ mesma mudança de cargo (Apoiador duplicado no #parceiros). Dedupe em memória 5min por `servidor:usuário:tier` nos 2 `index.js`.
+- Validação: `clube-vip` 10/10, PIX/config/setup-blueprint passando; suíte geral 110/138 — 28 falhas pré-existentes em suites que referenciam APIs não implementadas (`temp-voice`, `queue-buttons`, `guild-filter`, `cadastro-main`, `onboarding`, `info-embeds`, `rank-roles`), sem relação com a sessão. Ambos bots online (`CAPS BOT LOL#6241`, `CAPS BOT TESTE#6332`).
+
 ### 2026-10-17 — Refactor do `legacyCommands.js` (CAPS) finalizado + escopo de canais entre os bots
 - **Bug do boot:** `commands/legacyCommands.js` (CAPS) estava com o refactor pela metade — `handleHelpCommand`, `buildTempoEmbed` e `handleTorneioCommand` eram exportados/usados mas NÃO definidos → `ReferenceError` no load (o bot não subia e a suíte quebrava em `handleHelpCommand is not defined`). Reimplementados: `handleHelpCommand(message, page=1)` (usa `buildAjudaEmbed`), `buildTempoEmbed({displayName, avatarURL, times, rank})` (usa `voiceTimeService`) e `handleTorneioCommand(message, args)` (usa `torneioService`: entrar/sair/lista/status/info).
 - **Testes alinhados ao WIP:** `tests/helpers.js` (`makeRegisterVictoryDeps` agora passa `calculateTeamMmr`/`calculateTeamPdlDelta`/`getPdlMultiplier`/`onVictoryPdlApplied`) e `tests/queue-feed.test.js` (linha com 5 botões: CAPS/ARAM/TIERS/Esperar/Sair). Suíte CAPS **92/92**.
@@ -279,7 +403,6 @@ database/                    ← fallback JSON local
 - **Cargos de call (`🎙️ Ativo`/`🎙️ Frequente`/`🎙️ Viciado em Call`):** hoje são criados/atribuídos **só no tick mensal (dia 1º)** por `runVoiceTimeMonthlyTick` (`index.js`, com `findOrCreateRole`). O ✅ exibido no `!tempo` é apenas o rank ao vivo do mês corrente — NÃO indica cargo atribuído. (Pendente, se desejado: atribuir em tempo real ao bater a meta no mês.)
 
 ### 2026-10-14 — Deploy clube VIP na ARENA oficial
-- Teste de lembrete validado de ponta a ponta: assinatura forjada vencendo em ~3 dias → DM real `milestone: 3d` → assinatura de teste removida; assinatura real (`apoiador:active` até 13/11) intacta.
 - `MP_ACCESS_TOKEN` (prod, mesmo validado na TESTE) copiado para `.env` do CAPS; `clubePagamentos` já estava no `config.json`.
 - Restart `caps-admin` + `caps-bot` (`--update-env`); boot limpo, `CAPS BOT LOL#6241` online e estável. Sem URL pública (poller de 3 min assume).
 - Validação pendente: primeira compra real na ARENA (`!clube` → botões devem aparecer).

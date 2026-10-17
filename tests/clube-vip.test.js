@@ -7,6 +7,7 @@ const {
   getVipSeal,
   buildVipTierResolver,
   buildClubeEmbed,
+  buildClubeDetalEmbed,
   isRecentVipSubscription,
   parseLiveLink,
   getLiveCooldownRemainingMs,
@@ -75,6 +76,21 @@ describe('clube VIP (status, sem vantagem competitiva)', () => {
     assert.ok(names.includes('3 membro(s)'));
   });
 
+  it('buildClubeDetalEmbed tem beneficios por tier com precos e limites', () => {
+    const embed = buildClubeDetalEmbed();
+    const data = embed.toJSON();
+    assert.match(data.title, /benefícios detalhados/);
+    assert.match(data.description, /NÃO dá vantagem/);
+    assert.equal(data.fields.length, 4);
+    const text = data.fields.map((f) => `${f.name} ${f.value}`).join('\n');
+    assert.ok(text.includes('R$ 9,99'));
+    assert.ok(text.includes('R$ 16,90'));
+    assert.ok(text.includes('R$ 21,90'));
+    assert.ok(text.includes('!salalock'));
+    assert.ok(text.includes('!live'));
+    assert.ok(JSON.stringify(data).length < 6000);
+  });
+
   it('isRecentVipSubscription evita anúncio duplicado do webhook', () => {
     const now = Date.now();
     const fresh = [{ status: 'active', guildId: 'g1', discordId: 'u1', startedAt: new Date(now - 60 * 1000).toISOString() }];
@@ -96,6 +112,27 @@ describe('!live e promo automática', () => {
     assert.equal(parseLiveLink('https://evil.com/twitch.tv/x'), null);
     assert.equal(parseLiveLink('nao-link'), null);
     assert.equal(parseLiveLink(''), null);
+  });
+
+  it('normalizePresentearTier entende nomes, emojis e abreviacoes', () => {
+    const legacy = require('../commands/legacyCommands');
+    assert.equal(legacy.normalizePresentearTier('vip'), 'vip');
+    assert.equal(legacy.normalizePresentearTier('VIP'), 'vip');
+    assert.equal(legacy.normalizePresentearTier('⭐ VIP'), 'vip');
+    assert.equal(legacy.normalizePresentearTier('apoiador'), 'apoiador');
+    assert.equal(legacy.normalizePresentearTier('💜 Apoiador'), 'apoiador');
+    assert.equal(legacy.normalizePresentearTier('lendario'), 'lendario');
+    assert.equal(legacy.normalizePresentearTier('Lendário'), 'lendario');
+    assert.equal(legacy.normalizePresentearTier('👑 Lendário'), 'lendario');
+    assert.equal(legacy.normalizePresentearTier('gold'), null);
+    assert.equal(legacy.normalizePresentearTier(null), null);
+  });
+  it('cooldown do !live por tier (Lendario 6h, VIP 12h, Apoiador 24h)', () => {
+    const { LIVE_COOLDOWN_BY_TIER_MS } = require('../commands/legacyCommands');
+    assert.equal(LIVE_COOLDOWN_BY_TIER_MS['👑 Lendário'], 6 * 3600000);
+    assert.equal(LIVE_COOLDOWN_BY_TIER_MS['⭐ VIP'], 12 * 3600000);
+    assert.equal(LIVE_COOLDOWN_BY_TIER_MS['💜 Apoiador'], 24 * 3600000);
+    assert.equal(LIVE_COOLDOWN_BY_TIER_MS['Jogador'], undefined);
   });
 
   it('cooldown de 6h com formatacao', () => {
