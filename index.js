@@ -22,6 +22,7 @@ const config = require('./config.json');
 const { createVipPixPayment, getClubeTierConfig, recordPendingPayment, startVipPaymentPoller } = require('./services/clubePaymentsService');
 const { createRiotService } = require('./services/riotService');
 const { startSextaScheduler, startLclScheduler, startTorneioScheduler } = require('./services/eventoService');
+const { startSocialScheduler } = require('./services/socialService');
 const { startBackupScheduler } = require('./services/backupService');
 const { handleTempVoiceStateUpdate } = require('./services/tempVoiceService');
 const {
@@ -370,6 +371,7 @@ function buildSlashCommands() {
       .addStringOption((option) => option.setName('hora').setDescription('Hora de abrir (ex: 19:00)').setRequired(false))
       .addIntegerOption((option) => option.setName('diasinscricao').setDescription('Dias de inscrição (padrão 7)').setMinValue(1).setMaxValue(60).setRequired(false)),
     new SlashCommandBuilder().setName('clubefixar').setDescription('Posta e fixa os benefícios no #clube-vip (staff).'),
+    new SlashCommandBuilder().setName('social').setDescription('Mostra os canais e redes sociais oficiais da CAPS ARENA.'),
     new SlashCommandBuilder().setName('querolive').setDescription('Entra/sai do ping 🔴 Ao Vivo.'),
     new SlashCommandBuilder()
       .setName('live')
@@ -492,6 +494,7 @@ client.once('ready', async () => {
   startSextaScheduler();
   startLclScheduler();
   startTorneioScheduler();
+  startSocialScheduler();
   startVoiceTimeScheduler();
   startBackupScheduler();
 
@@ -793,6 +796,10 @@ async function processCommand(message, rawContent) {
         break;
       case 'live':
         await handlers.handleLiveCommand(message, args);
+        break;
+      case 'social':
+      case 'redes':
+        await handlers.handleSocialCommand(message);
         break;
       case 'ficha':
       case 'perfil':
@@ -1311,6 +1318,10 @@ client.on('interactionCreate', async (interaction) => {
       }
       case 'clubefixar':
         await handlers.handleClubeFixarCommand(context);
+        break;
+      case 'social':
+      case 'redes':
+        await handlers.handleSocialCommand(context);
         break;
       case 'querolive':
         await handlers.handleQueroLiveCommand(context);

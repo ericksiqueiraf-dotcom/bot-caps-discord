@@ -272,3 +272,27 @@ describe('handler !staff: guia restrito à Staff', () => {
     assert.equal(sent.length, 1);
   });
 });
+
+describe('handler !social: redes oficiais (público)', () => {
+  async function runSocial(member) {
+    setup({});
+    const message = mkMessage({ member: mkMember(member) });
+    const sent = [];
+    message.channel = { id: 'c1', isTextBased: () => true, send: async (p) => { sent.push(p); } };
+    await legacy.handleSocialCommand(message);
+    return sent;
+  }
+
+  it('qualquer jogador vê o painel das redes no canal', async () => {
+    const sent = await runSocial(ROLE_JOGADOR);
+    assert.equal(sent.length, 1);
+    const descricao = sent[0].embeds[0].toJSON().description;
+    assert.match(descricao, /instagram\.com\/capsarenatv/);
+    assert.match(descricao, /twitch\.tv\/capsarenatv/);
+  });
+
+  it('Capitão e Staff também usam (não é comando de gestão)', async () => {
+    assert.equal((await runSocial(ROLE_CAPITAO)).length, 1);
+    assert.equal((await runSocial(ROLE_STAFF)).length, 1);
+  });
+});

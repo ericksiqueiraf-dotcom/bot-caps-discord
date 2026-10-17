@@ -9,7 +9,7 @@
 
 - **Data:** 2026-10-17
 - **Foco:** Torneio — `!torneioon`/`!torneiooff`/`!torneioagenda` (staff) + janela de inscrição de 7 dias; base no merge `pr/local-into-main`
-- **Status:** ✅ CAPS **224/224** (42 suites) e LCL **108/108**. `caps-bot` (PROD, branch `feat/torneio-onoff`) e `lcl-bot` reiniciados e **online** (`CAPS BOT LOL#6241`, `LCL - LIGA CLANDESTINA DE LOL#8184`). Torneio segue **desativado** (default) até a staff rodar `!torneioon`. PR manual ainda pendente.
+- **Status:** ✅ CAPS **244/244** (47 suites) e LCL **108/108**. `caps-bot` (PROD, branch `feat/torneio-onoff`) e `lcl-bot` reiniciados e **online** (`CAPS BOT LOL#6241`, `LCL - LIGA CLANDESTINA DE LOL#8184`). Torneio segue **desativado** (default) até a staff rodar `!torneioon`. PR manual ainda pendente.
 
 ---
 
@@ -431,6 +431,18 @@ database/                    ← fallback JSON local
 - **`!staff` (guia interno) também virou só-Staff:** `handleStaffCommand` (`:2644`) passou de `isStaffViewer` para `isStaffOnly`. Com isso **`isStaffViewer` foi removida** (ficou sem uso no CAPS). No **LCL** ela permanece na definição (`lcl-bot/commands/legacyCommands.js:1865`) guardando o `!staff` de lá — inalcançável por causa do `INTER_ONLY` (não mudou comportamento; deixei para não adicionar código morto).
 - **Testes do `!staff`:** Capitão ❌ (não recebe o embed), jogador ❌, Staff ✅, Administrador ✅ (mesmo sem cargo de Staff).
 - Validação final: CAPS **224/224** (42 suites), LCL **108/108**.
+
+### 2026-10-17 — Divulgação das redes oficiais: `!social` + post automático 3x/dia
+- **Serviço novo `services/socialService.js`:** `buildSocialEmbed()`, `getRedes()`, `getHoras()`, `socialSlot()`, `findSocialChannel()`, `runSocialTick()`, `startSocialScheduler()` (tick de 60s, `.unref()`).
+- **Onde posta:** `config.social.divulgacaoChannelId` (prioridade) → `💬・geral-leagueoflegends` (exato) → nome parcial → fallback em `comunicados/anúncios/announcements`. Nasceu `divulgacaoChannelId: ""` de propósito (resolve por nome).
+- **Horários:** **10h, 16h e 21h (SP)**, configuráveis em `config.social.horas`. Escolhidos para **não colidir com a promo do clube** (`CLUBE_PROMO_HOURS = [12, 19]`, `utils/lobbyUtils.js:189`) — o geral fica com 10, 12, 16, 19, 21.
+- **Anti-duplicação:** `systemMeta.socialUltimoSlot` = `"AAAA-MM-DD#HH"`. Cada horário posta **1x/dia por slot**, sobrevive a restart; se o bot ficou offline a hora toda, o slot é pulado (não faz backfill/spam). Sem canal → não posta e **não** marca o slot (tenta de novo no próximo tick).
+- **Conteúdo:** Instagram `capsarenatv` e Twitch `capsarenatv`; **TikTok e YouTube aparecem como "em breve 🔜"** enquanto o link em `config.social.links` estiver vazio. É só preencher o link no config (sem mexer no código) que a linha vira link.
+- **Comando `!social` (alias `!redes`) + `/social`:** público — posta o painel no canal atual e apaga a mensagem de quem chamou (mesmo padrão do `!regras`). Documentado no `!ajuda2` (seção 🎁 Extras).
+- **Limpeza:** `config.json` tinha **`clubePagamentos` duplicado** (dois blocos; o último venceria). Removido o primeiro — preços seguem 9,99 / 16,90 / 21,90.
+- **Testes:** `tests/social.test.js` (17) — embed, links vazios/inválidos, horas (padrão/custom/inválidas), slot (hora cheia, fora de hora, virada de dia), canal (config/exato/parcial/fallback/null) e tick (fora de hora, 1x no slot, sem duplicar, 3x no dia, sem canal, multi-guild). + 3 no `tests/handlers.test.js` (público, jogador/Capitão/Staff).
+- **Validado em PROD:** `systemMeta.clubePromoLastAt = 2026-10-17T15:00:17Z` (= 12:00 SP) → o tick automático **está postando no `💬・geral-leagueoflegends`**, então a resolução de canal do `!social` (mesma busca) funciona. O guarda `tests/schedulers.test.js` pegou o `startSocialScheduler` sozinho (prova de que o teste novo serve).
+- Validação: CAPS **244/244** (47 suites), LCL **108/108**.
 
 ### 2026-10-14 — Deploy clube VIP na ARENA oficial
 - `MP_ACCESS_TOKEN` (prod, mesmo validado na TESTE) copiado para `.env` do CAPS; `clubePagamentos` já estava no `config.json`.

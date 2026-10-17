@@ -1579,7 +1579,7 @@ function buildAjudaEmbed(page = 1) {
         { name: '🏆 Ranking e pós-jogo', value: '`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!palpite <1|2> <10-100>` • Aposta pontos no vencedor da sua partida\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking geral (CLASSIC = pontos custom)\n`!placar tiers` • Só Esmeralda+\n`!top10` • Top 10 CLASSIC por pontos custom, desempate por winrate\n`!top10 tiers` • Top 10 só Esmeralda+\n`!topstreak` • Ranking Streak 🔥\n`!toprankinfernal` • Quem mais pegou INFERNAL na temporada 🔥\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
         { name: '💎 Clube VIP', value: '`!clube` • Tiers, assinatura PIX e renovação -10%\n`!querolive` • Entrar/sair do ping 🔴 Ao Vivo\n`!live <link>` • Divulgar live Twitch/YouTube/Kick (Lendário 6h, VIP 12h, Apoiador 24h)' },
         { name: '🔊 Salas temporárias (dono da sala)', value: 'Entre no ➕・criar-sala para ganhar sua sala\n`!salahub` • Lista as salas ativas\n`!sala` • Mostra sua sala • `!sala <nome>` renomeia\n`!convidar @u` • Chama alguém p/ sua sala\n`!salalock` • Tranca (`!salalock abrir` destranca)\n`!salalimit <0-99>` • Limite de usuários (0 = sem limite)\n`!salaexpulsar @u` • Remove alguém da sala\n`!limparvoz` • Apaga sua sala (dentro dela)' },
-        { name: '🎁 Extras', value: '`!convite` • Seu link pessoal (traga gente e ganhe recompensas)\n`!topconvites` • Ranking de quem mais trouxe gente\n`!torneio` • Torneio mata-mata (entrar, lista, status — staff: `!torneioon`/`!torneiooff`/`!torneioagenda`)\n`!tempo` • Seu tempo em call • `!topvoz` • Ranking de call\n`!palpite <1|2> <10-100>` • Bolão da partida • `!missoes` • Missões da semana • `!duelo @u` • Duelo de PDL\n🌅 Primeira vitória do dia vale +50% PDL (automático)\n`!regras` • Regulamento completo' },
+        { name: '🎁 Extras', value: '`!convite` • Seu link pessoal (traga gente e ganhe recompensas)\n`!topconvites` • Ranking de quem mais trouxe gente\n`!torneio` • Torneio mata-mata (entrar, lista, status — staff: `!torneioon`/`!torneiooff`/`!torneioagenda`)\n`!tempo` • Seu tempo em call • `!topvoz` • Ranking de call\n`!palpite <1|2> <10-100>` • Bolão da partida • `!missoes` • Missões da semana • `!duelo @u` • Duelo de PDL\n`!social` • Instagram, Twitch, TikTok e YouTube oficiais da CAPS ARENA\n🌅 Primeira vitória do dia vale +50% PDL (automático)\n`!regras` • Regulamento completo' },
         { name: '⬅️ Página 1', value: '`!ajuda` • Cadastro, fila e voto\n`!staff` • Guia da staff (restrito)' }
       );
     } else {
@@ -2614,6 +2614,20 @@ async function handleRulesCommand(message) {
   }
 }
 
+// Redes sociais / canais oficiais (público). Mesmo painel que a divulgação
+// automática de 3x/dia (services/socialService.js).
+async function handleSocialCommand(message) {
+  try {
+    const { buildSocialEmbed } = require('../services/socialService');
+    await sendToMessageChannel(message, { embeds: [buildSocialEmbed()] });
+  } catch (error) {
+    console.error('[ERRO] !social:', error);
+    await replyToMessage(message, `❌ Erro ao mostrar as redes sociais: \`${error.message}\``);
+  } finally {
+    if (message.deletable) await message.delete().catch(() => null);
+  }
+}
+
 // Staff "de verdade" (🛠️ Staff / Moderador / Admin) — SEM o cargo de Capitão.
 // Regra ÚNICA para todo comando de staff do qual o Capitão não participa.
 // Admin/Administrador sempre entra (Administrator implica ManageMessages).
@@ -2875,6 +2889,7 @@ module.exports = {
   handleRegisterCommand, handleNickUpdateCommand, handleSyncPlayerRankCommand, handleVoteCommand, pendingAutoStarts, triggerAutoStart,
   handleRematchCommand, handleRouletteCommand, handleRoletaSairCommand, handleRulesCommand, handleStaffCommand, handlePdlCommand,
   handleResultVoteButton, handleClubeCommand, handleClubeAdminCommand, handleClubeFixarCommand, handleQueroLiveCommand, handleLiveCommand,
+  handleSocialCommand,
   handleConviteCommand, handleTopConvitesCommand, handleTorneioCommand, handleTempoCommand, handleTopVozCommand,
   handleAjudaFixarCommand, buildAjudaEmbed, buildTempoEmbed, normalizePresentearTier, handlePresentearCommand, handlePalpiteCommand,
   handleMissoesCommand, handleDueloCommand,
