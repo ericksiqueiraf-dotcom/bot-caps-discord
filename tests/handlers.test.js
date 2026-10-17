@@ -14,7 +14,8 @@ let current = null;
 const legacy = loadLegacyWithStubs({
   loadSystemMeta: async () => current.meta,
   saveSystemMeta: async () => {},
-  loadPlayerStats: async () => current.stats
+  loadPlayerStats: async () => current.stats,
+  loadVipSubscriptions: async () => ({ subscriptions: [] })
 });
 
 function setup(meta = {}) {
@@ -192,4 +193,47 @@ describe('handler !torneio: sortear', () => {
     assert.deepEqual([...state.meta.torneio.reservas].sort(), ['p21', 'p22', 'p23']);
     assert.ok(sorteaveis.every((id) => !state.meta.torneio.reservas.includes(id)), 'reserva não pode jogar');
   });
+});
+
+describe('handler: comandos só de Staff (Capitão fora, Admin/Administrador entra)', () => {
+  const CASES = [
+    { name: '!clubefixar', run: (m) => legacy.handleClubeFixarCommand(m), passou: /Canal #clube-vip não encontrado/ },
+    { name: '!ajudafixar', run: (m) => legacy.handleAjudaFixarCommand(m), passou: /Canal #infos-lol não encontrado/ },
+    { name: '!clubeadmin', run: (m) => legacy.handleClubeAdminCommand(m), passou: /Nenhuma assinatura ativa/ }
+  ];
+
+  async function exec(command, member) {
+    setup({});
+    const message = mkMessage({ member: mkMember(member) });
+    await command.run(message);
+    return message.replies.map(textOf).join('\n');
+  }
+
+  for (const command of CASES) {
+    it(`${command.name}: Capitão é bloqueado`, async () => {
+      assert.match(await exec(command, ROLE_CAPITAO), /Restrito à staff/);
+    });
+
+    it(`${command.name}: Staff (cargo) passa`, async () => {
+      assert.match(await exec(command, ROLE_STAFF), command.passou);
+    });
+
+    it(`${command.name}: Moderador passa`, async () => {
+      assert.match(await exec(command, ROLE_MOD), command.passou);
+    });
+
+    it(`${command.name}: Administrador passa`, async () => {
+      const admin = { roleNames: ['Jogador'], perms: ['Administrator'] };
+      assert.match(await exec(command, admin), command.passou);
+    });
+
+    it(`${command.name}: ManageMessages passa`, async () => {
+      const mod = { roleNames: ['Jogador'], perms: ['ManageMessages'] };
+      assert.match(await exec(command, mod), command.passou);
+    });
+
+    it(`${command.name}: jogador comum é bloqueado`, async () => {
+      assert.match(await exec(command, ROLE_JOGADOR), /Restrito à staff/);
+    });
+  }
 });

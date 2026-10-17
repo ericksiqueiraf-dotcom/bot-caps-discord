@@ -18,7 +18,8 @@ function mkGuild(overrides = {}) {
   return {
     id: 'g1',
     roles: { cache: new Collection() },
-    members: { fetch: async (id) => ({ id, displayName: String(id) }) },
+    channels: { cache: new Collection() },
+    members: { fetch: async (id) => ({ id, displayName: String(id) }), me: { id: 'bot1' } },
     ...overrides
   };
 }

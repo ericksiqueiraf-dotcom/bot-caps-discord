@@ -933,7 +933,7 @@ async function handlePlayerCardCommand(message, targetUser = null) {
 
 async function handleClubeFixarCommand(message) {
   try {
-    if (!isStaffViewer(message.member)) {
+    if (!isStaffOnly(message.member)) {
       return await replyToMessage(message, '❌ Restrito à staff.');
     }
     const { buildClubeDetalEmbed } = require('../utils/lobbyUtils');
@@ -965,7 +965,7 @@ async function handleClubeFixarCommand(message) {
 
 async function handleAjudaFixarCommand(message) {
   try {
-    if (!isStaffViewer(message.member)) {
+    if (!isStaffOnly(message.member)) {
       return await replyToMessage(message, '❌ Restrito à staff.');
     }
     const guild = message.guild;
@@ -1141,7 +1141,7 @@ async function handleClubeCommand(message) {
 
 async function handleClubeAdminCommand(message) {
   try {
-    if (!isStaffViewer(message.member)) {
+    if (!isStaffOnly(message.member)) {
       return await replyToMessage(message, '❌ Restrito à staff.');
     }
     const { TIER_KEYS, TIER_ROLE_NAMES } = require('../services/clubePaymentsService');
@@ -1291,7 +1291,7 @@ async function handleTorneioCommand(message, args = []) {
     const systemMeta = await loadSystemMeta();
     const t = systemMeta.torneio || null;
     const habilitado = systemMeta.torneioHabilitado === true;
-    const staff = isTournamentStaff(message.member);
+    const staff = isStaffOnly(message.member);
     const save = async () => { await saveSystemMeta(systemMeta); };
 
     if (sub === 'info') {
@@ -2623,8 +2623,9 @@ function isStaffViewer(member) {
 }
 
 // Staff "de verdade" (🛠️ Staff / Moderador / Admin) — SEM o cargo de Capitão.
-// Usado nos comandos de gestão do torneio: Capitão não se envolve neles.
-function isTournamentStaff(member) {
+// Regra ÚNICA para todo comando de staff do qual o Capitão não participa.
+// Admin/Administrador sempre entra (Administrator implica ManageMessages).
+function isStaffOnly(member) {
   if (!member) return false;
   try {
     if (member.permissions?.has('ManageMessages') || member.permissions?.has('Administrator')) return true;
@@ -2636,6 +2637,9 @@ function isTournamentStaff(member) {
     return Boolean(member.roles?.cache?.some((role) => key(role?.name) === 'staff' || key(role?.name) === 'moderador'));
   } catch { return false; }
 }
+
+// Alias histórico (mesma regra) — mantido para compatibilidade.
+const isTournamentStaff = isStaffOnly;
 
 async function handleStaffCommand(message) {
   try {
@@ -2885,6 +2889,7 @@ module.exports = {
   LIVE_COOLDOWN_BY_TIER_MS,
   handleSalaHubCommand, handleConvidarCommand, handleLimparVozCommand, handleSalaCommand,
   handleSalaLockCommand, handleSalaLimitCommand, handleSalaExpulsarCommand,
+  isStaffOnly,
   isTournamentStaff,
   getSummonerLevelGate,
   findRecentVictoryByLetter,

@@ -9,7 +9,7 @@
 
 - **Data:** 2026-10-17
 - **Foco:** Torneio — `!torneioon`/`!torneiooff`/`!torneioagenda` (staff) + janela de inscrição de 7 dias; base no merge `pr/local-into-main`
-- **Status:** ✅ CAPS **202/202** (40 suites) e LCL **108/108**. `caps-bot` (PROD, branch `feat/torneio-onoff`) e `lcl-bot` reiniciados e **online** (`CAPS BOT LOL#6241`, `LCL - LIGA CLANDESTINA DE LOL#8184`). Torneio segue **desativado** (default) até a staff rodar `!torneioon`. PR manual ainda pendente.
+- **Status:** ✅ CAPS **220/220** (41 suites) e LCL **108/108**. `caps-bot` (PROD, branch `feat/torneio-onoff`) e `lcl-bot` reiniciados e **online** (`CAPS BOT LOL#6241`, `LCL - LIGA CLANDESTINA DE LOL#8184`). Torneio segue **desativado** (default) até a staff rodar `!torneioon`. PR manual ainda pendente.
 
 ---
 
@@ -421,6 +421,14 @@ database/                    ← fallback JSON local
 - **Bug corrigido:** `!torneio sortear` com 23 inscritos **rejeitava** ("precisa ser múltiplo de 10") — o corte só existia no fechamento automático. Agora, com ≥20 e não múltiplo de 10, fecha com os **primeiros 20** (mesma regra do deadline) e anuncia as reservas.
 - **Auditoria de acesso do `👑 Capitão`** (subagente, só leitura): a única função que **exclui** o capitão é `isTournamentStaff` (usada só no `!torneio` de gestão). O capitão **entra** em `isStaffViewer` (`!staff`, `!clubefixar`, `!ajudafixar`, `!clubeadmin`), `hasCaptainRole` (`!limparespera`, `!limparsalas`), `hasStaffPower` (`!roleta`, `!roletasair`), no gate de `!vitoria`/`!resultado` e em `!desafiar`/`!resultado-inter`/`!wo` do LCL. Comandos de gestão que exigem `ManageMessages`/`Administrator` sem citar o capitão (ele só passa se o **cargo** tiver a permissão): `!rematch`, `!pdl`, `!presentear`, `!reset`, `!resetgeral`, `!limpar`, `!sincronizarelo`, `!iniciartemporada`, `!onboarding`, etc. Riscos anotados: `!start` **sem gate algum**; `isStaffBypass` é **código morto**; capitão reconhecido por ID no CAPS mas por **nome** no inter do LCL (cargo legado `👑 Capitão de Customs` passa no `!desafiar` mas não em `!limparespera`); nenhum slash usa `setDefaultMemberPermissions` (todo mundo vê `/torneioon`, `/pdl`, … no menu).
 - Validação: CAPS **202/202** (40 suites), LCL **108/108**.
+
+### 2026-10-17 — `!clubefixar` / `!ajudafixar` / `!clubeadmin` agora são SÓ de Staff
+- **Regra unificada:** `isTournamentStaff` virou **`isStaffOnly(member)`** (nome genérico; `isTournamentStaff` continua exportado como alias) = `ManageMessages` **ou** `Administrator` **ou** cargo **`staff`/`moderador`** (nome normalizado). **Capitão NÃO entra.** É o gate único para todo comando de staff do qual o Capitão não participa.
+- **Aplicado em:** `handleClubeFixarCommand` (`legacyCommands.js:936`), `handleAjudaFixarCommand` (`:968`), `handleClubeAdminCommand` (`:1144`) e na gestão do `!torneio` (`:1294`). Antes usavam `isStaffViewer` (que inclui o Capitão) → o `👑 Capitão` conseguia fixar os guias e listar as assinaturas do clube.
+- **Admin/Administrador sempre liberado:** o check é por permissão (`ManageMessages`, e `Administrator` implica ManageMessages no discord.js), então qualquer comando de staff é acessível a Admins mesmo sem cargo `staff`. Confirmado também no LCL (`isCapitaoOuStaff` checa `Administrator`, `interCommandHandlers.js:33-34`).
+- **Testes:** novo bloco em `tests/handlers.test.js` — para cada um dos 3 comandos: **Capitão e jogador bloqueados**; **Staff / Moderador / `ManageMessages` / `Administrator` passam** (18 casos). `tests/torneio.test.js` passou a testar `isStaffOnly` (+ alias).
+- **Não mudado (decisão pendente):** `!staff` (o guia) continua em `isStaffViewer` — o Capitão ainda consegue ler; `!limparespera`/`!limparsalas` continuam aceitando o Capitão (`hasCaptainRole`).
+- Validação: CAPS **220/220** (41 suites), LCL **108/108**.
 
 ### 2026-10-14 — Deploy clube VIP na ARENA oficial
 - `MP_ACCESS_TOKEN` (prod, mesmo validado na TESTE) copiado para `.env` do CAPS; `clubePagamentos` já estava no `config.json`.

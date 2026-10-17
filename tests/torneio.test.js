@@ -218,13 +218,17 @@ describe('torneio CAPS ARENA', () => {
       permissions: { has: (p) => perms.includes(p) },
       roles: { cache: new Collection(roleNames.map((n, i) => [String(i), { name: n }])) }
     });
-    assert.equal(legacy.isTournamentStaff(mkMember(['🛠️ Staff'])), true);
-    assert.equal(legacy.isTournamentStaff(mkMember(['Staff'])), true);
-    assert.equal(legacy.isTournamentStaff(mkMember(['🛠️ Moderador'])), true);
-    assert.equal(legacy.isTournamentStaff(mkMember(['👑 Capitão LCL'])), false);
-    assert.equal(legacy.isTournamentStaff(mkMember(['👑 Capitão de Customs'])), false);
-    assert.equal(legacy.isTournamentStaff(mkMember([], ['ManageMessages'])), true);
-    assert.equal(legacy.isTournamentStaff(null), false);
+    assert.equal(legacy.isStaffOnly(mkMember(['🛠️ Staff'])), true);
+    assert.equal(legacy.isStaffOnly(mkMember(['Staff'])), true);
+    assert.equal(legacy.isStaffOnly(mkMember(['🛠️ Moderador'])), true);
+    assert.equal(legacy.isStaffOnly(mkMember(['👑 Capitão LCL'])), false);
+    assert.equal(legacy.isStaffOnly(mkMember(['👑 Capitão de Customs'])), false);
+    assert.equal(legacy.isStaffOnly(mkMember([], ['ManageMessages'])), true);
+    assert.equal(legacy.isStaffOnly(mkMember([], ['Administrator'])), true);
+    assert.equal(legacy.isStaffOnly(mkMember([], ['SendMessages'])), false);
+    assert.equal(legacy.isStaffOnly(null), false);
+    // alias histórico
+    assert.equal(legacy.isTournamentStaff, legacy.isStaffOnly);
   });
 
   it('tick: agenda abre sozinha quando o dia chega (e nao duplica)', async () => {
