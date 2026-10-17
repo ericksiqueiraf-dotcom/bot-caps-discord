@@ -1419,13 +1419,23 @@ async function handleTorneioCommand(message, args = []) {
       if (!t?.active) return await replyToMessage(message, '❌ Nenhum torneio ativo.');
       if (t.final) return await replyToMessage(message, '🔥 A final já está rolando. Use `!torneio resultado FINAL <1|2>`.');
       if (t.rounds.length === 0) {
+        // Múltiplo de 10: se passou de 20 e não fechou no múltiplo, fecha agora com
+        // os primeiros e manda o excedente para as reservas.
+        const total = (t.players || []).length;
+        if (total >= T.MIN_PLAYERS && total % T.FINAL_SIZE !== 0) {
+          T.fecharInscricoes(t);
+          await save();
+        }
         const req = T.startRequirement(t);
         if (!req.ok) return await replyToMessage(message, `❌ ${req.message}`);
         const pool = await resolveTorneioPool(message.guild, t.players);
         const games = T.drawGames(pool, (g) => createBalancedTeams(g), 'R1');
         t.rounds.push({ n: 1, games });
         await save();
-        return await replyToMessage(message, `🎲 **Rodada 1 sorteada!**\n${formatTorneioGames(games)}\n\nStaff: \`!torneio resultado <jogo> <1|2>\``);
+        const reservas = (t.reservas || []).length
+          ? `\n🍀 ${t.reservas.length} reserva(s): ${t.reservas.map((id) => `<@${id}>`).join(' ')}`
+          : '';
+        return await replyToMessage(message, `🎲 **Rodada 1 sorteada!**${reservas}\n${formatTorneioGames(games)}\n\nStaff: \`!torneio resultado <jogo> <1|2>\``);
       }
       const adv = T.advanceTournament(t, (g) => createBalancedTeams(g));
       if (!adv.ok) return await replyToMessage(message, `❌ ${adv.message}`);
