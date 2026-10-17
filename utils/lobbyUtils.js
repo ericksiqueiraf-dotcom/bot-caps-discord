@@ -1849,7 +1849,7 @@ const STAFF_SECTIONS = [
     value: '`!clubeadmin` • Assinaturas ativas por tier, com vencimento de cada uma.\n`!clubefixar` • Posta e fixa os benefícios detalhados no #clube-vip.\n`!presentear @u <tier> [dias]` • Dá dias de clube de presente (só Admin).\n`!clube` • O que o jogador vê (tiers, preços, botões de assinar).'
   },
   {
-    name: '🏆 Torneio — abrir, agendar e conduzir',
+    name: '🏆 Torneio — abrir e agendar (só Staff)',
     value: '`!torneioon [dias]` • Ativa o torneio e abre as inscrições (padrão 7 dias).\n`!torneiooff` • Desativa (membros não se inscrevem; `info/lista/status` seguem livres).\n`!torneioagenda sex,sab 19:00 [dias]` • Abre sozinho nos dias/hora (`!torneioagenda off` limpa).\n`!torneio sortear | resultado <jogo> <1|2> | encerrar` • Conduzir a edição (5x5 balanceado pelo elo).'
   },
   {

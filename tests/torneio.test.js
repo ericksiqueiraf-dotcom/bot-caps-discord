@@ -4,6 +4,8 @@ const assert = require('node:assert/strict');
 const T = require('../services/torneioService');
 const { createBalancedTeams } = require('../services/balanceService');
 const { getSPParts, runTorneioTick } = require('../services/eventoService');
+const legacy = require('../commands/legacyCommands');
+const { Collection } = require('discord.js');
 
 function pool(n, base = 2000) {
   return Array.from({ length: n }, (_, i) => ({ discordId: `u${i + 1}`, nickname: `P${i + 1}`, baseMmr: base - i * 50 }));
@@ -209,6 +211,20 @@ describe('torneio CAPS ARENA', () => {
     assert.equal(meta.torneio.inscricoes, true);
     assert.match(posts[0], /faltam/i);
     assert.match(posts[0], /8/);
+  });
+
+  it('comandos de torneio: Staff entra, Capitao nao', () => {
+    const mkMember = (roleNames, perms = []) => ({
+      permissions: { has: (p) => perms.includes(p) },
+      roles: { cache: new Collection(roleNames.map((n, i) => [String(i), { name: n }])) }
+    });
+    assert.equal(legacy.isTournamentStaff(mkMember(['🛠️ Staff'])), true);
+    assert.equal(legacy.isTournamentStaff(mkMember(['Staff'])), true);
+    assert.equal(legacy.isTournamentStaff(mkMember(['🛠️ Moderador'])), true);
+    assert.equal(legacy.isTournamentStaff(mkMember(['👑 Capitão LCL'])), false);
+    assert.equal(legacy.isTournamentStaff(mkMember(['👑 Capitão de Customs'])), false);
+    assert.equal(legacy.isTournamentStaff(mkMember([], ['ManageMessages'])), true);
+    assert.equal(legacy.isTournamentStaff(null), false);
   });
 
   it('tick: agenda abre sozinha quando o dia chega (e nao duplica)', async () => {

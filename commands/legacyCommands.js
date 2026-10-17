@@ -1291,7 +1291,7 @@ async function handleTorneioCommand(message, args = []) {
     const systemMeta = await loadSystemMeta();
     const t = systemMeta.torneio || null;
     const habilitado = systemMeta.torneioHabilitado === true;
-    const staff = isStaffViewer(message.member);
+    const staff = isTournamentStaff(message.member);
     const save = async () => { await saveSystemMeta(systemMeta); };
 
     if (sub === 'info') {
@@ -1342,7 +1342,7 @@ async function handleTorneioCommand(message, args = []) {
 
     // ---- staff ----
     if (!staff) {
-      return await replyToMessage(message, '❌ Esse subcomando é da staff. Jogadores: `!torneio entrar | sair | lista | info | status`.');
+      return await replyToMessage(message, '❌ Esse subcomando é **restrito à Staff**. Jogadores: `!torneio entrar | sair | lista | info | status`.');
     }
 
     if (sub === 'on') {
@@ -2612,6 +2612,21 @@ function isStaffViewer(member) {
   return Boolean(config.roles?.captainRoleId && member.roles?.cache?.has(config.roles.captainRoleId));
 }
 
+// Staff "de verdade" (🛠️ Staff / Moderador / Admin) — SEM o cargo de Capitão.
+// Usado nos comandos de gestão do torneio: Capitão não se envolve neles.
+function isTournamentStaff(member) {
+  if (!member) return false;
+  try {
+    if (member.permissions?.has('ManageMessages') || member.permissions?.has('Administrator')) return true;
+  } catch { /* noop */ }
+  const key = (name) => String(name || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+  try {
+    return Boolean(member.roles?.cache?.some((role) => key(role?.name) === 'staff' || key(role?.name) === 'moderador'));
+  } catch { return false; }
+}
+
 async function handleStaffCommand(message) {
   try {
     if (!isStaffViewer(message.member)) {
@@ -2860,6 +2875,7 @@ module.exports = {
   LIVE_COOLDOWN_BY_TIER_MS,
   handleSalaHubCommand, handleConvidarCommand, handleLimparVozCommand, handleSalaCommand,
   handleSalaLockCommand, handleSalaLimitCommand, handleSalaExpulsarCommand,
+  isTournamentStaff,
   getSummonerLevelGate,
   findRecentVictoryByLetter,
   findPendingAutoStartLobby,
