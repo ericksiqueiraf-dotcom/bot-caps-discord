@@ -1,0 +1,601 @@
+================================================================================
+  TODOS OS COMANDOS  -  CAPS ARENA + LCL BOT
+================================================================================
+  Documento gerado a partir do CODIGO dos dois bots (fontes: index.js,
+  commands/legacyCommands.js, commands/handlers/**, utils/lobbyUtils.js,
+  services/** e lcl-bot/** ).
+
+  - CAPS ARENA ....... bot da raiz do projeto      (prefixo !  e  slash / )
+  - LCL BOT .......... pasta lcl-bot\ , INTER_ONLY=1 (Liga Clandestina de LoL)
+
+  COMO USAR: procure a categoria e o comando. A linha "Acesso:" diz quem pode
+  usar. Nada aqui foi inventado: se um comando esta marcado como desligado, ele
+  existe no codigo mas nao responde naquele bot.
+
+  LEGENDA DE ACESSO
+    publico ....... qualquer membro do servidor
+    jogador ....... precisa estar cadastrado (!cadastrar) e/ou na partida/fila
+    capitao ....... dono do cargo de Capitao (config.roles.captainRoleId)
+    staff ......... permissao Gerenciar Mensagens / Administrador
+                    ou cargo "Staff" / "Moderador"
+    so Admin ...... exige a permissao Administrador
+================================================================================
+
+
+
+
+################################################################################
+#                                                                              #
+#   1)  CAPS ARENA   -   comandos de prefixo (!) e slash (/)                   #
+#                                                                              #
+################################################################################
+
+--------------------------------------------------------------------------------
+  AJUDA E SISTEMA
+--------------------------------------------------------------------------------
+  !ajuda  /  /ajuda
+      Guia de comandos - pagina 1/2 (o essencial: cadastro, fila, partida).
+      Acesso: publico
+
+  !ajuda2  /  /ajuda2
+      Guia de comandos - pagina 2/2 (ranking, clube, salas e extras).
+      Acesso: publico
+
+  !staff  /  /staff
+      Guia dos comandos de staff. Alias: !staffhelp
+      Acesso: staff
+
+  !ping  /  /ping
+      Verifica se o bot esta online e mostra a latencia.
+      Acesso: publico
+
+  !regras  /  /regras
+      Mostra o regulamento completo da CAPS ARENA. Aliases: !regra, !rules
+      Acesso: publico
+
+  !onboarding  /  /onboarding
+      Gera a mensagem de boas-vindas e o guia de inicio rapido.
+      Aliases: !inicio, !setup
+      Acesso: so Admin
+
+  !stats  /  (nao tem slash)
+      Estatisticas por modo: V/D, winrate, elo e pontos. !stats @usuario
+      Alias: !estatisticas
+      Acesso: publico
+
+
+--------------------------------------------------------------------------------
+  CADASTRO
+--------------------------------------------------------------------------------
+  !cadastrar  /  /cadastrar
+      Vincula sua conta Riot ao Discord: !cadastrar Nick#TAG
+      (exige nivel 30+; valida o nick na Riot).
+      Acesso: publico
+
+  !nick  /  /nick
+      Atualiza o nick Riot ja cadastrado: !nick Nick#TAG
+      Acesso: publico
+
+
+--------------------------------------------------------------------------------
+  FILA E VOTO
+--------------------------------------------------------------------------------
+  !entrar  /  /entrar
+      Entra na fila. Classic: !entrar Nick#TAG
+      ARAM: !entrar aram [1x1..5x5] Nick#TAG   -   Alias: !entra
+      Acesso: jogador (precisa estar no Lobby e estar cadastrado)
+
+  !lista  /  /lista
+      Mostra as filas/lobbies ativos (ou o lobby em que voce esta).
+      Alias: !fila   -   Acesso: publico
+
+  !espera  /  /espera
+      Fila de espera. !espera (entrar) | !espera ver | !espera sair
+      (quem tem o cargo INFERNAL fura para a posicao 5).
+      Acesso: jogador (exige cadastro)
+
+  !esperatiers  /  /esperatiers
+      Fila de espera do Lobby TIER S (so Esmeralda IV+).
+      !esperatiers | !esperatiers sair   -   Alias: !esperatier
+      Acesso: jogador (exige Esmeralda IV+)
+
+  !sair  /  /sair
+      Remove voce da fila/lobby e das filas de espera.
+      Acesso: jogador
+
+  !votar  /  /votar
+      Vota no time vencedor: !votar 1 ou !votar 2
+      (sem numero abre o painel de botoes).
+      Acesso: jogador (em partida ativa)
+
+
+--------------------------------------------------------------------------------
+  PARTIDA - CONDUZIR O JOGO
+--------------------------------------------------------------------------------
+  !start  /  /start
+      Inicia manualmente a sala cheia: !start A
+      Acesso: staff (o guia classifica como staff; no codigo nao ha trava)
+
+  !cancelarstart  /  /cancelarstart
+      Cancela a contagem de auto-start ou a partida ativa: !cancelarstart A
+      Alias: !cancelar   -   Acesso: staff
+
+  !vitoria  /  /vitoria
+      Registra o time vencedor: !vitoria 1 A
+      (o voto automatico com 6 votos tambem dispara)
+      Alias: !resultado   -   Acesso: staff + capitao
+
+  !rematch  /  (nao tem slash)
+      Devolve os 10 da ultima partida ao lobby, rebalanceados: !rematch A
+      Acesso: staff
+
+
+--------------------------------------------------------------------------------
+  RANKING E POS-JOGO
+--------------------------------------------------------------------------------
+  !placar  /  /placar
+      Ranking geral. !placar tiers = so Esmeralda+; !placar aram 2x2 por formato.
+      Acesso: publico
+
+  !top10  /  /top10
+      Top 10 por pontos custom. !top10 tiers | !top10 aram 3x3
+      Acesso: publico
+
+  !topstreak  /  /topstreak
+      Top 10 das maiores sequencias de vitorias ativas.
+      Acesso: publico
+
+  !toprankinfernal  /  /toprankinfernal
+      Quem mais conquistou o cargo INFERNAL na temporada.
+      Acesso: publico
+
+  !perfil  /  /perfil
+      Ficha do jogador (elo, pontos custom): !perfil @usuario
+      Aliases: !ficha, !p   -   Acesso: publico
+
+  !palpite  /  /palpite
+      Aposta pontos no vencedor (janela de 5 min): !palpite <1|2> <10-100>
+      Acesso: jogador (em partida)
+
+  !roleta  /  /roleta
+      Sorteia na hora N perdedores para sair da sala: !roleta N A
+      staff: !roleta N A @jogador   -   opcao: --com-infernal
+      Alias: !roletar   -   Acesso: jogador (loser) + staff
+
+  !roletasair  /  /roletasair
+      Fica fora da proxima partida (sem sorteio nem subida): !roletasair A
+      staff: !roletasair @jogador A   -   Acesso: jogador + staff
+
+
+--------------------------------------------------------------------------------
+  FILAS E SALAS - ORGANIZAR E LIMPAR
+--------------------------------------------------------------------------------
+  !pdl  /  /pdl
+      Ajuste/punicao de PDL Classic (-500 a +500, com auditoria):
+      !pdl @jogador -50 motivo
+      Acesso: so Admin
+
+  !remover  /  /remover
+      Tira um jogador da fila: !remover @jogador
+      (se o jogador tiver o cargo INFERNAL, exige Admin)
+      Acesso: staff
+
+  !limparsalas  /  /limparsalas
+      Apaga sala(s) vazia(s)/travada(s): !limparsalas A
+      (sem letra = todas; recusa se houver partida em andamento)
+      Acesso: staff + capitao
+
+  !limpar  /  /limpar
+      Apaga mensagens do canal: !limpar 10   -   Alias: !clear
+      Acesso: staff
+
+  !limparespera  /  /limparespera
+      Zera todas as filas de espera.
+      Acesso: staff + capitao
+
+  !reset  /  /reset
+      Emergencia: limpa filas e partidas ativas (nao mexe em pontos).
+      Acesso: staff
+
+
+--------------------------------------------------------------------------------
+  ELOS E CARGOS - MANTER ATUALIZADO
+--------------------------------------------------------------------------------
+  !sincronizarelo  /  /sincronizarelo
+      Atualiza elo Riot + cargo de um jogador: !sincronizarelo @jogador
+      Acesso: staff
+
+  !sincronizartodos  /  /sincronizartodos
+      Atualiza elo Riot + cargo de TODOS os cadastrados (lento, ~2,5s/jogador).
+      Aliases: !sicronizartodos, !sincronizatodos, !atualizartodos, !atualizarelos
+      Acesso: so Admin
+
+  !sincronizar-cargos  /  /sincronizar-cargos
+      Reaplica os cargos pelo elo salvo (sem chamar a Riot).
+      !sync elo|todos|riot atualiza na Riot; !sync infernal limpa INFERNALs orfaos.
+      Alias: !sync   -   Acesso: so Admin
+
+
+--------------------------------------------------------------------------------
+  CLUBE VIP
+--------------------------------------------------------------------------------
+  !clube  /  /clube
+      Mostra o Clube VIP (tiers, beneficios e botoes de assinar/renovar via PIX).
+      Acesso: publico
+
+  !clubeadmin  /  /clubeadmin
+      Lista as assinaturas ativas do clube por tier, com vencimento.
+      Acesso: staff
+
+  !presentear  /  /presentear
+      Da dias de clube de presente:
+      !presentear @usuario <apoiador|vip|lendario> [dias]
+      Acesso: so Admin
+
+  !querolive  /  /querolive
+      Entra/sai do ping "Ao Vivo" (cargo de notificacao de lives).
+      Aliases: !quero-live, !queroaovivo   -   Acesso: publico
+
+  !live  /  /live
+      Divulga sua live: !live <link>
+      (Lendario 6h, VIP 12h, Apoiador 24h entre divulgacoes)
+      Acesso: jogador (so assinante do Clube VIP)
+
+
+--------------------------------------------------------------------------------
+  SALAS TEMPORARIAS (DONO DA SALA)
+--------------------------------------------------------------------------------
+  !salahub  /  /salahub
+      Lista as salas temporarias ativas (dono e ocupacao).
+      Acesso: publico
+
+  !sala  /  /sala
+      Mostra sua sala (!sala) ou renomeia (!sala <novo-nome>).
+      Acesso: dono da sala
+
+  !convidar  /  /convidar
+      Convida alguem para a sua sala: !convidar @usuario
+      Acesso: dono da sala
+
+  !limparvoz  /  /limparvoz
+      Apaga a sua sala temporaria (use dentro dela).
+      Acesso: dono da sala
+
+  !salalock  /  /salalock
+      Tranca/destranca a sala (!salalock tranca; !salalock abrir destranca).
+      Acesso: dono da sala
+
+  !salalimit  /  /salalimit
+      Limite de usuarios da sala: !salalimit <0-99> (0 = sem limite).
+      Acesso: dono da sala
+
+  !salaexpulsar  /  /salaexpulsar
+      Remove alguem da sua sala: !salaexpulsar @usuario
+      Acesso: dono da sala
+
+
+--------------------------------------------------------------------------------
+  TORNEIO
+--------------------------------------------------------------------------------
+  !torneio  /  /torneio
+      Painel do torneio CAPS ARENA.
+      jogador: !torneio entrar | sair | lista | info | status
+      staff:   !torneio > on | off | agenda | novo | sortear | resultado | encerrar
+      (com o torneio OFF, so o "entrar" fica bloqueado; info/lista/status livres)
+      Acesso: jogador (inscricao) + staff (gestao)
+
+  !torneioon  /  /torneioon
+      Ativa o torneio e abre as inscricoes: !torneioon [dias]  (padrao 7)
+      Acesso: staff
+
+  !torneiooff  /  /torneiooff
+      Desativa o torneio e fecha as inscricoes.
+      Acesso: staff
+
+  !torneioagenda  /  /torneioagenda
+      Agenda a abertura automatica: !torneioagenda sex,sab 19:00 [dias]
+      (!torneioagenda off limpa o agendamento)
+      Acesso: staff
+
+
+--------------------------------------------------------------------------------
+  TEMPORADA
+--------------------------------------------------------------------------------
+  !temporadas  /  /temporadas
+      Lista os periodos/temporadas arquivados.
+      Acesso: publico
+
+  !temporada  /  /temporada
+      Resumo de uma temporada: !temporada <numero>
+      Acesso: publico
+
+  !iniciartemporada  /  /iniciartemporada
+      Liga a temporada oficial.   -   Alias: !iniciarseason
+      Acesso: so Admin
+
+  !resetgeral  /  /resetgeral
+      Arquiva o periodo atual e ZERA os pontos, iniciando um novo periodo.
+      Acesso: so Admin
+
+  !desfazerresettemporada  /  /desfazerresettemporada
+      Restaura o ultimo periodo arquivado (hoje responde "aguardando revisao manual").
+      Acesso: so Admin
+
+  !restaurarperiodo  /  /restaurarperiodo
+      Restaura um periodo arquivado especifico: !restaurarperiodo <numero>
+      (desabilitada por seguranca)
+      Acesso: so Admin
+
+
+--------------------------------------------------------------------------------
+  FIXAR GUIAS (STAFF)
+--------------------------------------------------------------------------------
+  !ajudafixar  /  /ajudafixar
+      Posta e fixa o !ajuda (1/2 e 2/2) no canal #infos-lol.
+      Acesso: staff
+
+  !clubefixar  /  /clubefixar
+      Posta e fixa os beneficios detalhados no canal #clube-vip.
+      Acesso: staff
+
+
+--------------------------------------------------------------------------------
+  EXTRAS
+--------------------------------------------------------------------------------
+  !convite  /  /convite
+      Seu link pessoal de convite + progresso de recompensas.
+      Acesso: publico
+
+  !topconvites  /  /topconvites
+      Ranking mensal de quem mais trouxe gente para o servidor.
+      Acesso: publico
+
+  !tempo  /  /tempo
+      Seu tempo em call (geral, semana, mes) + cargo/progresso.
+      Acesso: publico
+
+  !topvoz  /  /topvoz
+      Ranking de tempo em call do mes.
+      Acesso: publico
+
+  !missoes  /  /missoes
+      Missoes semanais (zeram toda segunda-feira).   -   Alias: !missao
+      Acesso: publico
+
+  !duelo  /  /duelo
+      Duelo de PDL: !duelo @usuario [10-200]
+      e !duelo aceitar | recusar | lista
+      Acesso: jogador
+
+  !social  /  /social
+      Mostra os canais e as redes sociais oficiais da CAPS ARENA.
+      Alias: !redes (o alias !redes funciona; a versao slash /redes nao existe)
+      Acesso: publico
+
+
+--------------------------------------------------------------------------------
+  SLASH COMMANDS DO CAPS (resumo)
+--------------------------------------------------------------------------------
+  publicos ....... /ping  /ajuda  /ajuda2  /regras  /lista  /fila  /placar
+                   /top10  /topstreak  /toprankinfernal  /ficha  /perfil
+                   /salahub  /clube  /convite  /topconvites  /tempo  /topvoz
+                   /missoes  /temporadas  /temporada  /cadastrar  /nick
+                   /social  /querolive
+  jogador ........ /entrar  /espera  /esperatiers  /sair  /votar  /palpite
+                   /duelo  /roleta  /roletasair  /live
+  dono da sala ... /sala  /convidar  /limparvoz  /salalock  /salalimit
+                   /salaexpulsar
+  staff .......... /staff  /ajudafixar  /clubefixar  /clubeadmin  /remover
+                   /limparsalas  /limparespera  /limpar  /reset  /start
+                   /cancelarstart  /vitoria  /sincronizarelo  /torneioon
+                   /torneiooff  /torneioagenda  /torneio
+  so Admin ....... /pdl  /presentear  /sincronizar-cargos  /sincronizartodos
+                   /onboarding  /resetgeral  /iniciartemporada
+                   /desfazerresettemporada  /restaurarperiodo
+
+
+--------------------------------------------------------------------------------
+  OBSERVACOES DO CAPS
+--------------------------------------------------------------------------------
+  * Sem versao slash (so por prefixo): !rematch, !stats/!estatisticas e todos
+    os aliases (entra, esperatier, cancelar, resultado, p, roletar, clear,
+    sync, quero-live, queroaovivo, iniciarseason, missao, regra, rules,
+    staffhelp, inicio, setup, estatisticas...).
+  * /redes existe no codigo (case do interactionCreate) mas NAO esta registrado
+    no buildSlashCommands - ou seja, nunca aparece no Discord. Use !redes.
+  * !start nao tem trava de permissao no codigo (o guia diz que e staff).
+  * !vitoria pode disparar sozinho quando 6 jogadores votam (ignora o gate).
+  * !restaurarperiodo responde que esta desabilitada por seguranca.
+  * !limparsalas e !limparespera sao as duas excecoes: staff + capitao.
+
+
+
+
+################################################################################
+#                                                                              #
+#   2)  LCL BOT  -  Liga Clandestina de LoL   (INTER_ONLY=1)                   #
+#                                                                              #
+################################################################################
+
+--------------------------------------------------------------------------------
+  COMO O LCL FUNCIONA (leia antes)
+--------------------------------------------------------------------------------
+  * Ele roda em modo INTER_ONLY: apenas os comandos do desafio inter-servidores
+    estao ligados. Os outros existem no codigo mas ficam desligados.
+  * Comandos de PREFIXO (!) so sao atendidos dentro da categoria "🔥・LCL".
+    Em qualquer outro canal, o bot ignora em silencio.
+  * Slash commands NAO tem essa restricao de categoria (funcionam em qualquer
+    canal), mas so os 11 listados no fim estao registrados.
+  * Comandos que nao estao na lista liberada nao respondem NADA (nem o aviso).
+
+
+--------------------------------------------------------------------------------
+  DESAFIAR  (capitao / staff)
+--------------------------------------------------------------------------------
+  !desafiar  /  /desafiar
+      Busca time adversario inter:
+      !desafiar <nome do time> [MD1|MD3] [@j2 @j3 @j4 @j5]
+      (Os 5 fixos: os marcados por mencao ou, sem mencao, os 5 da sua call.
+       Formato antigo tambem aceito: !desafiar MD1 <nome> @...)
+      Acesso: capitao/staff (e precisa estar no Lobby Clandestino)
+
+
+--------------------------------------------------------------------------------
+  CANCELAR A BUSCA  (capitao / staff)
+--------------------------------------------------------------------------------
+  !desafiar-cancelar  /  /desafiar-cancelar
+      Sai da busca inter em espera do seu time (antes do match ser formado).
+      Aliases: !cancelar-desafio, !cancelardesafio
+      Acesso: capitao/staff (so o dono da busca)
+
+
+--------------------------------------------------------------------------------
+  RESULTADO E W.O.  (capitao / staff)
+--------------------------------------------------------------------------------
+  !resultado-inter  /  /resultado-inter
+      Lanca o vencedor de um jogo da serie:
+      !resultado-inter [jogo] AZUL|VERM   (sem o jogo = proximo jogo)
+      Alias: !resultadointer   -   Acesso: capitao/staff
+
+  !wo  /  /wo-inter
+      Aplica W.O. contra o time ausente: !wo [A|B]
+      (sem letra = o time que nao e o seu) e fecha a serie.
+      Aliases: !wo-inter, !winter   -   Acesso: capitao/staff
+
+
+--------------------------------------------------------------------------------
+  CONSULTAS  (todos)
+--------------------------------------------------------------------------------
+  !inter-ranking  /  /inter-ranking
+      Top 10 do ranking inter-servidores
+      (pontos, MD1 V/D, MD3 V/D, jogos, WOs).
+      Alias: !interranking   -   Acesso: publico
+
+  !inter-historico  /  /inter-historico
+      Ultimas 8 series inter fechadas (placar, campeao, W.O.).
+      Alias: !interhistorico   -   Acesso: publico
+
+
+--------------------------------------------------------------------------------
+  AJUDA, REGRAS E UTILIDADES  (todos)
+--------------------------------------------------------------------------------
+  !ping  /  /ping
+      Responde "Pong" com a latencia atual do bot.
+      Acesso: publico
+
+  !ajuda  /  /ajuda
+      Lista de comandos (no LCL mostra so o modo desafio).
+      Acesso: publico
+
+  !ajudalcl  /  /ajudalcl
+      Guia dos comandos do LCL (desafio inter-servidores), com formatos e
+      pontuacao.   -   Alias: !ajuda-lcl
+      Acesso: publico
+
+  !regras  /  /regras
+      Regulamento geral do servidor.   (Aliases !regra e !rules NAO respondem
+      no LCL - ver secao "desligados".)
+      Acesso: publico
+
+  !regrasdesafio  /  /regrasdesafio
+      Regras do desafio LCL.
+      Acesso: publico
+
+
+--------------------------------------------------------------------------------
+  SLASH COMMANDS DO LCL  (os 11 registrados)
+--------------------------------------------------------------------------------
+  /ping
+  /ajuda
+  /ajudalcl
+  /regras
+  /regrasdesafio
+  /desafiar              ......... capitao/staff
+  /desafiar-cancelar     ......... capitao/staff
+  /resultado-inter       ......... capitao/staff
+  /wo-inter              ......... capitao/staff
+  /inter-ranking         ......... publico
+  /inter-historico       ......... publico
+
+
+--------------------------------------------------------------------------------
+  DESLIGADOS NO LCL  (existem no codigo, mas o INTER_ONLY os bloqueia)
+--------------------------------------------------------------------------------
+  Estes comandos NAO respondem no LCL. Ficam aqui so para registro, porque
+  o codigo do LCL e espelhado do CAPS:
+
+  Cadastro e perfil
+    !cadastrar        vincula a conta Riot
+    !nick             atualiza o nick Riot
+    !ficha / !perfil / !p    ficha do jogador
+    !stats / !estatisticas   V/D por modo
+
+  Fila, sala e partida
+    !entrar / !entra          entra na fila
+    !lista / !fila            mostra as filas
+    !espera                   fila de espera
+    !esperatiers / !esperatier  fila TIER S (Esmeralda+)
+    !limparespera             limpa as filas de espera
+    !sair                     sai da fila
+    !votar                    vota no vencedor
+    !start                    inicia a partida
+    !cancelarstart / !cancelar  cancela o start
+    !vitoria / !resultado     registra o vencedor
+    !rematch                  devolve os 10 ao lobby
+    !roleta / !roletar        sorteia quem sai
+    !roletasair               fica fora da proxima
+    !remover                  tira da fila
+    !reset                    limpa filas e partidas
+    !limparsalas              apaga salas vazias
+    !pdl                      ajuste de PDL
+
+  Ranking e temporada
+    !placar, !top10, !topstreak, !toprankinfernal
+    !temporadas, !temporada, !iniciartemporada / !iniciarseason, !resetgeral,
+    !desfazerresettemporada, !restaurarperiodo
+
+  Elos e cargos
+    !sincronizarelo, !sincronizartodos (+ aliases), !sincronizar-cargos / !sync
+
+  Administracao e salas temporarias
+    !limpar / !clear, !onboarding / !inicio / !setup, !shared,
+    !staff / !staffhelp, !salahub, !sala, !convidar, !limparvoz,
+    !lock, !unlock, !limite
+
+  Aliases que tambem nao passam: !winter, !regra, !rules,
+  !regras-desafio, !regralcl, !cancelar.
+
+  Slash definidos no codigo mas nao registrados no LCL:
+    /staff, /roletasair, /pdl, /entrar, /lista, /fila, /espera, /esperatiers,
+    /limparespera, /sair, /shared, /start, /cancelarstart, /vitoria, /placar,
+    /top10, /topstreak, /toprankinfernal, /ficha, /perfil, /remover,
+    /limparsalas, /roleta, /reset, /resetgeral, /sincronizar-cargos,
+    /sincronizartodos, /sincronizarelo, /onboarding, /limpar,
+    /desfazerresettemporada, /restaurarperiodo, /iniciartemporada,
+    /temporadas, /temporada, /cadastrar, /nick, /votar
+
+
+--------------------------------------------------------------------------------
+  OBSERVACOES DO LCL
+--------------------------------------------------------------------------------
+  * O gate dos comandos inter libera: permissao Gerenciar Mensagens,
+    Administrador, o cargo de Capitao (captainRoleId) ou um cargo com nome
+    Staff / CapitaoLCL / Capitao / CapitaoDeCustoms.
+  * O sistema de salas temporarias esta inativo no LCL (o hubChannelId esta
+    vazio e o voiceStateUpdate retorna cedo no modo INTER_ONLY).
+  * Boas-vindas de membro novo e o modal de cadastro tambem nao disparam
+    no modo INTER_ONLY.
+  * Dois botoes de voto (/votewin e /mvpvote) continuam ativos no codigo, mas
+    dependem de partida interna - que o LCL nao gera.
+  * O que o LCL tem de proprio, alem dos comandos:
+      - Painel da fila clandestina (botoes Entrar/Sair), publicado no boot e
+        que alimenta o !desafiar (exige estar no canal de voz do Lobby Clandestino).
+      - Agendador do ranking inter: post diario de ranking (mesma hora das
+        atualizacoes diarias, 8h).
+
+
+
+
+################################################################################
+#  FIM  -  TODOS OS COMANDOS  -  CAPS ARENA + LCL BOT
+################################################################################
