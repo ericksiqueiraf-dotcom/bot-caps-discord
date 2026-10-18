@@ -1,0 +1,160 @@
+{
+  "$schema": "caps-arena/visual-spec@1",
+  "id": "torneio_caps_arena",
+  "titulo": "Torneio CAPS ARENA — Mata-mata 5x5",
+  "versao": "2026-10-17",
+  "objetivo": "Divulgar o funcionamento do torneio para os membros, com a identidade visual padrão da CAPS ARENA.",
+  "arquivos": {
+    "html": "docs/assets/torneio-caps-arena.html",
+    "png": "docs/assets/torneio-caps-arena.png",
+    "pngGaleria": "IMAGENS/TORNEIO CAPS ARENA.png",
+    "regenerar": "servir a raiz por HTTP (o canvas exige mesma origem) e capturar a página 1080x1350 em PNG"
+  },
+
+  "imagem": {
+    "uso": "Post de divulgação do torneio (canal de comunicados e geral do Discord + Instagram)",
+    "tamanho": { "largura": 1080, "altura": 1350, "formato": "PNG", "proporcao": "4:5" },
+    "fundo": {
+      "estilo": "Fundo escuro chapado com degradê quase imperceptível e grade de hexágonos dourados bem discreta",
+      "referencia_logo": "banner caps arena.png sangrado no topo + emblema em hexágono com elmo (LOGO PURO CAPS arena discord.png)"
+    },
+    "cabecalho": {
+      "selo": "CAPS ARENA",
+      "titulo": "TORNEIO OFICIAL",
+      "destaque": "MATA-MATA 5X5",
+      "subtitulo": "SORTEIO POR RODADA • TIMES EQUILIBRADOS POR ELO",
+      "cores_titulo": ["#FFFFFF", "#C9D2DC"]
+    },
+    "blocos": [
+      { "icone": "🧾", "titulo": "INSCREVA-SE", "texto": "!torneio entrar em qualquer canal do CAPS ARENA — o torneio abre com no mínimo 20 inscritos" },
+      { "icone": "⚖️", "titulo": "SORTEIO", "texto": "Grupos de 10 com times 5x5 equilibrados pela soma de elo de cada lado" },
+      { "icone": "⚔️", "titulo": "JOGUE A RODADA", "texto": "Quem vence avança para a próxima; quem perde está fora" },
+      { "icone": "🔁", "titulo": "REPESCAGEM", "texto": "Se a rodada não fechar 10 vencedores, os melhores perdedores voltam" },
+      { "icone": "🏁", "titulo": "A FINAL", "texto": "Os 10 finalistas decidem em MD3 — melhor de 3, com os mesmos times" },
+      { "icone": "🏆", "titulo": "CAMPEÕES", "texto": "O time campeão leva o cargo 🏆 Campeão CAPS e o destaque da arena" }
+    ],
+    "rodape": {
+      "texto": "Inscrições por tempo limitado • !torneio info mostra as regras • !torneio status mostra a rodada atual",
+      "cor_fundo_rodape": "#0B0B1A",
+      "cor_texto_rodape": "#C9A227"
+    },
+    "estilo_texto": {
+      "fonte": "Sans-serif geométrica condensada, negrito, caixa alta nos títulos, entreletra ampla; comandos em monoespaçada",
+      "paleta": ["#C9A227", "#FFD700", "#FFFFFF", "#00C3FF", "#0B0B1A"]
+    }
+  },
+
+  "spec_tecnica": {
+    "nota_paleta": "O dourado implementado é #e8b84b (extraído do banner/logotipo atuais em IMAGENS/); o #C9A227 do ALTERAÇÕES BOT.txt é a referência antiga de marca. Ambos convivem no material da arena.",
+    "canvas": {
+      "largura": 1080,
+      "altura": 1350,
+      "margemLateral": 88,
+      "fundo": "#0a0a12",
+      "fundoGradiente": [
+        "radial 58% 26% no topo — rgba(232,184,75,.16) até transparente",
+        "radial 46% 22% embaixo — rgba(232,184,75,.07) até transparente",
+        "linear 180deg — #0b0b14 -> #0a0a12 (45%) -> #08080f"
+      ],
+      "textura": {
+        "descricao": "grade de hexágonos dourados (mesma linguagem do banner oficial)",
+        "cor": "#e8b84b",
+        "opacidade": 0.05,
+        "passo": "240px x 208px"
+      }
+    },
+    "paleta": {
+      "fundo": "#0a0a12",
+      "dourado": "#e8b84b",
+      "douradoClaro": "#ffd24a",
+      "texto": "#f2f5f8",
+      "textoSuave": "#9aa4b2",
+      "linhaDourada": "rgba(232,184,75,.28)"
+    },
+    "paletaBot": {
+      "comentario": "colors de embed usados pelo Caps Bot (utils/lobbyUtils.js THEME)",
+      "SUCCESS": "#00ff88",
+      "ERROR": "#ff4d4d",
+      "INFO": "#00c3ff",
+      "WARNING": "#ffaa00",
+      "RANK": "#ffd700"
+    },
+    "tipografia": {
+      "display": "'Bahnschrift SemiCondensed', 'Bahnschrift', 'Segoe UI Semibold', 'Arial Narrow', Arial, sans-serif",
+      "texto": "'Segoe UI', Inter, system-ui, Arial, sans-serif",
+      "mono": "'Cascadia Mono', Consolas, 'Courier New', monospace",
+      "regra": "títulos em caixa alta com letter-spacing; comandos sempre em mono, dentro de chips dourados"
+    },
+    "ativos": {
+      "banner": "IMAGENS/banner caps arena.png",
+      "logotipo": "IMAGENS/Logo dourado CAPS ARENA LOL SEM FUNDO.png",
+      "emblema": "IMAGENS/LOGO PURO CAPS arena discord.png"
+    },
+    "motivos": ["hexágono", "capacete/elmo", "dourado sobre fundo escuro", "caixa alta com entreletra larga"],
+    "blocos_posicionados": [
+      {
+        "id": "banner",
+        "tipo": "imagem-full-bleed",
+        "ativo": "IMAGENS/banner caps arena.png",
+        "area": { "top": 0, "altura": 298, "largura": 1080 },
+        "acabamento": "máscara de gradiente vertical: opaco até 44%, 30% em 76%, transparente em 100%"
+      },
+      { "id": "cabecalho", "tipo": "texto-centralizado", "area": { "top": 244 } },
+      { "id": "passos", "tipo": "lista-numerada", "area": { "top": 460 }, "marcador": "círculo 44px com borda dourada e número" },
+      {
+        "id": "cta",
+        "tipo": "botoes",
+        "area": { "top": 1159 },
+        "botoes": [
+          { "texto": "!torneio entrar", "estilo": "solido", "fundo": "gradiente #ffd77a -> #e0a92f", "cor": "#1a1409" },
+          { "texto": "!torneio info", "estilo": "contorno", "borda": "rgba(232,184,75,.55)", "cor": "#ffd24a" }
+        ]
+      },
+      { "id": "rodape", "tipo": "assinatura", "area": { "top": 1284 }, "esquerda": "CAPS ARENA", "direita": "CUSTOMS • RANKED • TORNEIOS" }
+    ]
+  },
+
+  "copy": {
+    "titulo": "Torneio CAPS ARENA — Mata-mata 5x5",
+    "chamada": "Inscrições por tempo limitado. Entre com !torneio entrar.",
+    "explicacaoMembros": [
+      "🏆 **TORNEIO CAPS ARENA — MATA-MATA 5X5**",
+      "",
+      "Como funciona:",
+      "**1. Inscrição** — `!torneio entrar` em qualquer canal do CAPS ARENA. O torneio abre com no mínimo 20 inscritos (múltiplo de 10 — os excedentes viram reserva).",
+      "**2. Sorteio** — a cada rodada o bot junta os inscritos em grupos de 10 e monta times **5x5 equilibrados** pela soma de elo de cada lado.",
+      "**3. Rodada** — quem vence avança, quem perde está fora.",
+      "**4. Repescagem** — se a rodada não fechar 10 vencedores, entram os **melhores perdedores** para completar o grupo.",
+      "**5. Final** — com 10 classificados: um sorteio, mesmos times e **MD3** (melhor de 3).",
+      "**6. Premiação** — o time campeão recebe o cargo **🏆 Campeão CAPS** e o destaque da arena.",
+      "",
+      "Comandos de jogador: `!torneio entrar | sair | lista | info | status`",
+      "A staff abre e fecha as inscrições com `!torneioon` / `!torneiooff` — fique de olho no anúncio."
+    ]
+  },
+
+  "comandos": {
+    "jogador": ["!torneio entrar", "!torneio sair", "!torneio lista", "!torneio info", "!torneio status"],
+    "staff": ["!torneioon", "!torneiooff", "!torneio novo", "!torneio sortear", "!torneio resultado <jogo> <1|2>", "!torneio encerrar", "!torneioagenda <dias> <hora>"],
+    "cargoCampeao": "🏆 Campeão CAPS",
+    "regras": {
+      "minInscritos": 20,
+      "tamanhoGrupo": 10,
+      "formatoPartida": "5x5 (melhor de 1 na rodada, MD3 na final)",
+      "janelaInscricaoDias": 7,
+      "fonte": "services/torneioService.js"
+    }
+  },
+
+  "discord": {
+    "comentario": "Variante de embed para publicar o pôster (imagem como anexo local ou URL hospedada).",
+    "embed": {
+      "title": "🏆 Torneio CAPS ARENA — Mata-mata 5x5",
+      "description": "Mata-mata com sorteio por rodada. Entre com `!torneio entrar` — mínimo de 20 inscritos.",
+      "color": 15251531,
+      "image": { "url": "attachment://torneio-caps-arena.png" },
+      "footer": { "text": "Caps Bot • !torneio info mostra as regras completas" }
+    },
+    "colorHex": "#e8b84b"
+  }
+}

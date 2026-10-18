@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Torneio CAPS ARENA — pôster</title>
+<!--
+  Pôster do Torneio CAPS ARENA (1080 x 1350, 4:5).
+  Identidade: fundo escuro + dourado + branco, o mesmo padrão do logotipo/banner oficiais
+  (hexágonos, capacete, "CUSTOMS • RANKED • TORNEIOS").
+  Banner e emblema são os arquivos oficiais de IMAGENS/.
+  Especificação estrutural: docs/assets/torneio-visual.json
+-->
+<style>
+  :root{
+    --bg:#0a0a12;
+    --gold:#e8b84b;
+    --gold-hi:#ffd24a;
+    --text:#f2f5f8;
+    --muted:#9aa4b2;
+    --line:rgba(232,184,75,.28);
+    --display:'Bahnschrift SemiCondensed','Bahnschrift','Segoe UI Semibold','Arial Narrow',Arial,sans-serif;
+    --body:'Segoe UI',Inter,system-ui,Arial,sans-serif;
+    --mono:'Cascadia Mono',Consolas,'Courier New',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:1080px;height:1350px;overflow:hidden}
+  body{font-family:var(--body);background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
+
+  .poster{position:relative;width:1080px;height:1350px;overflow:hidden;
+    background:
+      radial-gradient(58% 26% at 50% 0%,rgba(232,184,75,.16),transparent 72%),
+      radial-gradient(46% 22% at 50% 100%,rgba(232,184,75,.07),transparent 70%),
+      linear-gradient(180deg,#0b0b14 0%,#0a0a12 45%,#08080f 100%)}
+  /* grade de hexágonos discreta (mesma linguagem do banner) */
+  .hexgrid{position:absolute;inset:0;opacity:.05;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='104' viewBox='0 0 120 104'><path d='M30 0 60 17v34L30 68 0 51V17z' fill='none' stroke='%23e8b84b' stroke-width='2'/><path d='M90 0 120 17v34L90 68 60 51V17z' fill='none' stroke='%23e8b84b' stroke-width='2'/><path d='M60 52 90 69v34L60 120 30 103V69z' fill='none' stroke='%23e8b84b' stroke-width='2'/></svg>");
+    background-size:240px 208px}
+
+  /* ---------- banner oficial ---------- */
+  .banner{position:absolute;top:0;left:0;width:1080px;height:298px;
+    -webkit-mask-image:linear-gradient(180deg,#000 44%,rgba(0,0,0,.30) 76%,transparent 100%);
+    mask-image:linear-gradient(180deg,#000 44%,rgba(0,0,0,.30) 76%,transparent 100%)}
+  .banner img{width:1080px;height:298px;object-fit:cover;object-position:center}
+
+  .content{position:absolute;inset:0;padding:0 88px;display:flex;flex-direction:column}
+
+  /* ---------- cabeçalho ---------- */
+  .head{margin-top:244px;text-align:center}
+  .eyebrow{font-family:var(--display);font-weight:600;font-size:19px;letter-spacing:.42em;
+    color:var(--gold);text-transform:uppercase}
+  .title{font-family:var(--display);font-weight:700;font-size:80px;line-height:1;letter-spacing:.01em;
+    text-transform:uppercase;margin-top:12px;
+    background:linear-gradient(180deg,#fff 32%,#c9d2dc 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{font-family:var(--display);font-weight:600;font-size:19px;letter-spacing:.30em;
+    color:var(--gold);text-transform:uppercase;margin-top:14px}
+  .rule{height:2px;margin:26px auto 0;width:100%;
+    background:linear-gradient(90deg,transparent,var(--line) 18%,rgba(232,184,75,.55) 50%,var(--line) 82%,transparent)}
+
+  /* ---------- passos ---------- */
+  .steps{margin-top:36px;display:flex;flex-direction:column;gap:17px}
+  .step{display:flex;align-items:flex-start;gap:24px;padding:17px 22px;border-radius:14px;
+    background:linear-gradient(90deg,rgba(255,255,255,.035),rgba(255,255,255,.012) 70%,transparent);
+    border:1px solid rgba(255,255,255,.05);border-left:2px solid rgba(232,184,75,.5)}
+  .num{flex:0 0 44px;height:44px;border-radius:50%;border:1.6px solid var(--gold);
+    display:flex;align-items:center;justify-content:center;
+    font-family:var(--display);font-weight:700;font-size:22px;color:var(--gold-hi);
+    background:radial-gradient(circle at 50% 30%,rgba(232,184,75,.20),rgba(232,184,75,.04))}
+  .st{font-family:var(--display);font-weight:700;font-size:26px;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--text);line-height:1.15}
+  .sd{font-size:18.5px;line-height:1.42;color:var(--muted);margin-top:3px}
+  .sd b{color:#d7dee6;font-weight:600}
+  code{font-family:var(--mono);font-size:.94em;color:var(--gold-hi);
+    background:rgba(232,184,75,.12);border:1px solid rgba(232,184,75,.25);
+    border-radius:6px;padding:1px 7px;white-space:nowrap}
+
+  /* ---------- CTA ---------- */
+  .cta{margin-top:auto;display:flex;align-items:center;justify-content:center;gap:18px}
+  .pill{font-family:var(--display);font-weight:700;font-size:23px;letter-spacing:.08em;
+    text-transform:uppercase;padding:15px 34px;border-radius:999px}
+  .pill.solid{background:linear-gradient(180deg,#ffd77a,#e0a92f);color:#1a1409;
+    box-shadow:0 10px 30px rgba(232,184,75,.22)}
+  .pill.ghost{border:1.6px solid rgba(232,184,75,.55);color:var(--gold-hi);
+    background:rgba(232,184,75,.06)}
+  .note{text-align:center;margin-top:24px;font-size:17.5px;color:var(--muted)}
+  .note b{color:var(--text);font-weight:600}
+
+  /* ---------- rodapé ---------- */
+  .foot{margin-top:18px;padding:20px 0 24px;border-top:1px solid rgba(255,255,255,.07);
+    display:flex;align-items:center;justify-content:space-between}
+  .wordmark{font-family:var(--display);font-weight:600;font-size:16px;letter-spacing:.34em;
+    color:var(--gold);text-transform:uppercase}
+  .sig{font-size:15.5px;letter-spacing:.10em;color:rgba(154,164,178,.85);text-transform:uppercase}
+</style>
+</head>
+<body>
+<div class="poster">
+  <div class="hexgrid"></div>
+
+  <div class="banner"><img src="/IMAGENS/banner%20caps%20arena.png" alt="CAPS ARENA"></div>
+
+  <div class="content">
+    <div class="head">
+      <div class="eyebrow">Torneio oficial</div>
+      <div class="title">Mata-mata 5x5</div>
+      <div class="sub">Sorteio por rodada &bull; times equilibrados por elo</div>
+      <div class="rule"></div>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="num">1</div>
+        <div><div class="st">Inscreva-se</div>
+        <div class="sd">Use <code>!torneio entrar</code> &mdash; o torneio abre com no m&iacute;nimo 20 inscritos.</div></div>
+      </div>
+      <div class="step">
+        <div class="num">2</div>
+        <div><div class="st">Sorteio</div>
+        <div class="sd">Grupos de 10 com <b>times 5x5 equilibrados</b> pela soma de elo.</div></div>
+      </div>
+      <div class="step">
+        <div class="num">3</div>
+        <div><div class="st">Jogue a rodada</div>
+        <div class="sd">Venceu, avan&ccedil;a para a pr&oacute;xima. Perdeu, est&aacute; fora.</div></div>
+      </div>
+      <div class="step">
+        <div class="num">4</div>
+        <div><div class="st">Repescagem</div>
+        <div class="sd">Se a rodada n&atilde;o fechar 10 vencedores, os <b>melhores perdedores</b> voltam.</div></div>
+      </div>
+      <div class="step">
+        <div class="num">5</div>
+        <div><div class="st">A final</div>
+        <div class="sd">Os 10 finalistas decidem em <b>MD3</b> &mdash; melhor de 3, mesmos times.</div></div>
+      </div>
+      <div class="step">
+        <div class="num">6</div>
+        <div><div class="st">Campe&otilde;es</div>
+        <div class="sd">O time campe&atilde;o leva o cargo <b>&#127942; Campe&atilde;o CAPS</b> e o destaque da arena.</div></div>
+      </div>
+    </div>
+
+    <div class="cta">
+      <div class="pill solid">!torneio entrar</div>
+      <div class="pill ghost">!torneio info</div>
+    </div>
+    <div class="note"><b>Inscri&ccedil;&otilde;es por tempo limitado</b> &bull; <code>!torneio status</code> mostra a rodada atual &bull; <code>!torneio sair</code> desfaz a inscri&ccedil;&atilde;o</div>
+
+    <div class="foot">
+      <div class="wordmark">CAPS ARENA</div>
+      <div class="sig">Customs &bull; Ranked &bull; Torneios</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

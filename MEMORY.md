@@ -8,7 +8,7 @@
 ## 🗓️ Última Sessão
 
 - **Data:** 2026-10-17
-- **Foco:** Torneio — `!torneioon`/`!torneiooff`/`!torneioagenda` (staff) + janela de inscrição de 7 dias; base no merge `pr/local-into-main`
+- **Foco:** Torneio — `!torneioon`/`!torneiooff`/`!torneioagenda` (staff) + janela de inscrição de 7 dias; base no merge `pr/local-into-main`; material de divulgação do torneio (JSON de imagem + pôster em `docs/assets/`)
 - **Status:** ✅ CAPS **244/244** (47 suites) e LCL **108/108**. `caps-bot` (PROD, branch `feat/torneio-onoff`) e `lcl-bot` reiniciados e **online** (`CAPS BOT LOL#6241`, `LCL - LIGA CLANDESTINA DE LOL#8184`). Torneio segue **desativado** (default) até a staff rodar `!torneioon`. PR manual ainda pendente.
 
 ---
@@ -443,6 +443,15 @@ database/                    ← fallback JSON local
 - **Testes:** `tests/social.test.js` (17) — embed, links vazios/inválidos, horas (padrão/custom/inválidas), slot (hora cheia, fora de hora, virada de dia), canal (config/exato/parcial/fallback/null) e tick (fora de hora, 1x no slot, sem duplicar, 3x no dia, sem canal, multi-guild). + 3 no `tests/handlers.test.js` (público, jogador/Capitão/Staff).
 - **Validado em PROD:** `systemMeta.clubePromoLastAt = 2026-10-17T15:00:17Z` (= 12:00 SP) → o tick automático **está postando no `💬・geral-leagueoflegends`**, então a resolução de canal do `!social` (mesma busca) funciona. O guarda `tests/schedulers.test.js` pegou o `startSocialScheduler` sozinho (prova de que o teste novo serve).
 - Validação: CAPS **244/244** (47 suites), LCL **108/108**.
+
+### 2026-10-17 — JSON de imagem + pôster do torneio (docs/assets) + explicação para membros
+- **Criados em `docs/assets/`:** `torneio-visual.json` (o "JSON de imagem"), `torneio-caps-arena.html` (o pôster que gera o PNG) e `torneio-caps-arena.png` (**1080x1350, 4:5**).
+- **O pôster é renderizado, não só especificado:** HTML+CSS com os ativos reais (`IMAGENS/banner caps arena.png` sangrado no topo com máscara de gradiente + grade de hexágonos dourada a 5%) e captura via navegador headless. Para regerar: servir a raiz por HTTP (o `canvas` exige mesma origem) e fotografar a página.
+- **Convenção respeitada:** o projeto **já tinha** um padrão de "JSON de imagem" em `ALTERAÇÕES BOT.txt` (seções *JSON DA IMAGEM DE DIVULGAÇÃO* e *JSON 1/2, 2/2, 3/3*) com `uso`, `tamanho`, `fundo`, `cabecalho`, `blocos`, `rodape`, `estilo_texto`. O JSON novo traz esse bloco `imagem` (drop-in para gerador) **e** um `spec_tecnica` com medidas reais.
+- **Paleta:** implementado `#e8b84b` (extraído do banner/logotipo atuais) sobre `#0a0a12`; `#C9A227` do `ALTERAÇÕES BOT.txt` é a referência antiga de marca — os dois estão documentados no JSON.
+- **Texto p/ membros:** cada regra foi conferida em `services/torneioService.js` antes de escrever — inclusive **"time campeão"** (não "dupla": o formato é 5x5) e os 5 subcomandos de jogador (`entrar | sair | lista | info | status`, `legacyCommands.js:1285-1341`).
+- **Pendente (decisão do usuário):** agendar a publicação do pôster nos canais **comunicados** (`📢┃comunicados`) e **geral** (`💬・geral-leagueoflegends`) — hoje a divulgação automática (`socialService`) posta **só no geral**.
+- Branch `feat/torneio-onoff`; nenhum arquivo de código foi alterado nesta etapa (só `docs/assets/`).
 
 ### 2026-10-14 — Deploy clube VIP na ARENA oficial
 - `MP_ACCESS_TOKEN` (prod, mesmo validado na TESTE) copiado para `.env` do CAPS; `clubePagamentos` já estava no `config.json`.
