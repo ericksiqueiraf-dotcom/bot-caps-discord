@@ -1,6 +1,7 @@
 const { ChannelType, EmbedBuilder, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const config = require('../config.json');
 const { parseModeAndFormatArgs, shouldMirrorAramGroupedStats } = require('../domain/queue/selection');
+const { parseRankingView } = require('../domain/ranking/rankingViews');
 const { enterQueue } = require('../application/use-cases/enterQueue');
 const { startMatch } = require('../application/use-cases/startMatch');
 const { registerVictory } = require('../application/use-cases/registerVictory');
@@ -894,23 +895,61 @@ async function handlePingCommand(message) {
 }
 
 async function handleLeaderboardCommand(message, args = []) {
+  const view = parseRankingView(args);
+  if (!view.ok) return await replyToMessage(message, view.message);
+  if (view.view === 'infernal') return await handleTopInfernalCommand(message);
+
   const statsData = await loadPlayerStats();
-  const { mode, format, tierSOnly } = parseModeAndFormatArgs(args);
-  const embed = buildLeaderboardEmbed(statsData, mode, format, { tierSOnly, tierResolver: buildVipTierResolver(message.guild), excludeTierS: !tierSOnly && mode === QUEUE_MODES.CLASSIC });
+
+  if (view.view === 'duelo') {
+    const [systemMeta, seasonMeta] = await Promise.all([loadSystemMeta(), loadSeasonMeta()]);
+    const embed = buildLeaderboardEmbed(statsData, 'duel', null, { duelos: systemMeta.duelos || [], seasonMeta });
+    return await sendToMessageChannel(message, { embeds: [embed] });
+  }
+
+  const tierSOnly = view.view === 'tiers';
+  const mode = view.view === 'tt3x3' ? QUEUE_MODES.ARAM : QUEUE_MODES.CLASSIC;
+  const format = view.view === 'tt3x3' ? '3x3' : null;
+  const embed = buildLeaderboardEmbed(statsData, mode, format, {
+    tierSOnly,
+    tierResolver: buildVipTierResolver(message.guild),
+    excludeTierS: !tierSOnly && mode === QUEUE_MODES.CLASSIC
+  });
   await sendToMessageChannel(message, { embeds: [embed] });
 }
 
 async function handleTopTenCommand(message, args = []) {
+  const view = parseRankingView(args);
+  if (!view.ok) return await replyToMessage(message, view.message);
+  if (view.view === 'infernal') return await handleTopInfernalCommand(message);
+
   const statsData = await loadPlayerStats();
   const seasonMeta = await loadSeasonMeta();
-  const { mode, format, tierSOnly } = parseModeAndFormatArgs(args);
-  const embed = buildTopTenEmbed(statsData, seasonMeta, mode, format, { tierSOnly, tierResolver: buildVipTierResolver(message.guild), excludeTierS: !tierSOnly && mode === QUEUE_MODES.CLASSIC });
+
+  if (view.view === 'duelo') {
+    const systemMeta = await loadSystemMeta();
+    const embed = buildTopTenEmbed(statsData, seasonMeta, 'duel', null, { duelos: systemMeta.duelos || [] });
+    return await sendToMessageChannel(message, { embeds: [embed] });
+  }
+
+  const tierSOnly = view.view === 'tiers';
+  const mode = view.view === 'tt3x3' ? QUEUE_MODES.ARAM : QUEUE_MODES.CLASSIC;
+  const format = view.view === 'tt3x3' ? '3x3' : null;
+  const embed = buildTopTenEmbed(statsData, seasonMeta, mode, format, {
+    tierSOnly,
+    tierResolver: buildVipTierResolver(message.guild),
+    excludeTierS: !tierSOnly && mode === QUEUE_MODES.CLASSIC
+  });
   await sendToMessageChannel(message, { embeds: [embed] });
 }
 
 async function handleTopStreakCommand(message, args = []) {
+  // Streak só faz sentido para os modos de fila (duelo não guarda sequência).
+  const view = parseRankingView(args, { allowed: ['classic', 'tt3x3'] });
+  if (!view.ok) return await replyToMessage(message, view.message);
   const statsData = await loadPlayerStats();
-  const { mode, format } = parseModeAndFormatArgs(args);
+  const mode = view.view === 'tt3x3' ? QUEUE_MODES.ARAM : QUEUE_MODES.CLASSIC;
+  const format = view.view === 'tt3x3' ? '3x3' : null;
   const embed = buildTopStreakEmbed(statsData, mode, format);
   await sendToMessageChannel(message, { embeds: [embed] });
 }
@@ -1576,10 +1615,10 @@ function buildAjudaEmbed(page = 1) {
       .setTitle('📚 Guia de Comandos (2/2) — Ranking e extras')
       .setDescription('Ranking, clube VIP, salas temporárias e extras. Página 1 no `!ajuda`.')
       .addFields(
-        { name: '🏆 Ranking e pós-jogo', value: '`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!palpite <1|2> <10-100>` • Aposta pontos no vencedor da sua partida\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking geral (CLASSIC = pontos custom)\n`!placar tiers` • Só Esmeralda+\n`!top10` • Top 10 CLASSIC por pontos custom, desempate por winrate\n`!top10 tiers` • Top 10 só Esmeralda+\n`!topstreak` • Ranking Streak 🔥\n`!toprankinfernal` • Quem mais pegou INFERNAL na temporada 🔥\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
+        { name: '🏆 Ranking e pós-jogo', value: '`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!palpite <1|2> <10-100>` • Aposta pontos no vencedor da sua partida\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking CLASSIC (pontos custom)\n`!placar tiers` • Só Esmeralda+\n`!placar duelo` • TOP 10 dos duelos 1v1 (vitórias em duelo)\n`!placar tt` • TWISTED TREELINE 3x3 (antigo 3x3)\n`!top10` • Top 10 (classic, tiers, duelo ou tt)\n`!topstreak` • Ranking Streak 🔥 (classic ou tt)\n`!toprankinfernal` • Quem mais pegou INFERNAL na temporada 🔥\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
         { name: '💎 Clube VIP', value: '`!clube` • Tiers, assinatura PIX e renovação -10%\n`!querolive` • Entrar/sair do ping 🔴 Ao Vivo\n`!live <link>` • Divulgar live Twitch/YouTube/Kick (Lendário 6h, VIP 12h, Apoiador 24h)' },
         { name: '🔊 Salas temporárias (dono da sala)', value: 'Entre no ➕・criar-sala para ganhar sua sala\n`!salahub` • Lista as salas ativas\n`!sala` • Mostra sua sala • `!sala <nome>` renomeia\n`!convidar @u` • Chama alguém p/ sua sala\n`!salalock` • Tranca (`!salalock abrir` destranca)\n`!salalimit <0-99>` • Limite de usuários (0 = sem limite)\n`!salaexpulsar @u` • Remove alguém da sala\n`!limparvoz` • Apaga sua sala (dentro dela)' },
-        { name: '🎁 Extras', value: '`!convite` • Seu link pessoal (traga gente e ganhe recompensas)\n`!topconvites` • Ranking de quem mais trouxe gente\n`!torneio` • Torneio mata-mata (entrar, lista, status — staff: `!torneioon`/`!torneiooff`/`!torneioagenda`)\n`!tempo` • Seu tempo em call • `!topvoz` • Ranking de call\n`!palpite <1|2> <10-100>` • Bolão da partida • `!missoes` • Missões da semana • `!duelo @u` • Duelo de PDL\n`!social` • Instagram, Twitch, TikTok e YouTube oficiais da CAPS ARENA\n🌅 Primeira vitória do dia vale +50% PDL (automático)\n`!regras` • Regulamento completo' },
+        { name: '🎁 Extras', value: '`!convite` • Seu link pessoal (traga gente e ganhe recompensas)\n`!topconvites` • Ranking de quem mais trouxe gente\n`!torneio` • Torneio mata-mata (entrar, lista, status — staff: `!torneioon`/`!torneiooff`/`!torneioagenda`)\n`!tempo` • Seu tempo em call • `!topvoz` • Ranking de call\n`!palpite <1|2> <10-100>` • Bolão da partida • `!missoes` • Missões da semana • `!duelo @u` • Duelo de PDL (`!duelo rank` • Top 10 dos duelos)\n`!social` • Instagram, Twitch, TikTok e YouTube oficiais da CAPS ARENA\n🌅 Primeira vitória do dia vale +50% PDL (automático)\n`!regras` • Regulamento completo' },
         { name: '⬅️ Página 1', value: '`!ajuda` • Cadastro, fila e voto\n`!staff` • Guia da staff (restrito)' }
       );
     } else {
@@ -1700,6 +1739,11 @@ async function handleDueloCommand(message, args = [], targetUserOverride = null)
       const mine = pendentes.filter((d) => d.status !== 'concluido' && (d.a === message.author.id || d.b === message.author.id));
       if (mine.length === 0) return await replyToMessage(message, '📭 Nenhum duelo seu pendente. Desafie com `!duelo @usuário [pontos]`.');
       return await replyToMessage(message, mine.map((d) => `⚔️ <@${d.a}> 🆚 <@${d.b}> — ${d.pontos} PDL (${d.status})`).join('\n'));
+    }
+
+    // Rank do duelo: Top 10 de quem mais venceu duelos (mesma view do `!top10 duelo`).
+    if (['rank', 'ranking', 'top', 'top10', 'topduelos'].includes(sub)) {
+      return await handleTopTenCommand(message, ['duelo']);
     }
 
     const targetUser = targetUserOverride || message.mentions.users.first();
@@ -2334,8 +2378,8 @@ async function handleOnboardingCommand(message) {
         name: '📈 Acompanhe sua evolução',
         value:
           '`!perfil` — Seu card com MMR e histórico\n' +
-          '`!placar` — Ranking geral por modo\n' +
-          '`!top10` — Top 10 por MMR\n' +
+          '`!placar` — Ranking CLASSIC • `!placar tiers` só Esmeralda+\n' +
+          '`!top10 duelo` — Top 10 dos duelos • `!top10 tt` — Twisted Treeline 3x3\n' +
           '`!topstreak` — Maiores sequências de vitória ativas\n' +
           '`!temporadas` — Períodos arquivados'
       },

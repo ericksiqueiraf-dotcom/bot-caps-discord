@@ -134,15 +134,17 @@
   RANKING E POS-JOGO
 --------------------------------------------------------------------------------
   !placar  /  /placar
-      Ranking geral. !placar tiers = so Esmeralda+; !placar aram 2x2 por formato.
+      Ranking geral. Views: classic (padrao), tiers (so Esmeralda+),
+      duelo (Top 10 dos duelos 1v1) e tt (Twisted Treeline 3x3).
+      O antigo 1x1 agora cai em duelo (!placar 1x1 = !placar duelo).
       Acesso: publico
 
   !top10  /  /top10
-      Top 10 por pontos custom. !top10 tiers | !top10 aram 3x3
+      Top 10 da view escolhida: classic | tiers | duelo | tt (Twisted Treeline 3x3).
       Acesso: publico
 
   !topstreak  /  /topstreak
-      Top 10 das maiores sequencias de vitorias ativas.
+      Maiores sequencias de vitorias ativas (ate 5 jogadores): classic | tt.
       Acesso: publico
 
   !toprankinfernal  /  /toprankinfernal
@@ -364,7 +366,8 @@
 
   !duelo  /  /duelo
       Duelo de PDL: !duelo @usuario [10-200]
-      e !duelo aceitar | recusar | lista
+      e !duelo aceitar | recusar | lista | rank
+      (!duelo rank = Top 10 dos duelos, igual a !top10 duelo)
       Acesso: jogador
 
   !social  /  /social
@@ -378,6 +381,8 @@
 --------------------------------------------------------------------------------
   publicos ....... /ping  /ajuda  /ajuda2  /regras  /lista  /fila  /placar
                    /top10  /topstreak  /toprankinfernal  /ficha  /perfil
+                   (placar e top10 aceitam: duelo, classic, tiers, tt, infernal;
+                    topstreak aceita: classic e tt. O /duelo tem a opcao "Rank")
                    /salahub  /clube  /convite  /topconvites  /tempo  /topvoz
                    /missoes  /temporadas  /temporada  /cadastrar  /nick
                    /social  /querolive
@@ -397,6 +402,11 @@
 --------------------------------------------------------------------------------
   OBSERVACOES DO CAPS
 --------------------------------------------------------------------------------
+  * RANKINGS ATIVOS: duelo (Top 10), classic, classic tier s, infernal e
+    twisted treeline 3x3. Os rankings de ARAM 1x1, 2x2, 4x4 e 5x5 foram
+    retirados: o 1x1 virou o rank do duelo e o 3x3 passou a se chamar
+    TWISTED TREELINE 3X3. As FILAS continuam iguais (!entrar aram 2x2 etc.);
+    quem digitar um modo retirado no ranking recebe um aviso com as opcoes.
   * Sem versao slash (so por prefixo): !rematch, !stats/!estatisticas e todos
     os aliases (entra, esperatier, cancelar, resultado, p, roletar, clear,
     sync, quero-live, queroaovivo, iniciarseason, missao, regra, rules,

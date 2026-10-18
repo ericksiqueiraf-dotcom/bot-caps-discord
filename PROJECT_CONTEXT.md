@@ -14,12 +14,13 @@ Bot de Discord para organizar partidas personalizadas de League of Legends com:
 
 O foco atual do projeto é operação de comunidades de custom games no Discord, com suporte principal a:
 
-- `Classic` (Summoner's Rift)
-- `ARAM 1x1`
-- `ARAM 2x2`
-- `ARAM 3x3`
-- `ARAM 4x4`
-- `ARAM 5x5` sem pontuação
+- `Classic` (Summoner's Rift 5x5)
+- `Twisted Treeline` (3x3)
+- `Duelo 1v1` (desafio de PDL entre dois jogadores)
+
+Regras de fila ainda disponíveis (`!entrar aram 1x1|2x2|3x3|4x4|5x5`), mas o MENU DE RANKING expõe apenas 5 views:
+`duelo` (Top 10), `classic`, `classic tier s`, `infernal` e `twisted treeline 3x3`.
+Ver `domain/ranking/rankingViews.js` e `domain/ranking/duelRanking.js`.
 
 ## Stack e Tecnologias
 
@@ -261,13 +262,13 @@ database/
 
 ### Top streak
 
-`topstreak` foi consolidado em 3 blocos:
+`topstreak` ficou com 2 blocos:
 
 - `Classic`
-- `ARAM 1x1`
-- `ARAM 2x2/3x3/4x4` agrupados
+- `Twisted Treeline 3x3`
 
-O top streak mostra os 5 melhores com streak ativa.
+O top streak mostra os 5 melhores com streak ativa. O comando não aceita `duelo` nem `tiers`
+(o duelo não guarda sequência de vitórias e o Tier S é um filtro do Classic).
 
 ## Avaliação de Modularidade
 

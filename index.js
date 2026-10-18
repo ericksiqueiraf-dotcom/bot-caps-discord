@@ -157,7 +157,8 @@ function buildSlashCommands() {
           { name: 'Desafiar', value: 'desafiar' },
           { name: 'Aceitar', value: 'aceitar' },
           { name: 'Recusar', value: 'recusar' },
-          { name: 'Lista', value: 'lista' }
+          { name: 'Lista', value: 'lista' },
+          { name: 'Rank (Top 10 dos duelos)', value: 'rank' }
         ))
       .addUserOption((option) => option.setName('usuario').setDescription('Adversário (p/ desafiar)').setRequired(false))
       .addIntegerOption((option) => option.setName('pontos').setDescription('10 a 200').setRequired(false).setMinValue(10).setMaxValue(200)),
@@ -199,54 +200,34 @@ function buildSlashCommands() {
     addModeAndLobbyOptions(new SlashCommandBuilder().setName('vitoria').setDescription('Registra a equipe vencedora.'), true),
     new SlashCommandBuilder()
       .setName('placar')
-      .setDescription('Mostra o ranking do modo escolhido.')
+      .setDescription('Mostra o ranking escolhido.')
       .addStringOption((option) =>
         option
           .setName('modo')
-          .setDescription('Modo desejado')
+          .setDescription('Ranking desejado')
           .setRequired(false)
           .addChoices(
+            { name: 'DUELO (dos duelos 1v1)', value: 'duelo' },
             { name: 'CLASSIC', value: 'classic' },
             { name: 'CLASSIC TIER S', value: 'tiers' },
-            { name: 'ARAM', value: 'aram' }
-          )
-      )
-      .addStringOption((option) =>
-        option
-          .setName('formato')
-          .setDescription('Formato do ARAM')
-          .setRequired(false)
-          .addChoices(
-            { name: '1x1', value: '1x1' },
-            { name: '2x2', value: '2x2' },
-            { name: '3x3', value: '3x3' },
-            { name: '4x4', value: '4x4' }
+            { name: 'TWISTED TREELINE 3X3', value: 'tt3x3' },
+            { name: 'INFERNAL', value: 'infernal' }
           )
       ),
     new SlashCommandBuilder()
       .setName('top10')
-      .setDescription('Mostra o top 10 do modo escolhido.')
+      .setDescription('Mostra o top 10 do ranking escolhido.')
       .addStringOption((option) =>
         option
           .setName('modo')
-          .setDescription('Modo desejado')
+          .setDescription('Ranking desejado')
           .setRequired(false)
           .addChoices(
+            { name: 'DUELO (dos duelos 1v1)', value: 'duelo' },
             { name: 'CLASSIC', value: 'classic' },
             { name: 'CLASSIC TIER S', value: 'tiers' },
-            { name: 'ARAM', value: 'aram' }
-          )
-      )
-      .addStringOption((option) =>
-        option
-          .setName('formato')
-          .setDescription('Formato do ARAM')
-          .setRequired(false)
-          .addChoices(
-            { name: '1x1', value: '1x1' },
-            { name: '2x2', value: '2x2' },
-            { name: '3x3', value: '3x3' },
-            { name: '4x4', value: '4x4' }
+            { name: 'TWISTED TREELINE 3X3', value: 'tt3x3' },
+            { name: 'INFERNAL', value: 'infernal' }
           )
       ),
     new SlashCommandBuilder()
@@ -328,19 +309,7 @@ function buildSlashCommands() {
           .setRequired(false)
           .addChoices(
             { name: 'CLASSIC', value: 'classic' },
-            { name: 'ARAM', value: 'aram' }
-          )
-      )
-      .addStringOption((option) =>
-        option
-          .setName('formato')
-          .setDescription('Formato do ARAM')
-          .setRequired(false)
-          .addChoices(
-            { name: '1x1', value: '1x1' },
-            { name: '2x2', value: '2x2' },
-            { name: '3x3', value: '3x3' },
-            { name: '4x4', value: '4x4' }
+            { name: 'TWISTED TREELINE 3X3', value: 'tt3x3' }
           )
       ),
     new SlashCommandBuilder()

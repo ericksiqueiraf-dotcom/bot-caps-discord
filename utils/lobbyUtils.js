@@ -1,7 +1,7 @@
 const { ChannelType, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const config = require('../config.json');
 const { QUEUE_MODES } = require('../domain/constants/queueModes');
-const { KNOWN_ARAM_FORMATS, isGroupedAramStreakFormat, normalizeQueueFormat } = require('../domain/constants/queueFormats');
+const { KNOWN_ARAM_FORMATS, normalizeQueueFormat } = require('../domain/constants/queueFormats');
 const {
   createEmptyModeStats,
   getStatsBucketKey,
@@ -11,6 +11,7 @@ const {
   getRankedPlayersByMode,
   getRankedPlayersByStreak
 } = require('../domain/ranking/playerStats');
+const { getRankedPlayersByDuel } = require('../domain/ranking/duelRanking');
 const { 
   loadQueue, saveQueue, loadSystemMeta, saveSystemMeta, 
   loadPlayerStats, savePlayerStats, loadSeasonMeta, 
@@ -508,11 +509,24 @@ function formatQueueMode(mode) {
   return mode === QUEUE_MODES.ARAM ? 'ARAM' : 'CLASSIC';
 }
 
+// View de ranking do duelos 1v1 (não é um modo de fila: vive em systemMeta.duelos).
+const RANK_VIEW_DUEL = 'duel';
+
+function isDuelRankView(mode) {
+  return String(mode || '').toLowerCase() === RANK_VIEW_DUEL;
+}
+
 function getStatsBucketLabel(mode, format = null) {
+  if (isDuelRankView(mode)) {
+    return 'DUELO';
+  }
+
   if (mode === QUEUE_MODES.ARAM) {
     const normalizedFormat = normalizeQueueFormat(format);
-    if (isGroupedAramStreakFormat(normalizedFormat)) {
-      return 'ARAM 2X2/3X3/4X4';
+
+    // Twisted Treeline = 3v3 (o único formato ARAM que ainda tem ranking).
+    if (normalizedFormat === '3x3') {
+      return 'TWISTED TREELINE 3X3';
     }
 
     return normalizedFormat && normalizedFormat !== '5x5' ? `ARAM ${normalizedFormat}`.toUpperCase() : 'ARAM';
@@ -1965,7 +1979,10 @@ function buildTeamsEmbed(teams, tierResolver = null) {
 }
 
 function buildLeaderboardEmbed(statsData, mode = QUEUE_MODES.CLASSIC, format = null, options = {}) {
-  const rankedPlayers = getRankedPlayersByMode(statsData, mode, format, null, options);
+  const duelRank = isDuelRankView(mode);
+  const rankedPlayers = duelRank
+    ? getRankedPlayersByDuel(options?.duelos || [], statsData, options?.seasonMeta || null)
+    : getRankedPlayersByMode(statsData, mode, format, null, options);
   const modeLabel = getStatsBucketLabel(mode, format);
   const titleLabel = options?.tierSOnly && mode === QUEUE_MODES.CLASSIC ? 'CLASSIC TIER S (Esmeralda+)' : modeLabel;
   const medals = ['🥇', '🥈', '🥉'];
@@ -1973,16 +1990,22 @@ function buildLeaderboardEmbed(statsData, mode = QUEUE_MODES.CLASSIC, format = n
   const embed = new EmbedBuilder()
     .setColor(THEME.RANK)
     .setTitle(`🏆 Placar Geral - ${titleLabel}`)
-    .setDescription(options?.tierSOnly
-      ? 'Mesmo PDL do Classic, filtrado para **Esmeralda IV ou superior**.'
-      : `Ranking interno de **${modeLabel}** baseado no histórico.`)
+    .setDescription(
+      duelRank
+        ? 'Ranking do **DUELO** (1v1 de PDL): vitórias em duelos realizados nas partidas. Desempate pelo PDL líquido dos duelos.'
+        : options?.tierSOnly
+          ? 'Mesmo PDL do Classic, filtrado para **Esmeralda IV ou superior**.'
+          : `Ranking interno de **${modeLabel}** baseado no histórico.`
+    )
     .setFooter({ text: `${FOOTER_PREFIX} • Ranking ${titleLabel}` })
     .setTimestamp();
 
   if (rankedPlayers.length === 0) {
     embed.addFields({
       name: 'Sem estatísticas ainda',
-      value: `Nenhuma partida ${modeLabel} foi registrada até o momento.`
+      value: duelRank
+        ? 'Nenhum duelo foi concluído ainda. Desafie alguém com `!duelo @usuario [10-200]`.'
+        : `Nenhuma partida ${modeLabel} foi registrada até o momento.`
     });
     return embed;
   }
@@ -1993,8 +2016,15 @@ function buildLeaderboardEmbed(statsData, mode = QUEUE_MODES.CLASSIC, format = n
     .slice(0, 15)
     .map((player, index) => {
       const medal = medals[index] || `#${index + 1}`;
-      const rankName = getRankName(player.baseMmr);
       const label = player.discordId ? `<@${player.discordId}>` : `\`${player.nickname}\``;
+
+      if (duelRank) {
+        const net = Number(player.duelPoints ?? player.adjustedMmr ?? 0);
+        const netLabel = net >= 0 ? `+${net}` : `${net}`;
+        return `${medal}${resolve(player.discordId)} ${label}\n**⚔️ ${player.duelWins}V / ${player.duelLosses}D** • ${netLabel} PDL em duelos`;
+      }
+
+      const rankName = getRankName(player.baseMmr);
       const displayScore = isClassicRank
         ? (Number.isFinite(Number(player.customScore)) ? Number(player.customScore) : player.adjustedMmr)
         : player.adjustedMmr;
@@ -2019,7 +2049,10 @@ function buildLeaderboardEmbed(statsData, mode = QUEUE_MODES.CLASSIC, format = n
 }
 
 function buildTopTenEmbed(statsData, seasonMeta, mode, format = null, options = {}) {
-  const rankedPlayers = getRankedPlayersByMode(statsData, mode, format, seasonMeta, options).slice(0, 10);
+  const duelRank = isDuelRankView(mode);
+  const rankedPlayers = duelRank
+    ? getRankedPlayersByDuel(options?.duelos || [], statsData, seasonMeta).slice(0, 10)
+    : getRankedPlayersByMode(statsData, mode, format, seasonMeta, options).slice(0, 10);
   const modeLabel = getStatsBucketLabel(mode, format);
   const titleLabel = options?.tierSOnly && mode === QUEUE_MODES.CLASSIC ? 'CLASSIC TIER S (Esmeralda+)' : modeLabel;
   const medals = ['🥇', '🥈', '🥉'];
@@ -2027,16 +2060,22 @@ function buildTopTenEmbed(statsData, seasonMeta, mode, format = null, options = 
   const embed = new EmbedBuilder()
     .setColor(THEME.RANK)
     .setTitle(`🏆 Top 10 - ${titleLabel}`)
-    .setDescription(options?.tierSOnly
-      ? `Mesmo PDL do Classic, filtrado para **Esmeralda IV ou superior**. Período: **${getSeasonDisplayLabel(seasonMeta)}**`
-      : `Período atual: **${getSeasonDisplayLabel(seasonMeta)}**`)
+    .setDescription(
+      duelRank
+        ? `Duelos 1v1 de PDL concluídos nas partidas. Período: **${getSeasonDisplayLabel(seasonMeta)}**`
+        : options?.tierSOnly
+          ? `Mesmo PDL do Classic, filtrado para **Esmeralda IV ou superior**. Período: **${getSeasonDisplayLabel(seasonMeta)}**`
+          : `Período atual: **${getSeasonDisplayLabel(seasonMeta)}**`
+    )
     .setFooter({ text: `${FOOTER_PREFIX} • Top 10 ${titleLabel}` })
     .setTimestamp();
 
   if (rankedPlayers.length === 0) {
     embed.addFields({
-      name: 'Sem ranking ainda',
-      value: `Ainda nao ha jogadores ranqueados no modo ${modeLabel} neste periodo.`
+      name: `Sem ranking ainda`,
+      value: duelRank
+        ? 'Nenhum duelo foi concluído neste período. Desafie alguém com `!duelo @usuario [10-200]`.'
+        : `Ainda nao ha jogadores ranqueados no modo ${modeLabel} neste periodo.`
     });
 
     return embed;
@@ -2048,6 +2087,13 @@ function buildTopTenEmbed(statsData, seasonMeta, mode, format = null, options = 
     .map(
       (player, index) => {
         const medal = medals[index] || `#${index + 1}`;
+
+        if (duelRank) {
+          const net = Number(player.duelPoints ?? player.adjustedMmr ?? 0);
+          const netLabel = net >= 0 ? `+${net}` : `${net}`;
+          return `${medal}${resolve(player.discordId)} <@${player.discordId}>\n**⚔️ ${player.duelWins}V / ${player.duelLosses}D** • ${netLabel} PDL em duelos • ${player.winRate}% WR`;
+        }
+
         const rankName = getRankName(player.baseMmr);
         const totalGames = player.customWins + player.customLosses;
         const winRate = totalGames > 0 ? ((player.customWins / totalGames) * 100).toFixed(0) : '0';
@@ -2097,7 +2143,7 @@ function buildSeasonHistoryEmbed(history, seasonNumber) {
     .slice(0, 5)
     .map((player, index) => `**${index + 1}.** ${player.nickname} | Rank: ${player.adjustedMmr} | ${player.customWins}V/${player.customLosses}D`)
     .join('\n');
-  const aram1x1Top = (season.topAram1x1 || [])
+  const tt3x3Top = (season.topAram3x3 || season.topAram1x1 || [])
     .slice(0, 5)
     .map((player, index) => `**${index + 1}.** ${player.nickname} | Rank: ${player.adjustedMmr} | ${player.customWins}V/${player.customLosses}D`)
     .join('\n');
@@ -2109,7 +2155,7 @@ function buildSeasonHistoryEmbed(history, seasonNumber) {
     .addFields(
       { name: 'Top 5 CLASSIC', value: classicTop || 'Sem dados' },
       { name: 'Top 5 ARAM', value: aramTop || 'Sem dados' },
-      { name: 'Top 5 ARAM 1x1', value: aram1x1Top || 'Sem dados' }
+      { name: 'Top 5 TWISTED TREELINE 3X3', value: tt3x3Top || 'Sem dados' }
     )
     .setTimestamp();
 }
@@ -2158,7 +2204,7 @@ function hasArchivedSeasonData(season) {
     return true;
   }
 
-  return ['topClassic', 'topAram', 'topAram1x1'].some((key) => Array.isArray(season[key]) && season[key].length > 0);
+  return ['topClassic', 'topAram', 'topAram3x3', 'topAram1x1'].some((key) => Array.isArray(season[key]) && season[key].length > 0);
 }
 
 function buildRestoredStatsFromArchive(archivedSeason, currentStats) {
@@ -2170,6 +2216,8 @@ function buildRestoredStatsFromArchive(archivedSeason, currentStats) {
   const buckets = [
     { key: 'topClassic', modeKey: 'classic' },
     { key: 'topAram', modeKey: 'aram' },
+    { key: 'topAram3x3', modeKey: 'aram3x3' },
+    // Arquivos antigos (antes da troca do rank 1x1 pelo Twisted Treeline 3x3)
     { key: 'topAram1x1', modeKey: 'aram1x1' }
   ];
 
@@ -2241,7 +2289,7 @@ function archiveCurrentSeason(statsData, seasonMeta) {
     endedAt: new Date().toISOString(),
     topClassic: getRankedPlayersByMode(statsData, QUEUE_MODES.CLASSIC, null, seasonMeta).slice(0, 10),
     topAram: getRankedPlayersByMode(statsData, QUEUE_MODES.ARAM, null, seasonMeta).slice(0, 10),
-    topAram1x1: getRankedPlayersByMode(statsData, QUEUE_MODES.ARAM, '1x1', seasonMeta).slice(0, 10),
+    topAram3x3: getRankedPlayersByMode(statsData, QUEUE_MODES.ARAM, '3x3', seasonMeta).slice(0, 10),
     playersSnapshot: deepClone(statsData),
     seasonMetaSnapshot: deepClone(seasonMeta)
   };
@@ -3229,7 +3277,7 @@ async function postSeasonSummaryToSeasonLog(guild, archivedSeason) {
       { name: '🎮 Total de Partidas', value: `\`${totalMatches}\``, inline: true },
       { name: 'Top 5 CLASSIC', value: formatTop5(archivedSeason.topClassic), inline: false },
       { name: 'Top 5 ARAM', value: formatTop5(archivedSeason.topAram), inline: false },
-      { name: 'Top 5 ARAM 1x1', value: formatTop5(archivedSeason.topAram1x1), inline: false }
+      { name: 'Top 5 TWISTED TREELINE 3X3', value: formatTop5(archivedSeason.topAram3x3 || archivedSeason.topAram1x1), inline: false }
     )
     .setFooter({ text: `${FOOTER_PREFIX} • Season Log` })
     .setTimestamp();

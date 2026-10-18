@@ -55,18 +55,18 @@
             </ol>
           </article>
           <article class="leaderboard-card">
-            <h3>ARAM 1x1</h3>
+            <h3>Twisted Treeline 3x3</h3>
             <ol>
-              <% leaderboardPreview.aram1x1.forEach((player) => { %>
+              <% leaderboardPreview.tt3x3.forEach((player) => { %>
                 <li><strong><%= player.registeredNickname || player.discordUsername %></strong><span><%= player.adjustedMmr %> MMR</span></li>
               <% }) %>
             </ol>
           </article>
           <article class="leaderboard-card">
-            <h3>ARAM agrupado</h3>
+            <h3>Duelo (1v1)</h3>
             <ol>
-              <% leaderboardPreview.aram.forEach((player) => { %>
-                <li><strong><%= player.registeredNickname || player.discordUsername %></strong><span><%= player.adjustedMmr %> MMR</span></li>
+              <% leaderboardPreview.duelo.forEach((player) => { %>
+                <li><strong><%= player.registeredNickname || player.discordUsername %></strong><span><%= player.duelWins %>V/<%= player.duelLosses %>D</span></li>
               <% }) %>
             </ol>
           </article>

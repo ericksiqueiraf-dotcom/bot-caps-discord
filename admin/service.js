@@ -10,6 +10,7 @@ const {
   saveCurrentMatch,
   loadSeasonMeta,
   loadSeasonHistory,
+  loadSystemMeta,
   loadContentTemplates,
   saveContentTemplates,
   withQueueOperationLock,
@@ -22,6 +23,7 @@ const {
   getStatsBucketKey,
   getRankedPlayersByMode
 } = require('../domain/ranking/playerStats');
+const { getRankedPlayersByDuel } = require('../domain/ranking/duelRanking');
 const { calculateHybridMmr, calculateSeedRating, calculateEloDelta, RATING_VERSION } = require('../services/balanceService');
 const { DEFAULT_CONTENT_TEMPLATES, getResolvedContentTemplates } = require('../services/contentTextService');
 
@@ -135,30 +137,31 @@ function buildPlayerSummaries(statsData, query = '') {
     });
 }
 
-function getLeaderboardPreview(statsData, seasonMeta) {
+function getLeaderboardPreview(statsData, seasonMeta, duelos = []) {
   return {
     classic: getRankedPlayersByMode(statsData, QUEUE_MODES.CLASSIC, null, seasonMeta).slice(0, 5),
-    aram1x1: getRankedPlayersByMode(statsData, QUEUE_MODES.ARAM, '1x1', seasonMeta).slice(0, 5),
-    aram: getRankedPlayersByMode(statsData, QUEUE_MODES.ARAM, null, seasonMeta).slice(0, 5)
+    tt3x3: getRankedPlayersByMode(statsData, QUEUE_MODES.ARAM, '3x3', seasonMeta).slice(0, 5),
+    duelo: getRankedPlayersByDuel(duelos, statsData, seasonMeta).slice(0, 5)
   };
 }
 
 async function getDashboardViewModel(query = '') {
   await ensureDataFiles();
 
-  const [storedTemplates, statsData, queueData, currentMatchData, seasonMeta, seasonHistory] = await Promise.all([
+  const [storedTemplates, statsData, queueData, currentMatchData, seasonMeta, seasonHistory, systemMeta] = await Promise.all([
     loadContentTemplates(),
     loadPlayerStats(),
     loadQueue(),
     loadCurrentMatch(),
     loadSeasonMeta(),
-    loadSeasonHistory()
+    loadSeasonHistory(),
+    loadSystemMeta()
   ]);
 
   return {
     overviewCards: getOverviewCards({ statsData, queueData, currentMatchData, seasonMeta, seasonHistory }),
     seasonMeta,
-    leaderboardPreview: getLeaderboardPreview(statsData, seasonMeta),
+    leaderboardPreview: getLeaderboardPreview(statsData, seasonMeta, systemMeta?.duelos || []),
     players: buildPlayerSummaries(statsData, query),
     lobbies: buildLobbySummaries(queueData),
     matches: buildMatchSummaries(currentMatchData),
