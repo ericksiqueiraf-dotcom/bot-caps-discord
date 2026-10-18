@@ -31,7 +31,7 @@
       { "icone": "⚔️", "titulo": "JOGUE A RODADA", "texto": "Quem vence avança para a próxima; quem perde está fora" },
       { "icone": "🔁", "titulo": "REPESCAGEM", "texto": "Se a rodada não fechar 10 vencedores, os melhores perdedores voltam" },
       { "icone": "🏁", "titulo": "A FINAL", "texto": "Os 10 finalistas decidem em MD3 — melhor de 3, com os mesmos times" },
-      { "icone": "🏆", "titulo": "CAMPEÕES", "texto": "O time campeão leva o cargo 🏆 Campeão CAPS e o destaque da arena" }
+      { "icone": "🏆", "titulo": "CAMPEÕES", "texto": "O time campeão leva o cargo 🏆 Campeão CAPS + premiação a definir" }
     ],
     "rodape": {
       "texto": "Inscrições por tempo limitado • !torneio info mostra as regras • !torneio status mostra a rodada atual",
@@ -126,7 +126,7 @@
       "**3. Rodada** — quem vence avança, quem perde está fora.",
       "**4. Repescagem** — se a rodada não fechar 10 vencedores, entram os **melhores perdedores** para completar o grupo.",
       "**5. Final** — com 10 classificados: um sorteio, mesmos times e **MD3** (melhor de 3).",
-      "**6. Premiação** — o time campeão recebe o cargo **🏆 Campeão CAPS** e o destaque da arena.",
+      "**6. Premiação** — o time campeão recebe o cargo **🏆 Campeão CAPS** + premiação a definir.",
       "",
       "Comandos de jogador: `!torneio entrar | sair | lista | info | status`",
       "A staff abre e fecha as inscrições com `!torneioon` / `!torneiooff` — fique de olho no anúncio."

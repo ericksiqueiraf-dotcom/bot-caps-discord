@@ -155,7 +155,7 @@ function buildPosterEmbed(cfg = config) {
       '**3.** Rodada: quem vence avança, quem perde está fora',
       '**4.** Repescagem: sem 10 vencedores, os **melhores perdedores** voltam',
       '**5.** Final: 10 classificados em **MD3** — melhor de 3, mesmos times',
-      '**6.** O time campeão leva o cargo **🏆 Campeão CAPS**',
+      '**6.** O time campeão leva o cargo **🏆 Campeão CAPS** + premiação a definir',
       '',
       '`!torneio info` mostra o regulamento • `!torneio status` mostra a rodada atual'
     ].join('\n'))
