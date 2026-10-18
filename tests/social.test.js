@@ -185,3 +185,204 @@ describe('social: tick automático', () => {
     assert.equal(b.sent.length, 1);
   });
 });
+
+// ---------------------------------------------------------------- pôster
+const CFG_POSTER = {
+  social: {
+    ...CFG.social,
+    poster: {
+      ativo: true,
+      arquivo: 'IMAGENS/TORNEIO CAPS ARENA.png',
+      canais: ['📢┃comunicados', '💬・geral-leagueoflegends'],
+      horas: [10, 16, 21]
+    }
+  }
+};
+
+function makeDepsPoster(guilds = [], meta = {}, cfg = CFG_POSTER) {
+  const salvos = [];
+  return {
+    meta,
+    salvos,
+    deps: {
+      loadSystemMeta: async () => meta,
+      saveSystemMeta: async (m) => { salvos.push({ ...m }); },
+      guilds,
+      cfg,
+      anexoFactory: (arquivo) => ({ attachment: arquivo, name: S.POSTER_ANEXO_NOME })
+    }
+  };
+}
+
+describe('pôster agendado: config e canais', () => {
+  it('defaults: comunicados + geral, nos horários da divulgação', () => {
+    const p = S.getPosterCfg({});
+    assert.equal(p.ativo, true);
+    assert.deepEqual(p.canais, S.POSTER_CANAIS_DEFAULT);
+    assert.deepEqual(p.canais, ['📢┃comunicados', '💬・geral-leagueoflegends']);
+    assert.equal(p.arquivo, S.POSTER_ARQUIVO_DEFAULT);
+    assert.deepEqual(p.horas, [10, 16, 21]);
+  });
+
+  it('lê canais/arquivo/horas da config e respeita ativo=false', () => {
+    const p = S.getPosterCfg({ social: { poster: { ativo: false, arquivo: 'x.png', canais: ['só-esse'], horas: [21, 7] } } });
+    assert.equal(p.ativo, false);
+    assert.equal(p.arquivo, 'x.png');
+    assert.deepEqual(p.canais, ['só-esse']);
+    assert.deepEqual(p.horas, [7, 21], 'ordena as horas');
+  });
+
+  it('findCanaisPorNomes: exato nos dois, sem duplicar, e parcial quando não há exato', () => {
+    const geral = makeCanal('💬・geral-leagueoflegends', 'g');
+    const comun = makeCanal('📢┃comunicados', 'c');
+    const outros = makeCanal('🤖・comandos', 'x');
+    const achados = S.findCanaisPorNomes(makeGuild([outros, geral, comun]), ['📢┃comunicados', '💬・geral-leagueoflegends']);
+    assert.deepEqual(achados.map((c) => c.id), ['c', 'g']);
+    const parcial = makeCanal('📢┃comunicados-avisos', 'p');
+    assert.deepEqual(S.findCanaisPorNomes(makeGuild([parcial]), ['📢┃comunicados']).map((c) => c.id), ['p']);
+  });
+
+  it('findCanaisPorNomes: aceita ID (à prova de renomeação)', () => {
+    const idComun = '1487953358407860235';
+    const comun = makeCanal('📢┃comunicados', idComun);
+    const outro = makeCanal('📢┃comunicados-v2', '1487953358407860236');
+    assert.deepEqual(S.findCanaisPorNomes(makeGuild([outro, comun]), [idComun]).map((c) => c.id), [idComun]);
+    assert.deepEqual(S.findCanaisPorNomes(makeGuild([comun]), ['999999999999999999']), [], 'id inexistente');
+  });
+
+  it('poster aceita os 2 canais por ID na config', () => {
+    const cfg = {
+      social: {
+        poster: {
+          canais: ['1487953358407860235', '1544297359918506004']
+        }
+      }
+    };
+    const comun = makeCanal('📢┃comunicados', '1487953358407860235');
+    const geral = makeCanal('💬・geral-leagueoflegends', '1544297359918506004');
+    assert.deepEqual(S.findPosterChannels(makeGuild([geral, comun]), cfg).map((c) => c.id),
+      ['1487953358407860235', '1544297359918506004']);
+  });
+
+  it('findPosterChannels: acha os 2 canais; sem eles cai no canal da divulgação; ignora não-texto', () => {
+    const geral = makeCanal('💬・geral-leagueoflegends', 'g');
+    const comun = makeCanal('📢┃comunicados', 'c');
+    assert.deepEqual(S.findPosterChannels(makeGuild([geral, comun]), CFG_POSTER).map((x) => x.id), ['c', 'g']);
+
+    const soGeral = makeCanal('💬・geral-leagueoflegends', 'g');
+    assert.deepEqual(S.findPosterChannels(makeGuild([soGeral]), CFG_POSTER).map((x) => x.id), ['g']);
+
+    assert.deepEqual(S.findPosterChannels(makeGuild([]), CFG_POSTER), []);
+    assert.deepEqual(
+      S.findPosterChannels(makeGuild([makeCanal('📢┃comunicados', 'c', { texto: false })]), CFG_POSTER),
+      [],
+      'canal de voz não conta'
+    );
+  });
+
+  it('posterSlot: 10/16/21 valem a hora toda; fora disso é null; vira o dia', () => {
+    assert.equal(S.posterSlot(sp(10), CFG_POSTER), '2026-10-17#10');
+    assert.equal(S.posterSlot(sp(10, 59), CFG_POSTER), '2026-10-17#10');
+    assert.equal(S.posterSlot(sp(16, 5), CFG_POSTER), '2026-10-17#16');
+    assert.equal(S.posterSlot(sp(15), CFG_POSTER), null);
+    assert.equal(S.posterSlot(sp(10, 0, 18), CFG_POSTER), '2026-10-18#10');
+  });
+
+  it('embed do pôster: título do torneio + imagem do anexo', () => {
+    const e = S.buildPosterEmbed(CFG_POSTER).toJSON();
+    assert.match(e.title, /TORNEIO CAPS ARENA/);
+    assert.equal(e.image.url, `attachment://${S.POSTER_ANEXO_NOME}`);
+    assert.match(e.description, /!torneio entrar/);
+    assert.match(e.description, /MD3/);
+  });
+});
+
+describe('pôster agendado: tick automático', () => {
+  it('posta nos 2 canais no horário e grava o slot por canal', async () => {
+    const geral = makeCanal('💬・geral-leagueoflegends', 'g');
+    const comun = makeCanal('📢┃comunicados', 'c');
+    const { deps, meta, salvos } = makeDepsPoster([makeGuild([geral, comun])]);
+    const r = await S.runPosterTick(sp(10), deps);
+    assert.equal(r.posted, 2);
+    assert.equal(geral.sent.length, 1);
+    assert.equal(comun.sent.length, 1);
+    assert.equal(geral.sent[0].embeds.length, 1);
+    assert.equal(geral.sent[0].files.length, 1, 'vai o pôster anexado');
+    assert.deepEqual(meta.posterSlots, { c: '2026-10-17#10', g: '2026-10-17#10' });
+    assert.equal(meta.posterUltimoSlot, '2026-10-17#10');
+    assert.equal(salvos.length, 1);
+  });
+
+  it('não duplica no mesmo slot (tick repetido)', async () => {
+    const geral = makeCanal('💬・geral-leagueoflegends', 'g');
+    const { deps } = makeDepsPoster([makeGuild([geral])]);
+    await S.runPosterTick(sp(10), deps);
+    const r = await S.runPosterTick(sp(10, 30), deps);
+    assert.equal(r.posted, 0);
+    assert.equal(geral.sent.length, 1);
+  });
+
+  it('canal que já recebeu no slot não recebe de novo; o outro sim', async () => {
+    const geral = makeCanal('💬・geral-leagueoflegends', 'g');
+    const comun = makeCanal('📢┃comunicados', 'c');
+    const meta = { posterSlots: { g: '2026-10-17#10' } };
+    const { deps } = makeDepsPoster([makeGuild([geral, comun])], meta);
+    const r = await S.runPosterTick(sp(10), deps);
+    assert.equal(r.posted, 1);
+    assert.equal(geral.sent.length, 0);
+    assert.equal(comun.sent.length, 1);
+  });
+
+  it('posta de novo no horário seguinte', async () => {
+    const geral = makeCanal('💬・geral-leagueoflegends', 'g');
+    const { deps } = makeDepsPoster([makeGuild([geral])]);
+    await S.runPosterTick(sp(10), deps);
+    await S.runPosterTick(sp(16), deps);
+    assert.equal(geral.sent.length, 2);
+  });
+
+  it('fora de horário não posta nem grava slot', async () => {
+    const geral = makeCanal('💬・geral-leagueoflegends', 'g');
+    const { deps, meta, salvos } = makeDepsPoster([makeGuild([geral])]);
+    const r = await S.runPosterTick(sp(15), deps);
+    assert.equal(r.posted, 0);
+    assert.equal(geral.sent.length, 0);
+    assert.equal(meta.posterSlots, undefined);
+    assert.equal(salvos.length, 0);
+  });
+
+  it('pôster ausente no disco: não posta e não marca o slot', async () => {
+    const geral = makeCanal('💬・geral-leagueoflegends', 'g');
+    const cfg = { social: { ...CFG_POSTER.social, poster: { ...CFG_POSTER.social.poster, arquivo: 'imagens/nao-existe.png' } } };
+    const { deps, meta } = makeDepsPoster([makeGuild([geral])], {}, cfg);
+    const r = await S.runPosterTick(sp(10), deps);
+    assert.equal(r.posted, 0);
+    assert.match(r.reason, /ausente/);
+    assert.equal(geral.sent.length, 0);
+    assert.equal(meta.posterSlots, undefined);
+  });
+
+  it('ativo=false desliga o pôster sem mexer na divulgação', async () => {
+    const geral = makeCanal('💬・geral-leagueoflegends', 'g');
+    const cfg = { social: { ...CFG_POSTER.social, poster: { ...CFG_POSTER.social.poster, ativo: false } } };
+    const { deps } = makeDepsPoster([makeGuild([geral])], {}, cfg);
+    const r = await S.runPosterTick(sp(10), deps);
+    assert.equal(r.posted, 0);
+    assert.equal(geral.sent.length, 0);
+  });
+
+  it('sem canal: não posta e não grava', async () => {
+    const { deps, meta } = makeDepsPoster([makeGuild([])]);
+    const r = await S.runPosterTick(sp(10), deps);
+    assert.equal(r.posted, 0);
+    assert.equal(meta.posterSlots, undefined);
+  });
+
+  it('multi-guild: posta nos 2 canais de cada guild', async () => {
+    const g1 = makeGuild([makeCanal('💬・geral-leagueoflegends', 'g1a'), makeCanal('📢┃comunicados', 'g1b')]);
+    const g2 = makeGuild([makeCanal('💬・geral-leagueoflegends', 'g2a'), makeCanal('📢┃comunicados', 'g2b')]);
+    const { deps } = makeDepsPoster([g1, g2]);
+    const r = await S.runPosterTick(sp(21), deps);
+    assert.equal(r.posted, 4);
+  });
+});
