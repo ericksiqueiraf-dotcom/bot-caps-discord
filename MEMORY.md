@@ -456,6 +456,13 @@ database/                    ← fallback JSON local
 - **Testes:** `tests/social.test.js` +18 casos (defaults da config, ID/parcial, `posterSlot`, embed, tick nos 2 canais, dedup por canal, pôster ausente, ativo=false, multi-guild). Suíte CAPS **261/261** (49 suites).
 - Branch `feat/torneio-onoff`; `caps-bot` reiniciado (boot limpo).
 
+### 2026-10-17 — Instalador de 1 clique (`INSTALAR.bat`) para servidor novo
+- **`INSTALAR.bat` (raiz, duplo clique):** `npm install` (CAPS e `lcl-bot`) → confere o `.env` e **pede o `DISCORD_TOKEN`** se faltar (grava via PowerShell sem apagar as outras variáveis) → mostra os **links de convite** → **para o bot no PM2** → `node instalar.js <GUILD> <caps|lcl|ambos>` (cria cargos, categorias, canais, permissões e painéis fixados) → sobe de novo no PM2 (`:sobeBot` = restart se já existe, senão start) → `pm2 save`. ASCII puro (sem acento) como os outros `.bat`, porque `cmd` com UTF-8 corrompe.
+- **Por que "parar antes":** `setup-servidor.js:222` e `organize-official-discord.js:354` fazem `client.login()` no **gateway** com o **mesmo token** do bot — dois logins simultâneos brigam (mesma classe do incidente do `caps-admin` de 2026-10-14). As sub-rotinas foram testadas isoladamente (`:paraBot`, `:garanteToken`, escape de `&`/`%` nas URLs); nada de produção foi parado.
+- **IDs das aplicações (links de convite):** CAPS `1487258474810183711`; LCL `1558697998924513441` — descobertos com `GET /users/@me` usando o token do `.env` de cada bot.
+- **Docs:** `docs/INSTALAR_OUTRO_SERVIDOR.md` (passo a passo + o que o instalador **não** faz: não cria a aplicação, não copia banco, não apaga nada) e a seção de convite do `ALTERAÇÕES BOT.txt` agora tem os 2 links.
+- **O setup já servia p/ outro servidor:** `setup-servidor.js`/`organize-official-discord.js` leem o `config.json` e fazem **merge** (não sobrescrevem), então o bloco `social.poster` e o resto sobrevivem; o `server-pattern.json` já contém `📢┃comunicados` e `💬・geral-leagueoflegends`.
+
 ### 2026-10-14 — Deploy clube VIP na ARENA oficial
 - `MP_ACCESS_TOKEN` (prod, mesmo validado na TESTE) copiado para `.env` do CAPS; `clubePagamentos` já estava no `config.json`.
 - Restart `caps-admin` + `caps-bot` (`--update-env`); boot limpo, `CAPS BOT LOL#6241` online e estável. Sem URL pública (poller de 3 min assume).

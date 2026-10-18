@@ -258,10 +258,18 @@ Diretriz: épico mas organizado. Simetria total, centro livre para a logo.
 LINK DE CONVITE DO BOT (copiar p/ navegador)
 ============================================================
 
+CAPS ARENA:
 https://discord.com/oauth2/authorize?client_id=1487258474810183711&permissions=8&scope=bot%20applications.commands
 
-Como usar: cole no navegador → escolha o servidor CAPS Teste → Continuar → marque Administrador → Autorizar.
+LCL BOT:
+https://discord.com/oauth2/authorize?client_id=1558697998924513441&permissions=8&scope=bot%20applications.commands
+
+Como usar: cole no navegador → escolha o servidor → Continuar → marque Administrador → Autorizar.
 O permissions=8 (Administrador) é só para o setup criar cargos e canais; depois pode tirar.
+
+Instalar/organizar num servidor novo (1 clique): duplo clique em INSTALAR.bat na pasta do CAPS BOT.
+Ele instala dependências, prepara o .env, para o bot no PM2 (o setup loga com o mesmo token),
+aplica cargos/canais/painéis e sobe o bot de novo. Passo a passo: docs/INSTALAR_OUTRO_SERVIDOR.md
 
 ============================================================
 COMUNICADO DISCORD — VOTAÇÃO DE RESULTADO COM BOTÕES (copiar p/ Discord)
