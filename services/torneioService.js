@@ -12,14 +12,21 @@ const FINAL_SIZE = 10;
 const TORNEIO_CARGO_NOME = '🏆 Campeão CAPS';
 const INSCRICOES_DIAS_DEFAULT = 7;
 const DIA_MS = 24 * 60 * 60 * 1000;
+// Ausência: checagem em 2 tempos — aviso em T+5min, substituição em T+10min.
+const AUSENCIA_AVISO_MIN = 5;
+const AUSENCIA_SUBSTITUICAO_MIN = 10;
 
 const TORNEIO_INFO =
   '🏆 **TORNEIO CAPS ARENA** — mata-mata com sorteio por rodada.\n' +
   '• Inscrição individual: `!torneio entrar` (mínimo 20, múltiplo de 10)\n' +
   '• A cada rodada o bot monta partidas **5x5 balanceadas**; quem perde sai, quem ganha avança\n' +
   '• Se os vencedores não fecharem 10, entra a **repescagem** (melhores perdedores da rodada)\n' +
-  '• **Final**: 1 sorteio, mesmos times, **MD3** (melhor de 3)\n' +
-  '• Campeões ganham o cargo 🏆 (premiação extra a decidir)\n' +
+  '• Ao sortear, o bot move os 10 de cada jogo para o **lobby de voz** da rodada\n' +
+  '• **Presença**: só o lobby da rodada vale. Falta aos **5 min** = aviso; aos **10 min** = desistência automática e a reserva assume\n' +
+  '• Reserva assume a vaga de desistente/ausente e o jogo é **re-balanceado** (`!torneio desistencia @user` registra desistência)\n' +
+  '• **Final**: 1 sorteio, mesmos times, **MD3** (melhor de 3) — 🚫 **FEARLESS**: proibido pickar campeão usado na partida anterior da série\n' +
+  '• Lados na final: **J1 sorteado pelo bot** • **J2 lados invertidos** • **J3 quem venceu o J1 escolhe o lado**\n' +
+  '• Campeões ganham o cargo 🏆; premiação extra anunciada pela staff a cada edição\n' +
   '• A staff abre/fecha o torneio com `!torneioon` / `!torneiooff`';
 
 function newTournament(edition = 1, options = {}) {
@@ -35,6 +42,7 @@ function newTournament(edition = 1, options = {}) {
     rounds: [],
     final: null,
     champion: null,
+    canais: null,
     createdAt: new Date().toISOString()
   };
 }
@@ -118,6 +126,35 @@ function startRequirement(t) {
   return { ok: true };
 }
 
+function slimPlayer(p) {
+  return { discordId: String(p.discordId), nickname: p.nickname || p.discordId, baseMmr: Number(p.baseMmr || 0) };
+}
+function slimPlayers(list) { return (list || []).map(slimPlayer); }
+
+// ─── Nomes estáveis de time (Etapa 1) ──────────────────────────────────────
+// Time nasce com nome no sorteio ("R1 TIME A", "R1 TIME B", ...) e mantém até o fim.
+// A sequência de letras é exclusiva por edição (t.timeSeq) — nunca repete.
+const LETRAS_TIME = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+function nomeLetraTime(i) {
+  const ciclos = Math.floor(i / 26);
+  const letra = LETRAS_TIME[i % 26];
+  return ciclos === 0 ? letra : `${letra}${ciclos + 1}`;
+}
+
+// Atribui nomes aos times criados neste sorteio (muta os player slims com p.timeNome,
+// que é como o advanceTournament reconhece o time vencedor na formação da final).
+function atribuirNomesTimes(t, games) {
+  t.timeSeq ||= 0;
+  for (const g of games) {
+    const rodada = String(g.id || '').split('-')[0] || 'TIME';
+    g.nomeTimeA = `${rodada} TIME ${nomeLetraTime(t.timeSeq++)}`;
+    g.nomeTimeB = `${rodada} TIME ${nomeLetraTime(t.timeSeq++)}`;
+    for (const p of g.teamOne) p.timeNome = g.nomeTimeA;
+    for (const p of g.teamTwo) p.timeNome = g.nomeTimeB;
+  }
+  return games;
+}
+
 // pool: [{ discordId, nickname, baseMmr }]. balanceFn: (grupoDe10) => { teamOne, teamTwo }.
 function drawGames(pool, balanceFn, roundLabel) {
   const sorted = [...pool].sort((a, b) => Number(b.baseMmr || 0) - Number(a.baseMmr || 0));
@@ -130,8 +167,7 @@ function drawGames(pool, balanceFn, roundLabel) {
   });
   return groups.map((group, gi) => {
     const teams = balanceFn(group);
-    const slim = (list) => list.map((p) => ({ discordId: String(p.discordId), nickname: p.nickname || p.discordId, baseMmr: Number(p.baseMmr || 0) }));
-    return { id: `${roundLabel}-J${gi + 1}`, teamOne: slim(teams.teamOne), teamTwo: slim(teams.teamTwo), winner: null };
+    return { id: `${roundLabel}-J${gi + 1}`, teamOne: slimPlayers(teams.teamOne), teamTwo: slimPlayers(teams.teamTwo), winner: null };
   });
 }
 
@@ -181,7 +217,57 @@ function roundLosers(t, roundN) {
   return out.sort((a, b) => Number(b.baseMmr || 0) - Number(a.baseMmr || 0));
 }
 
-// Avança: vencedores (+ repescagem se não fechar 10) viram próxima rodada ou final.
+// ─── Times como unidade (nome estável) ─────────────────────────────────────
+// A partir da R2 o time avança COMO SEU TIME: os 5 mantêm o nome até o fim.
+// Só os jogadores mudam, por substituição de reserva (desistência/ausência).
+function somaMmrTime(list) {
+  return (list || []).reduce((s, p) => s + Number(p.baseMmr || 0), 0);
+}
+
+function timeLado(game, lado) {
+  const players = lado === '1' ? game.teamOne : game.teamTwo;
+  return {
+    nome: lado === '1' ? (game.nomeTimeA || 'Time 1') : (game.nomeTimeB || 'Time 2'),
+    players: [...players],
+    mmr: somaMmrTime(players)
+  };
+}
+
+// Times vencedores da rodada (um por jogo fechado).
+function timesVencedores(t, roundN) {
+  return roundGames(t, roundN).filter((g) => g.winner).map((g) => timeLado(g, g.winner));
+}
+
+// Times perdedores, melhor elo primeiro (repescagem usa o afinado inteiro).
+function timesPerdedores(t, roundN) {
+  return roundGames(t, roundN)
+    .filter((g) => g.winner)
+    .map((g) => timeLado(g, g.winner === '1' ? '2' : '1'))
+    .sort((a, b) => b.mmr - a.mmr);
+}
+
+// Emparelha times confronto a confronto (serpentina por elo: 1º vs último...,
+// força similar por jogo e times mais fortes separados).
+function pairTeamsEmJogos(teams, roundLabel) {
+  const sorted = [...teams].sort((a, b) => b.mmr - a.mmr);
+  const total = sorted.length;
+  const games = [];
+  for (let i = 0; i < total / 2; i++) {
+    const A = sorted[i];
+    const B = sorted[total - 1 - i];
+    games.push({
+      id: `${roundLabel}-J${i + 1}`,
+      nomeTimeA: A.nome, teamOne: [...A.players],
+      nomeTimeB: B.nome, teamTwo: [...B.players],
+      winner: null
+    });
+  }
+  return games;
+}
+
+// Avança: vencedores (+ repescagem dos melhores perdedores) são RE-BALANCEADOS
+// na próxima rodada (formato do torneio) — até sobrarem 10, que vão para a
+// final MD3 CONGELADA: os dois times vencedores jogam a MD3 intocados, nomes mantidos.
 function advanceTournament(t, balanceFn) {
   const lastN = (t.rounds || []).length;
   if (lastN === 0) return { ok: false, message: 'Nenhuma rodada sorteada ainda.' };
@@ -189,21 +275,33 @@ function advanceTournament(t, balanceFn) {
   if (t.final) return { ok: false, message: 'A final já está rolando.' };
   const winners = roundWinners(t, lastN);
   if (winners.length === FINAL_SIZE) {
-    const teams = balanceFn(winners);
+    // 10 vencedores = os 2 times vencedores: final MD3 com os MESMOS times (sem re-split).
+    const winTeams = timesVencedores(t, lastN);
+    let teamOne, teamTwo, nomeTime1, nomeTime2;
+    if (winTeams.length === 2) {
+      teamOne = winTeams[0].players; teamTwo = winTeams[1].players;
+      nomeTime1 = winTeams[0].nome; nomeTime2 = winTeams[1].nome;
+    } else {
+      const teams = balanceFn(winners);
+      teamOne = teams.teamOne; teamTwo = teams.teamTwo;
+      nomeTime1 = 'Time 1'; nomeTime2 = 'Time 2';
+    }
     t.final = {
-      teamOne: teams.teamOne, teamTwo: teams.teamTwo,
-      wins1: 0, wins2: 0, games: []
+      teamOne, teamTwo, nomeTime1, nomeTime2,
+      // Lado azul do J1 é sorteado (J2 inverte; no J3 o vencedor do J1 escolhe).
+      sides: { j1: Math.random() < 0.5 ? '1' : '2' },
+      games: [], wins1: 0, wins2: 0, ausencia: null
     };
     return { ok: true, type: 'final', final: t.final };
   }
   const need = Math.ceil(winners.length / FINAL_SIZE) * FINAL_SIZE - winners.length;
-  const losers = roundLosers(t, lastN);
-  if (losers.length < need) return { ok: false, message: 'Repescagem impossível: perdedores insuficientes.' };
-  const repechage = losers.slice(0, need);
-  const pool = [...winners, ...repechage];
+  const repescados = roundLosers(t, lastN).slice(0, need);
+  if (repescados.length < need) return { ok: false, message: 'Repescagem impossível: perdedores insuficientes.' };
+  const pool = [...winners, ...repescados];
   const games = drawGames(pool, balanceFn, `R${lastN + 1}`);
-  t.rounds.push({ n: lastN + 1, games, repechage: repechage.map((p) => p.discordId) });
-  return { ok: true, type: 'round', round: lastN + 1, games, repechage };
+  atribuirNomesTimes(t, games); // re-balance: times novos, letras continuam (R2 TIME E, F...)
+  t.rounds.push({ n: lastN + 1, games, ausencia: null, repechage: repescados.map((p) => p.discordId) });
+  return { ok: true, type: 'round', round: lastN + 1, games, repechage: repescados };
 }
 
 function recordFinalGame(t, winner) {
@@ -222,8 +320,175 @@ function recordFinalGame(t, winner) {
   return { ok: true, champion: false, final: t.final };
 }
 
-const DIAS_PT = { dom: 0, domingo: 0, seg: 1, segunda: 1, ter: 2, terca: 2, 'terça': 2, qua: 3, quarta: 3, qui: 4, quinta: 4, sex: 5, sexta: 5, sab: 6, sabado: 6, 'sábado': 6 };
+// ─── Reservas: fila e substituição por desistência/ausência ─────────────────
+// Mantém a fila sem IDs de quem já virou jogador/participante (defensivo).
+function normalizarReservas(t) {
+  t.reservas ||= [];
+  const ativos = new Set(t.players || []);
+  for (const round of t.rounds || []) {
+    for (const g of round.games || []) [...g.teamOne, ...g.teamTwo].forEach((p) => ativos.add(p.discordId));
+  }
+  if (t.final) [...t.final.teamOne, ...t.final.teamTwo].forEach((p) => ativos.add(p.discordId));
+  t.reservas = t.reservas.filter((id) => !ativos.has(String(id)));
+  return t.reservas;
+}
 
+// Espia o 1º da fila (ordem de inscrição) sem consumir.
+function peakReserva(t) {
+  return normalizarReservas(t)[0] || null;
+}
+
+// Saída da fila (consumo explícito).
+function promoverReserva(t) {
+  return normalizarReservas(t).shift() || null;
+}
+
+// Re-balanceia os 10 de um jogo já sorteado (entrada de reserva etc.).
+function rebalanceGame(game, balanceFn) {
+  const pool = [...game.teamOne, ...game.teamTwo];
+  const teams = balanceFn(pool);
+  game.teamOne = slimPlayers(teams.teamOne);
+  game.teamTwo = slimPlayers(teams.teamTwo);
+  return game;
+}
+
+// Substituição por desistência/ausência — decide o modo pelo estado:
+// • pré-1º-sorteio (inscrições fechadas): troca direta na lista de players;
+// • jogo em aberto na rodada: reserva entra nos 10 e o jogo é re-balanceado;
+// • jogo já registrado e o desistente venceu: reserva assume a vaga para a próxima;
+// • desistente eliminado (perdeu): segue eliminado — reserva permanece na fila;
+// • final em andamento: troca no time congelado.
+// reservaPlayer: { discordId, nickname, baseMmr } (stats buscadas pelo chamador).
+function substituirDesistente(t, alvoId, reservaPlayer, balanceFn) {
+  const alvo = String(alvoId || '');
+  if (!t?.active) return { ok: false, message: 'Nenhum torneio ativo.' };
+  if (!alvo) return { ok: false, message: 'Informe o jogador desistente.' };
+  const reserva = slimPlayer(reservaPlayer || {});
+  normalizarReservas(t);
+  if (!reserva.discordId) return { ok: false, message: 'Não há reservas na fila (jogador inválido).' };
+
+  // 1) Pré-sorteio.
+  if ((t.rounds || []).length === 0 && !t.final) {
+    const idx = (t.players || []).indexOf(alvo);
+    if (idx < 0) return { ok: false, message: 'Jogador não está inscrito no torneio.' };
+    if (!t.reservas.length) return { ok: false, message: 'Não há reservas na fila.' };
+    const reservaId = t.reservas.shift();
+    t.players[idx] = reservaId;
+    return { ok: true, modo: 'pre-sorteio', alvo, reserva: reservaId, players: t.players.length };
+  }
+
+  // 2) Final em andamento: troca no time congelado.
+  if (t.final && !t.champion) {
+    if (![...t.final.teamOne, ...t.final.teamTwo].some((p) => p.discordId === alvo)) {
+      return { ok: false, message: 'O jogador não está na final.' };
+    }
+    if (!t.reservas.length) return { ok: false, message: 'Não há reservas na fila.' };
+    const reservaId = t.reservas.shift();
+    for (const key of ['teamOne', 'teamTwo']) {
+      const idx = t.final[key].findIndex((p) => p.discordId === alvo);
+      if (idx >= 0) t.final[key][idx] = { ...reserva, discordId: reservaId };
+    }
+    return { ok: true, modo: 'final', alvo, reserva: reservaId };
+  }
+
+  // 3) Rodadas.
+  if ((t.rounds || []).length > 0) {
+    const rodada = t.rounds[t.rounds.length - 1];
+    const gameAberto = (rodada.games || []).find((g) => !g.winner &&
+      [...g.teamOne, ...g.teamTwo].some((p) => p.discordId === alvo));
+    if (gameAberto) {
+      if (!t.reservas.length) return { ok: false, message: 'Não há reservas na fila.' };
+      const reservaId = t.reservas.shift();
+      const pool = [...gameAberto.teamOne, ...gameAberto.teamTwo]
+        .map((p) => (p.discordId === alvo ? { ...reserva, discordId: reservaId } : p));
+      const teams = balanceFn(pool);
+      gameAberto.teamOne = slimPlayers(teams.teamOne);
+      gameAberto.teamTwo = slimPlayers(teams.teamTwo);
+      // Re-stamp: o re-balance muda jogadores, nunca o NOME do time.
+      for (const p of gameAberto.teamOne) p.timeNome = gameAberto.nomeTimeA || p.timeNome;
+      for (const p of gameAberto.teamTwo) p.timeNome = gameAberto.nomeTimeB || p.timeNome;
+      return { ok: true, modo: 'jogo', jogo: gameAberto.id, alvo, reserva: reservaId, rebalanceado: true };
+    }
+    const gameFechado = (rodada.games || []).find((g) => g.winner &&
+      (g.winner === '1' ? g.teamOne : g.teamTwo).some((p) => p.discordId === alvo));
+    if (gameFechado) {
+      if (!t.reservas.length) return { ok: false, message: 'Não há reservas na fila.' };
+      const reservaId = t.reservas.shift();
+      const lista = gameFechado.winner === '1' ? 'teamOne' : 'teamTwo';
+      const idx = gameFechado[lista].findIndex((p) => p.discordId === alvo);
+      const slot = gameFechado[lista][idx];
+      gameFechado[lista][idx] = { ...reserva, discordId: reservaId, timeNome: slot?.timeNome };
+      return { ok: true, modo: 'proxima-rodada', jogo: gameFechado.id, alvo, reserva: reservaId };
+    }
+    return { ok: false, message: 'O desistente já está eliminado — a reserva permanece na fila.' };
+  }
+
+  return { ok: false, message: 'Não há vaga aberta para substituição neste momento.' };
+}
+
+// ─── Ausência: avaliação pura (Discord fica no chamador) ────────────────────
+// presenteMap: { [gameId]: [...discordId conectados no lobby] }.
+// Retorna { fase: 'aviso'|'substituir'|'limpar'|null, alvos: [{ gameId, ids }] }.
+// fases: 'aviso' (T+5min), 'substituir' (T+10min) e 'limpar' (janela passou sem ausentes).
+function avaliarAusencia(t, nowMs = Date.now(), presenteMap = {}) {
+  const out = { fase: null, alvos: [] };
+  if (!t?.active || t.champion) return out;
+  const AVISO_MS = AUSENCIA_AVISO_MIN * 60000;
+
+  // Fonte única: última rodada OU a final (também movida p/ lobby).
+  let marcador = null;
+  const jogos = [];
+  const lastN = (t.rounds || []).length;
+  if (lastN) {
+    marcador = t.rounds[lastN - 1].ausencia || null;
+    for (const g of t.rounds[lastN - 1].games || []) {
+      jogos.push({ id: g.id, winner: g.winner, players: [...g.teamOne, ...g.teamTwo].map((p) => p.discordId) });
+    }
+  } else if (t.final && !t.champion) {
+    marcador = t.final.ausencia || null;
+    jogos.push({
+      id: 'FINAL', winner: null,
+      players: [...t.final.teamOne, ...t.final.teamTwo].map((p) => p.discordId)
+    });
+  }
+  if (!marcador?.criadoEm || marcador.aplicadoEm) return out;
+  const desdeCriacaoMs = nowMs - Date.parse(marcador.criadoEm);
+  if (!Number.isFinite(desdeCriacaoMs) || desdeCriacaoMs < 0) return out;
+
+  const alvos = jogos
+    .filter((g) => !g.winner)
+    .map((g) => {
+      const presentes = new Set(presenteMap[g.id] || []);
+      return { gameId: g.id, ids: g.players.filter((id) => !presentes.has(id)) };
+    })
+    .filter((a) => a.ids.length > 0);
+
+  if (!marcador.avisoEm) {
+    if (desdeCriacaoMs >= AVISO_MS && alvos.length) {
+      out.fase = 'aviso';
+      out.alvos = alvos;
+    }
+    return out;
+  }
+  const desdeAvisoMs = nowMs - Date.parse(marcador.avisoEm);
+  if (!Number.isFinite(desdeAvisoMs) || desdeAvisoMs < 0) return out;
+  if (desdeAvisoMs >= AVISO_MS) {
+    out.fase = alvos.length ? 'substituir' : 'limpar';
+    out.alvos = alvos;
+  }
+  return out;
+}
+
+// `!torneio encerrar` só aborta antes do 1º sorteio (ou com o torneio já campeão).
+function podeEncerrar(t) {
+  if (!t?.active) return { ok: false, message: 'Nenhum torneio ativo.' };
+  if ((t.rounds || []).length > 0 && !t.champion) {
+    return { ok: false, message: 'O torneio já começou — só termina com **campeão**.' };
+  }
+  return { ok: true };
+}
+
+const DIAS_PT = { dom: 0, domingo: 0, seg: 1, segunda: 1, ter: 2, terca: 2, 'terça': 2, qua: 3, quarta: 3, qui: 4, quinta: 4, sex: 5, sexta: 5, sab: 6, sabado: 6, 'sábado': 6 };
 function parseDiasArg(raw) {
   const parts = String(raw || '').split(/[,\s/]+/).map((p) => p.trim().toLowerCase()).filter(Boolean);
   const dias = [];
@@ -297,6 +562,7 @@ function getStatus(t) {
   if (!t?.active) return { active: false };
   const lastN = (t.rounds || []).length;
   const pending = lastN ? roundGames(t, lastN).filter((g) => !g.winner).map((g) => g.id) : [];
+  normalizarReservas(t);
   return {
     active: true,
     edition: t.edition,
@@ -304,6 +570,7 @@ function getStatus(t) {
     inscricoes: t.inscricoes !== false,
     inscricoesAte: t.inscricoesAte || null,
     reservas: (t.reservas || []).length,
+    reservasLista: [...(t.reservas || [])],
     origem: t.origem || null,
     rodada: lastN,
     jogosPendentes: pending,
@@ -320,6 +587,8 @@ module.exports = {
   TORNEIO_CARGO_NOME,
   TORNEIO_INFO,
   INSCRICOES_DIAS_DEFAULT,
+  AUSENCIA_AVISO_MIN,
+  AUSENCIA_SUBSTITUICAO_MIN,
   addDias,
   newTournament,
   novaEdicao,
@@ -346,5 +615,17 @@ module.exports = {
   setAgenda,
   weekdayIndex,
   dateKeySP,
-  autoTorneioAction
+  autoTorneioAction,
+  normalizarReservas,
+  peakReserva,
+  promoverReserva,
+  rebalanceGame,
+  substituirDesistente,
+  avaliarAusencia,
+  podeEncerrar,
+  nomeLetraTime,
+  atribuirNomesTimes,
+  timesVencedores,
+  timesPerdedores,
+  pairTeamsEmJogos
 };

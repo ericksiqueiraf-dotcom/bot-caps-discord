@@ -296,8 +296,10 @@ function startLclScheduler() {
 }
 
 // ─── Torneio agendado (dias/horários definidos pelo Admin) ─────────────────
-async function defaultPostTorneio(text) {
-  const id = config.textChannels?.matchOngoingChannelId;
+async function defaultPostTorneio(text, meta = null) {
+  // Preferência: canal de inscrições da categoria do torneio (Etapa 1).
+  const idTorneio = meta?.torneio?.canais?.inscricoes;
+  const id = idTorneio || config.textChannels?.matchOngoingChannelId;
   const channel = id ? await global.discordClient?.channels?.fetch(id).catch(() => null) : null;
   if (channel?.isTextBased?.()) {
     await channel.send(text).catch(() => null);
@@ -327,29 +329,40 @@ async function runTorneioTick(nowMs = Date.now(), deps = {}) {
           : '';
         meta.torneioFechadoEm = parts.key;
         await saveSystemMeta(meta);
-        await post(`🔒 **Inscrições do Torneio #${t.edition} encerradas!** ${r.kept} confirmados${reservas}\nStaff: \`!torneio sortear\`.`);
-        return meta;
+        await post(`🔒 **Inscrições do Torneio #${t.edition} encerradas!** ${r.kept} confirmados${reservas}\nStaff: \`!torneio sortear\`.`, meta);
+        return await finalizarTickTorneio(deps, meta, t, nowMs);
       }
       if (meta.torneioAvisoEm !== parts.key) {
         meta.torneioAvisoEm = parts.key;
         const faltam = Torneio.MIN_PLAYERS - (t.players || []).length;
         await saveSystemMeta(meta);
-        await post(`⏳ **Torneio #${t.edition}:** inscrições estendidas — faltam **${faltam}** para ${Torneio.MIN_PLAYERS}. Use \`!torneio entrar\`.`);
+        await post(`⏳ **Torneio #${t.edition}:** inscrições estendidas — faltam **${faltam}** para ${Torneio.MIN_PLAYERS}. Use \`!torneio entrar\`.`, meta);
       }
-      return meta;
+      return await finalizarTickTorneio(deps, meta, t, nowMs);
     }
 
     // 2) Abertura automática pela agenda (não duplica com a ativação manual).
     const decision = Torneio.autoTorneioAction(t, nowMs, { abertoEm: meta.torneioAbertoEm });
-    if (!decision) return meta;
-    if (meta.torneioAbertoEm === decision.dateKey) return meta;
+    if (!decision) return await finalizarTickTorneio(deps, meta, t, nowMs);
+    if (meta.torneioAbertoEm === decision.dateKey) return await finalizarTickTorneio(deps, meta, t, nowMs);
     const dias = Number(t.agenda?.diasInscricao) > 0 ? Number(t.agenda.diasInscricao) : Torneio.INSCRICOES_DIAS_DEFAULT;
     meta.torneio = Torneio.novaEdicao(t, { origem: 'agenda', dias, nowMs });
     meta.torneioHabilitado = true;
     meta.torneioAbertoEm = decision.dateKey;
     await saveSystemMeta(meta);
-    await post(`🏆 **Inscrições abertas — Torneio #${meta.torneio.edition}!** Use \`!torneio entrar\` (${dias} dia(s) para se inscrever).`);
-    return meta;
+    // Categoria dedicada (Etapa 1): cria/revalida os canais na abertura automática.
+    try {
+      const Canais = require('./torneioChannelsService');
+      const client = deps.getClient ? deps.getClient() : global.discordClient;
+      const guild = await resolverGuildTorneio(client, meta.torneio);
+      if (guild) {
+        await Canais.ensureCategoriaTorneio(guild, meta.torneio);
+        await Canais.atualizarInscricoes(guild, meta.torneio);
+        await saveSystemMeta(meta);
+      }
+    } catch (err) { console.error('[TORNEIO] canais agenda:', err.message); }
+    await post(`🏆 **Inscrições abertas — Torneio #${meta.torneio.edition}!** Use \`!torneio entrar\` (${dias} dia(s) para se inscrever).`, meta);
+    return await finalizarTickTorneio(deps, meta, meta.torneio, nowMs);
   });
 }
 
@@ -357,6 +370,129 @@ function startTorneioScheduler() {
   setInterval(() => {
     runTorneioTick(Date.now()).catch((err) => console.error('[TORNEIO] Erro no tick:', err.message));
   }, 60000).unref?.();
+}
+
+// ─── Etapa 1: guild/canais + ausência (5min aviso / 10min substituição) ─────
+// Descobre a guild pela categoria/canal do torneio (fallback: matchOngoing).
+async function resolverGuildTorneio(client, t) {
+  if (!client?.channels?.fetch) return null;
+  const ids = [t?.canais?.categoria, t?.canais?.inscricoes, config.textChannels?.matchOngoingChannelId].filter(Boolean);
+  for (const id of ids) {
+    const ch = await client.channels.fetch(String(id)).catch(() => null);
+    if (ch?.guild) return ch.guild;
+  }
+  return null;
+}
+
+// Stats da reserva (sem.guild): elo do classic, fallback 1500 neutro.
+async function buscarStatsJogador(id) {
+  try {
+    const { loadPlayerStats, QUEUE_MODES } = require('./dataService');
+    const { getStoredPlayerStats, getModeStats } = require('../utils/lobbyUtils');
+    const stats = await loadPlayerStats();
+    const stored = getStoredPlayerStats(stats, { discordId: id });
+    const mode = stored ? getModeStats(stored, QUEUE_MODES.CLASSIC) : null;
+    return {
+      discordId: String(id),
+      nickname: stored?.registeredNickname || stored?.nickname || String(id),
+      baseMmr: Number.isFinite(Number(mode?.baseMmr)) ? Number(mode.baseMmr) : 1500
+    };
+  } catch {
+    return { discordId: String(id), nickname: String(id), baseMmr: 1500 };
+  }
+}
+
+// Etapa final do tick: ausência nos lobbies (aviso/substituição) + limpeza de lobbies.
+// Só roda com bot conectado; em testes (sem client) é um no-op.
+async function finalizarTickTorneio(deps, meta, t, nowMs) {
+  try {
+    const client = deps.getClient ? deps.getClient() : global.discordClient;
+    if (!client?.readyAt || !t?.canais) return meta;
+    const guild = await resolverGuildTorneio(client, t);
+    if (!guild) return meta;
+    await processarAusenciaTorneio(deps, meta, t, guild, nowMs);
+  } catch (err) { console.error('[TORNEIO] ausencia/salas:', err.message); }
+  return meta;
+}
+
+async function processarAusenciaTorneio(deps, meta, t, guild, nowMs) {
+  const Canais = require('./torneioChannelsService');
+  const Torneio = require('./torneioService');
+  const { post, saveSystemMeta = require('./dataService').saveSystemMeta } = deps;
+  let mudou = false;
+  const lastN = (t.rounds || []).length;
+
+  // a) Rodada completa → apaga os lobbies da rodada.
+  if (Array.isArray(t.canais.lobbies) && t.canais.lobbies.length) {
+    const finalAberta = Boolean(t.final && !t.champion);
+    if (lastN && Torneio.roundComplete(t, lastN) && !finalAberta) {
+      await Canais.apagarLobbies(guild, t);
+      mudou = true;
+    }
+  }
+
+  // b) Ausência: presença nos lobbies × lista dos jogos (aviso T+5 / substituição T+10).
+  if (Array.isArray(t.canais.lobbies) && t.canais.lobbies.length) {
+    const presente = await Canais.lerLobbiesConectados(guild, t);
+    const aval = Torneio.avaliarAusencia(t, nowMs, presente);
+    const marcador = lastN ? t.rounds[lastN - 1]?.ausencia : (t.final && !t.champion ? t.final.ausencia : null);
+    if (marcador && aval.fase) {
+      if (aval.fase === 'aviso') {
+        marcador.avisoEm = new Date(nowMs).toISOString();
+        const linhas = aval.alvos.map(({ gameId, ids }) => `• **${gameId}**: ${ids.map((id) => `<@${id}>`).join(' ')}`).join('\n');
+        const texto = `⏰ **Aviso de ausência** — ${T.AUSENCIA_SUBSTITUICAO_MIN - T.AUSENCIA_AVISO_MIN} min para entrar no lobby:\n${linhas}`;
+        await post(texto, meta);
+        await Canais.logInscricoes(guild, t, texto);
+        mudou = true;
+      } else if (aval.fase === 'substituir') {
+        marcador.aplicadoEm = new Date(nowMs).toISOString();
+        const linhas = [];
+        for (const { gameId, ids } of aval.alvos) {
+          for (const idAusente of ids) {
+            const resId = Torneio.peakReserva(t);
+            if (!resId) {
+              linhas.push(`⚠️ **${gameId}**: <@${idAusente}> ausente — sem reservas na fila. Staff resolve via \`!torneio resultado\`.`);
+              continue;
+            }
+            const stats = await buscarStatsJogador(resId);
+            const r = Torneio.substituirDesistente(t, idAusente, stats, (g) => require('./balanceService').createBalancedTeams(g));
+            if (r.ok) {
+              linhas.push(`🔁 **${gameId}**: <@${idAusente}> ausente → <@${r.reserva}> assume e o jogo foi re-balanceado.`);
+              try { await moverReservaParaLobby(guild, t, r.reserva, gameId); } catch { /* move é best-effort */ }
+            } else {
+              linhas.push(`⚠️ **${gameId}**: <@${idAusente}> ausente — ${r.message}`);
+            }
+          }
+        }
+        if (linhas.length) {
+          const texto = `🚫 **Ausência aplicada** (${T.AUSENCIA_SUBSTITUICAO_MIN} min após o sorteio):\n${linhas.join('\n')}`;
+          await post(texto, meta);
+          await Canais.logInscricoes(guild, t, texto);
+          await Canais.atualizarBracket(guild, t);
+          await Canais.atualizarInscricoes(guild, t);
+        }
+        mudou = true;
+      } else if (aval.fase === 'limpar') {
+        marcador.aplicadoEm = new Date(nowMs).toISOString();
+        mudou = true;
+      }
+    }
+  }
+
+  if (mudou) await saveSystemMeta(meta);
+  return meta;
+}
+
+// Move a reserva recém-substituída para o lobby do jogo (se já estiver em voz).
+async function moverReservaParaLobby(guild, t, playerId, gameId) {
+  const Canais = require('./torneioChannelsService');
+  const lobby = (t.canais?.lobbies || []).find((l) => l.gameId === String(gameId).toUpperCase());
+  if (!lobby) return;
+  const ch = await guild.channels.fetch(String(lobby.canal)).catch(() => null);
+  const member = await guild.members.fetch(String(playerId)).catch(() => null);
+  if (ch && member?.voice?.channelId) {
+    await member.voice.setChannel(ch, 'Torneio — reserva assumiu a vaga').catch(() => null);
+  }
 }
 
 module.exports = {

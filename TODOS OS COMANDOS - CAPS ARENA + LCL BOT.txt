@@ -282,8 +282,17 @@
   !torneio  /  /torneio
       Painel do torneio CAPS ARENA.
       jogador: !torneio entrar | sair | lista | info | status
-      staff:   !torneio > on | off | agenda | novo | sortear | resultado | encerrar
+      staff:   !torneio > on | off | agenda | novo | sortear | resultado | desistencia | encerrar
       (com o torneio OFF, so o "entrar" fica bloqueado; info/lista/status livres)
+      Categoria dedicada: !torneioon cria "TORNEIO CAPS ARENA" (regras, inscricoes,
+      bracket, campeoes + 1 lobby de voz por jogo; os 10 sorteados sao movidos).
+      Reservas: excedente na inscricao vira fila (ex. 23 -> 20 + 3 reservas);
+      desistencia/ausente (aviso 5min, substituicao 10min) chama a reserva e
+      o jogo e re-balanceado. Times nascem com nome no sorteio (R1 TIME A,
+      R1 TIME B...) e mantem o nome ate a final; re-balance por rodada ate
+      a final (vencedores + repescagem dos 5 melhores perdedores) e a MD3
+      mantem os mesmos times. Lados: J1 sorteados, J2 inverte, J3
+      o vencedor do J1 escolhe; FEARLESS (nao repita campeao da partida anterior).
       Acesso: jogador (inscricao) + staff (gestao)
 
   !torneioon  /  /torneioon

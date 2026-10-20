@@ -1313,16 +1313,19 @@ function fmtDataBR(iso) {
 function formatTorneioGames(games) {
   const somaMmr = (team) => (team || []).reduce((s, p) => s + Number(p.baseMmr || 0), 0);
   return games.map((g) => {
+    const nomeA = g.nomeTimeA || 'Time 1';
+    const nomeB = g.nomeTimeB || 'Time 2';
     const t1 = g.teamOne.map((p) => `<@${p.discordId}>`).join(' ');
     const t2 = g.teamTwo.map((p) => `<@${p.discordId}>`).join(' ');
-    const placar = g.winner ? ` — **venceu time ${g.winner}**` : '';
+    const placar = g.winner ? ` → **${g.winner === '1' ? nomeA : nomeB} venceu**` : '';
     const diff = Math.abs(somaMmr(g.teamOne) - somaMmr(g.teamTwo));
-    return `**${g.id}**: ${t1} 🆚 ${t2}${placar} • **Δ MMR ${diff}**`;
-  }).join('\n');
+    return `**${g.id}** • ${nomeA} 🆚 ${nomeB}${placar} • Δ MMR ${diff}\n🟦 ${t1}\n🟥 ${t2}`;
+  }).join('\n\n');
 }
 
 async function handleTorneioCommand(message, args = []) {
   const T = require('../services/torneioService');
+  const TorneioCanais = require('../services/torneioChannelsService');
   const { createBalancedTeams } = require('../services/balanceService');
   const sub = String(args[0] || 'info').toLowerCase();
   const rest = args.slice(1);
@@ -1350,6 +1353,13 @@ async function handleTorneioCommand(message, args = []) {
       if (!t?.active) return await replyToMessage(message, '❌ Nenhum torneio aberto. Aguarde o anúncio da staff.');
       if (t.inscricoes === false) return await replyToMessage(message, '❌ As inscrições já foram encerradas. Aguarde o sorteio!');
       const r = T.joinTournament(t, message.author.id);
+      if (r.ok) {
+        try {
+          await TorneioCanais.ensureCategoriaTorneio(message.guild, t);
+          await TorneioCanais.logInscricoes(message.guild, t, `✅ <@${message.author.id}> se inscreveu no **Torneio #${t.edition}**! Total: ${r.count}`);
+          await TorneioCanais.atualizarInscricoes(message.guild, t);
+        } catch (err) { console.error('[TORNEIO] canais entrar:', err.message); }
+      }
       await save();
       return await replyToMessage(message, r.ok ? `✅ Inscrito no **Torneio #${t.edition}**! (${r.count} inscritos)` : `❌ ${r.message}`);
     }
@@ -1357,6 +1367,12 @@ async function handleTorneioCommand(message, args = []) {
     if (sub === 'sair') {
       if (!t?.active) return await replyToMessage(message, '❌ Nenhum torneio aberto.');
       const r = T.leaveTournament(t, message.author.id);
+      if (r.ok) {
+        try {
+          await TorneioCanais.logInscricoes(message.guild, t, `➖ <@${message.author.id}> saiu (${r.count} inscritos).`);
+          await TorneioCanais.atualizarInscricoes(message.guild, t);
+        } catch (err) { console.error('[TORNEIO] canais sair:', err.message); }
+      }
       await save();
       return await replyToMessage(message, r.ok ? `Inscrição removida. (${r.count} inscritos)` : `❌ ${r.message}`);
     }
@@ -1391,6 +1407,10 @@ async function handleTorneioCommand(message, args = []) {
       const emRodada = Boolean(t && (t.rounds || []).length > 0);
       const emFinal = Boolean(t?.final);
       if (t && t.active && !t.champion && (emRodada || emFinal)) {
+        try {
+          await TorneioCanais.ensureCategoriaTorneio(message.guild, t);
+          await TorneioCanais.atualizarInscricoes(message.guild, t);
+        } catch (err) { console.error('[TORNEIO] canais on reativar:', err.message); }
         await save();
         return await replyToMessage(message,
           `🏆 **Torneio #${t.edition} reativado.** Ele já está em andamento — conduza com \`!torneio sortear\`/\`resultado\`.`);
@@ -1401,6 +1421,10 @@ async function handleTorneioCommand(message, args = []) {
         systemMeta.torneio = T.novaEdicao(t, { origem: 'manual', dias, nowMs: now });
       }
       systemMeta.torneioAbertoEm = T.dateKeySP(now);
+      try {
+        await TorneioCanais.ensureCategoriaTorneio(message.guild, systemMeta.torneio);
+        await TorneioCanais.atualizarInscricoes(message.guild, systemMeta.torneio);
+      } catch (err) { console.error('[TORNEIO] canais on:', err.message); }
       await save();
       const ed = systemMeta.torneio.edition;
       return await replyToMessage(message,
@@ -1443,15 +1467,51 @@ async function handleTorneioCommand(message, args = []) {
       systemMeta.torneio = T.novaEdicao(t, { origem: 'manual', dias, nowMs: Date.now() });
       systemMeta.torneio.edition = edition;
       systemMeta.torneioHabilitado = true;
+      try {
+        await TorneioCanais.ensureCategoriaTorneio(message.guild, systemMeta.torneio);
+        await TorneioCanais.atualizarInscricoes(message.guild, systemMeta.torneio);
+      } catch (err) { console.error('[TORNEIO] canais novo:', err.message); }
       await save();
       return await replyToMessage(message, `🏆 **Torneio #${edition} aberto!** Inscrições até **${fmtDataBR(systemMeta.torneio.inscricoesAte)}** (${dias} dia(s)). Use \`!torneio entrar\`.`);
     }
 
     if (sub === 'encerrar') {
-      if (!t?.active) return await replyToMessage(message, '📭 Nenhum torneio ativo.');
+      const gate = T.podeEncerrar(t);
+      if (!gate.ok) return await replyToMessage(message, `❌ ${gate.message}`);
       t.active = false;
+      try {
+        await TorneioCanais.apagarLobbies(message.guild, t);
+        await TorneioCanais.logInscricoes(message.guild, t, `🚫 Torneio #${t.edition} **cancelado** pela staff.`);
+      } catch (err) { console.error('[TORNEIO] canais encerrar:', err.message); }
       await save();
       return await replyToMessage(message, `Torneio #${t.edition} encerrado.`);
+    }
+
+    if (sub === 'desistencia') {
+      if (!t?.active) return await replyToMessage(message, '❌ Nenhum torneio ativo.');
+      const alvo = String(rest[0] || '').replace(/[<@!>]/g, '');
+      if (!alvo) return await replyToMessage(message, '❌ Use: `!torneio desistencia @usuário`.');
+      if (!t.players.includes(alvo) && !(t.final && !t.champion) && (t.rounds || []).length === 0) {
+        return await replyToMessage(message, '❌ Esse jogador não está inscrito no torneio.');
+      }
+      const resId = T.peakReserva(t);
+      if (!resId) return await replyToMessage(message, '❌ Não há reservas na fila para assumir a vaga.');
+      const [resStats] = await resolveTorneioPool(message.guild, [resId]);
+      const r = T.substituirDesistente(t, alvo, resStats, (g) => createBalancedTeams(g));
+      if (!r.ok) return await replyToMessage(message, `❌ ${r.message}`);
+      await save();
+      try {
+        if (r.modo === 'jogo') {
+          await TorneioCanais.logInscricoes(message.guild, t, `🔁 <@${alvo}> desistiu — <@${r.reserva}> assume e o jogo **${r.jogo}** foi re-balanceado!`);
+          await TorneioCanais.atualizarBracket(message.guild, t);
+        } else {
+          await TorneioCanais.logInscricoes(message.guild, t, `🔁 <@${alvo}> desistiu — <@${r.reserva}> assumiu a vaga (modo: ${r.modo}).`);
+        }
+        await TorneioCanais.atualizarInscricoes(message.guild, t);
+      } catch (err) { console.error('[TORNEIO] canais desistencia:', err.message); }
+      return await replyToMessage(message, r.modo === 'jogo'
+        ? `🔁 **Desistência registrada.** <@${r.reserva}> entrou e **${r.jogo}** foi re-balanceado.`
+        : `🔁 **Desistência registrada.** <@${r.reserva}> assumiu a vaga (modo: ${r.modo}).`);
     }
 
     if (sub === 'sortear') {
@@ -1469,7 +1529,13 @@ async function handleTorneioCommand(message, args = []) {
         if (!req.ok) return await replyToMessage(message, `❌ ${req.message}`);
         const pool = await resolveTorneioPool(message.guild, t.players);
         const games = T.drawGames(pool, (g) => createBalancedTeams(g), 'R1');
-        t.rounds.push({ n: 1, games });
+        T.atribuirNomesTimes(t, games);
+        t.rounds.push({ n: 1, games, ausencia: null });
+        try {
+          await TorneioCanais.criarLobbies(message.guild, t, games);
+          await TorneioCanais.logInscricoes(message.guild, t, `🔊 **Rodada 1 nos lobbies!** Entre no lobby do seu jogo — aviso de ausência em ${T.AUSENCIA_AVISO_MIN} min.`);
+          await TorneioCanais.atualizarBracket(message.guild, t);
+        } catch (err) { console.error('[TORNEIO] canais sortear R1:', err.message); }
         await save();
         const reservas = (t.reservas || []).length
           ? `\n🍀 ${t.reservas.length} reserva(s): ${t.reservas.map((id) => `<@${id}>`).join(' ')}`
@@ -1480,9 +1546,19 @@ async function handleTorneioCommand(message, args = []) {
       if (!adv.ok) return await replyToMessage(message, `❌ ${adv.message}`);
       await save();
       if (adv.type === 'final') {
+        try {
+          await TorneioCanais.criarLobbies(message.guild, t, [{ id: 'FINAL', teamOne: t.final.teamOne, teamTwo: t.final.teamTwo, nomeTimeA: t.final.nomeTime1, nomeTimeB: t.final.nomeTime2 }]);
+          await TorneioCanais.atualizarBracket(message.guild, t);
+          await TorneioCanais.logInscricoes(message.guild, t, `🔥 **FINAL MD3 nos lobbies** (${t.final.nomeTime1} 🆚 ${t.final.nomeTime2})! 🚫 Fearless: não repita campeão da partida anterior.`);
+        } catch (err) { console.error('[TORNEIO] canais final:', err.message); }
         return await replyToMessage(message,
-          `🔥 **FINAL MD3!** Mesmos times, melhor de 3:\n${formatTorneioGames([{ id: 'FINAL', teamOne: t.final.teamOne, teamTwo: t.final.teamTwo, winner: null }])}\n\nStaff: \`!torneio resultado FINAL <1|2>\``);
+          `🔥 **FINAL MD3!** Os times vencedores se enfrentam, melhor de 3:\n${formatTorneioGames([{ id: 'FINAL', teamOne: t.final.teamOne, teamTwo: t.final.teamTwo, nomeTimeA: t.final.nomeTime1, nomeTimeB: t.final.nomeTime2, winner: null }])}\n\nStaff: \`!torneio resultado FINAL <1|2>\``);
       }
+      try {
+        await TorneioCanais.criarLobbies(message.guild, t, adv.games);
+        await TorneioCanais.atualizarBracket(message.guild, t);
+        await TorneioCanais.logInscricoes(message.guild, t, `🔊 **Rodada ${adv.round} nos lobbies!** Aviso de ausência em ${T.AUSENCIA_AVISO_MIN} min.`);
+      } catch (err) { console.error('[TORNEIO] canais sortear rodada:', err.message); }
       const rep = adv.repechage?.length ? `\n🍀 Repescagem: ${adv.repechage.map((p) => `<@${p.discordId}>`).join(' ')}` : '';
       return await replyToMessage(message, `🎲 **Rodada ${adv.round} sorteada!**${rep}\n${formatTorneioGames(adv.games)}\n\nStaff: \`!torneio resultado <jogo> <1|2>\``);
     }
@@ -1492,22 +1568,38 @@ async function handleTorneioCommand(message, args = []) {
       const [jogo, time] = rest;
       if (!jogo || !time) return await replyToMessage(message, '❌ Use: `!torneio resultado <jogo> <1|2>` ou `!torneio resultado FINAL <1|2>`.');
       if (String(jogo).toUpperCase() === 'FINAL') {
+        const prevChampionTeam = [...(t.champion?.team || [])];
         const r = T.recordFinalGame(t, time);
         if (!r.ok) return await replyToMessage(message, `❌ ${r.message}`);
-        await save();
         if (!r.champion) {
+          await save();
+          try { await TorneioCanais.atualizarBracket(message.guild, t); } catch (err) { console.error('[TORNEIO] canais final resultado:', err.message); }
           return await replyToMessage(message, `📝 Final: **${r.final.wins1}x${r.final.wins2}**. Faltam ${2 - Math.max(r.final.wins1, r.final.wins2)} vitória(s) para fechar!`);
         }
         const guild = message.guild;
+        const novoTime = [...(t.champion.team || [])];
+        const mesmoTime = prevChampionTeam.length === novoTime.length && novoTime.every((id) => prevChampionTeam.includes(id));
         let cargo = guild.roles.cache.find((r_) => r_.name === T.TORNEIO_CARGO_NOME);
         if (!cargo) cargo = await guild.roles.create({ name: T.TORNEIO_CARGO_NOME, reason: 'Cargo de campeão do torneio' }).catch(() => null);
-        if (cargo) {
+        if (cargo && !mesmoTime) {
           for (const [, m] of cargo.members) await m.roles.remove(cargo, 'Novo campeão do torneio').catch(() => null);
-          for (const id of t.champion.team) {
-            const m = await guild.members.fetch(id).catch(() => null);
-            if (m) await m.roles.add(cargo, 'Campeão do torneio').catch(() => null);
-          }
         }
+        const campeoesInfo = [];
+        for (const id of novoTime) {
+          const m = await guild.members.fetch(id).catch(() => null);
+          if (!mesmoTime && cargo && m) await m.roles.add(cargo, 'Campeão do torneio').catch(() => null);
+          campeoesInfo.push({ discordId: id, nickname: m?.displayName || id, avatarURL: m?.displayAvatarURL?.() || null });
+        }
+        systemMeta.torneioHistorico = [
+          ...(Array.isArray(systemMeta.torneioHistorico) ? systemMeta.torneioHistorico : []),
+          { edition: t.edition, encerradoEm: new Date().toISOString(), placar: t.champion.placar, campeoes: campeoesInfo }
+        ];
+        await save();
+        try {
+          await TorneioCanais.postarCampeoes(guild, t, { edition: t.edition, placar: t.champion.placar, campeoes: campeoesInfo });
+          await TorneioCanais.arquivarPosCampeao(guild, t);
+          await save();
+        } catch (err) { console.error('[TORNEIO] canais campeão:', err.message); }
         return await replyToMessage(message,
           `🏆 **CAMPEÕES DO TORNEIO #${t.edition}** (${t.champion.placar})!\n` +
           `${t.champion.team.map((id) => `<@${id}>`).join(' ')}\nParabéns!`);
@@ -1515,10 +1607,18 @@ async function handleTorneioCommand(message, args = []) {
       const r = T.recordGameResult(t, jogo, time);
       if (!r.ok) return await replyToMessage(message, `❌ ${r.message}`);
       await save();
+      try {
+        const lastN = (t.rounds || []).length;
+        if (lastN && T.roundComplete(t, lastN)) {
+          await TorneioCanais.apagarLobbies(message.guild, t);
+          await TorneioCanais.logInscricoes(message.guild, t, `🏁 Rodada ${lastN} completa — lobbies encerrados. Staff: \`!torneio sortear\` para avançar.`);
+        }
+        await TorneioCanais.atualizarBracket(message.guild, t);
+      } catch (err) { console.error('[TORNEIO] canais resultado:', err.message); }
       return await replyToMessage(message, `✅ ${r.game.id}: venceu o **time ${r.game.winner}**.`);
     }
 
-    return await replyToMessage(message, '❌ Use: `!torneio entrar | sair | lista | info | status` (staff: `!torneioon`, `!torneiooff`, `!torneioagenda`, `novo | sortear | resultado | encerrar`).');
+    return await replyToMessage(message, '❌ Use: `!torneio entrar | sair | lista | info | status` (staff: `!torneioon`, `!torneiooff`, `!torneioagenda`, `novo | sortear | resultado | desistencia | encerrar`).');
   } catch (error) {
     console.error('[ERRO] !torneio:', error);
     await replyToMessage(message, `❌ Erro no torneio: \`${error.message}\``);
@@ -1618,7 +1718,7 @@ function buildAjudaEmbed(page = 1) {
         { name: '🏆 Ranking e pós-jogo', value: '`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!palpite <1|2> <10-100>` • Aposta pontos no vencedor da sua partida\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking CLASSIC (pontos custom)\n`!placar tiers` • Só Esmeralda+\n`!placar duelo` • TOP 10 dos duelos 1v1 (vitórias em duelo)\n`!placar tt` • TWISTED TREELINE 3x3 (antigo 3x3)\n`!top10` • Top 10 (classic, tiers, duelo ou tt)\n`!topstreak` • Ranking Streak 🔥 (classic ou tt)\n`!toprankinfernal` • Quem mais pegou INFERNAL na temporada 🔥\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
         { name: '💎 Clube VIP', value: '`!clube` • Tiers, assinatura PIX e renovação -10%\n`!querolive` • Entrar/sair do ping 🔴 Ao Vivo\n`!live <link>` • Divulgar live Twitch/YouTube/Kick (Lendário 6h, VIP 12h, Apoiador 24h)' },
         { name: '🔊 Salas temporárias (dono da sala)', value: 'Entre no ➕・criar-sala para ganhar sua sala\n`!salahub` • Lista as salas ativas\n`!sala` • Mostra sua sala • `!sala <nome>` renomeia\n`!convidar @u` • Chama alguém p/ sua sala\n`!salalock` • Tranca (`!salalock abrir` destranca)\n`!salalimit <0-99>` • Limite de usuários (0 = sem limite)\n`!salaexpulsar @u` • Remove alguém da sala\n`!limparvoz` • Apaga sua sala (dentro dela)' },
-        { name: '🎁 Extras', value: '`!convite` • Seu link pessoal (traga gente e ganhe recompensas)\n`!topconvites` • Ranking de quem mais trouxe gente\n`!torneio` • Torneio mata-mata (entrar, lista, status — staff: `!torneioon`/`!torneiooff`/`!torneioagenda`)\n`!tempo` • Seu tempo em call • `!topvoz` • Ranking de call\n`!palpite <1|2> <10-100>` • Bolão da partida • `!missoes` • Missões da semana • `!duelo @u` • Duelo de PDL (`!duelo rank` • Top 10 dos duelos)\n`!social` • Instagram, Twitch, TikTok e YouTube oficiais da CAPS ARENA\n🌅 Primeira vitória do dia vale +50% PDL (automático)\n`!regras` • Regulamento completo' },
+        { name: '🎁 Extras', value: '`!convite` • Seu link pessoal (traga gente e ganhe recompensas)\n`!topconvites` • Ranking de quem mais trouxe gente\n`!torneio` • Torneio mata-mata (entrar, lista, status, fila de reservas — staff: `!torneioon`/`!torneiooff`/`!torneioagenda`)\n`!tempo` • Seu tempo em call • `!topvoz` • Ranking de call\n`!palpite <1|2> <10-100>` • Bolão da partida • `!missoes` • Missões da semana • `!duelo @u` • Duelo de PDL (`!duelo rank` • Top 10 dos duelos)\n`!social` • Instagram, Twitch, TikTok e YouTube oficiais da CAPS ARENA\n🌅 Primeira vitória do dia vale +50% PDL (automático)\n`!regras` • Regulamento completo' },
         { name: '⬅️ Página 1', value: '`!ajuda` • Cadastro, fila e voto\n`!staff` • Guia da staff (restrito)' }
       );
     } else {
