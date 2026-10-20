@@ -108,6 +108,16 @@
       (sem numero abre o painel de botoes).
       Acesso: jogador (em partida ativa)
 
+  !pause  /  (nao tem slash)
+      Pause de partida: 1 pause de ATE 5 min por time, por partida.
+      !pause [A] pede o pause do seu time (anuncia no canal de partidas);
+      !pause de novo (mesmo time) RETOMA na hora — sem precisar avisar
+      antes; aos 5 min a partida retoma sozinha. O outro time nao pode
+      retomar o pause alheio (aguarda o automatico).
+      Estado por guild/doc (currentMatch): sem conflito entre CAPS BOT e
+      CAPS BOT TESTE (discords/bancos separados).
+      Acesso: jogador (participante da partida)
+
 
 --------------------------------------------------------------------------------
   PARTIDA - CONDUZIR O JOGO

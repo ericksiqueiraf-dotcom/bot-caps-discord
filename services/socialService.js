@@ -171,8 +171,12 @@ function buildPosterEmbed(cfg = config) {
 
 // Posta o pôster nos canais configurados. Anti-duplicação por canal/slot em
 // `systemMeta.posterSlots` (sobrevive a restart e não perde canal que falhou).
+// A janela load→save roda na fila global 'evento:systemMeta' — sem ela, ticks
+// concorrentes (social/pôster/prévia/torneio) sobrescrevem o meta inteiro e o
+// slot se perde → post duplicado no minuto seguinte.
 async function runPosterTick(nowMs = Date.now(), deps = {}) {
   const {
+    withQueueOperationLock = require('./dataService').withQueueOperationLock,
     loadSystemMeta = require('./dataService').loadSystemMeta,
     saveSystemMeta = require('./dataService').saveSystemMeta,
     guilds = global.discordClient?.guilds?.cache?.values?.() || [],
@@ -189,29 +193,31 @@ async function runPosterTick(nowMs = Date.now(), deps = {}) {
   const arquivo = posterPath(cfg);
   if (!fs.existsSync(arquivo)) return { posted: 0, reason: `pôster ausente: ${alvo.arquivo}` };
 
-  const meta = (await loadSystemMeta()) || {};
-  const slots = meta.posterSlots && typeof meta.posterSlots === 'object' ? meta.posterSlots : {};
   const embed = buildPosterEmbed(cfg);
-  let posted = 0;
+  return withQueueOperationLock('evento:systemMeta', async () => {
+    const meta = (await loadSystemMeta()) || {};
+    const slots = meta.posterSlots && typeof meta.posterSlots === 'object' ? meta.posterSlots : {};
+    let posted = 0;
 
-  for (const guild of guilds) {
-    for (const canal of findPosterChannels(guild, cfg)) {
-      const chave = String(canal.id);
-      if (slots[chave] === slot) continue;
-      try {
-        await canal.send({ embeds: [embed], files: [anexoFactory(arquivo)] });
-        slots[chave] = slot;
-        posted += 1;
-      } catch { /* próximo canal */ }
+    for (const guild of guilds) {
+      for (const canal of findPosterChannels(guild, cfg)) {
+        const chave = String(canal.id);
+        if (slots[chave] === slot) continue;
+        try {
+          await canal.send({ embeds: [embed], files: [anexoFactory(arquivo)] });
+          slots[chave] = slot;
+          posted += 1;
+        } catch { /* próximo canal */ }
+      }
     }
-  }
 
-  if (posted > 0) {
-    meta.posterSlots = slots;
-    meta.posterUltimoSlot = slot;
-    await saveSystemMeta(meta);
-  }
-  return { posted, slot };
+    if (posted > 0) {
+      meta.posterSlots = slots;
+      meta.posterUltimoSlot = slot;
+      await saveSystemMeta(meta);
+    }
+    return { posted, slot };
+  });
 }
 
 // ─── Prévia agendada do torneio (`config.social.torneioPreview`) ────────────
@@ -241,6 +247,7 @@ function torneioPreviewSlot(nowMs = Date.now(), cfg = config) {
 
 async function runTorneioPreviewTick(nowMs = Date.now(), deps = {}) {
   const {
+    withQueueOperationLock = require('./dataService').withQueueOperationLock,
     loadSystemMeta = require('./dataService').loadSystemMeta,
     saveSystemMeta = require('./dataService').saveSystemMeta,
     guilds = global.discordClient?.guilds?.cache?.values?.() || [],
@@ -260,36 +267,40 @@ async function runTorneioPreviewTick(nowMs = Date.now(), deps = {}) {
   const arquivo = bannerPreviewPath(cfg);
   if (!fs.existsSync(arquivo)) return { posted: 0, reason: `banner ausente: ${alvo.banner}` };
 
-  const meta = (await loadSystemMeta()) || {};
-  const slots = meta.torneioPreviewSlots && typeof meta.torneioPreviewSlots === 'object' ? meta.torneioPreviewSlots : {};
-  // Edição real quando existe torneio no estado; senão demo com a última edição conhecida.
-  const torneio = meta.torneio?.edition ? { ...meta.torneio } : T.newTournament(1);
-  const embeds = [C.buildRegrasEmbed(torneio, true), C.buildIntroducaoBracketEmbed()];
-  const content = `🏆 **Prévia do Torneio CAPS ARENA (Edição #${torneio.edition})** — regulamento em \`!torneio info\` • inscrição: \`!torneio entrar\``;
-  let posted = 0;
+  // Janela meta na fila global (mesmo lock do torneio/sexta/lcl/social).
+  return withQueueOperationLock('evento:systemMeta', async () => {
+    const meta = (await loadSystemMeta()) || {};
+    const slots = meta.torneioPreviewSlots && typeof meta.torneioPreviewSlots === 'object' ? meta.torneioPreviewSlots : {};
+    // Edição real quando existe torneio no estado; senão demo com a última edição conhecida.
+    const torneio = meta.torneio?.edition ? { ...meta.torneio } : T.newTournament(1);
+    const embeds = [C.buildRegrasEmbed(torneio, true), C.buildIntroducaoBracketEmbed()];
+    const content = `🏆 **Prévia do Torneio CAPS ARENA (Edição #${torneio.edition})** — regulamento em \`!torneio info\` • inscrição: \`!torneio entrar\``;
+    let posted = 0;
 
-  for (const guild of guilds) {
-    for (const canal of findCanaisPorNomes(guild, alvo.canais)) {
-      const chave = String(canal.id);
-      if (slots[chave] === slot) continue;
-      try {
-        await canal.send({ content, embeds, files: [anexoFactory(arquivo)] });
-        slots[chave] = slot;
-        posted += 1;
-      } catch { /* próximo canal */ }
+    for (const guild of guilds) {
+      for (const canal of findCanaisPorNomes(guild, alvo.canais)) {
+        const chave = String(canal.id);
+        if (slots[chave] === slot) continue;
+        try {
+          await canal.send({ content, embeds, files: [anexoFactory(arquivo)] });
+          slots[chave] = slot;
+          posted += 1;
+        } catch { /* próximo canal */ }
+      }
     }
-  }
 
-  if (posted > 0) {
-    meta.torneioPreviewSlots = slots;
-    meta.torneioPreviewUltimoSlot = slot;
-    await saveSystemMeta(meta);
-  }
-  return { posted, slot };
+    if (posted > 0) {
+      meta.torneioPreviewSlots = slots;
+      meta.torneioPreviewUltimoSlot = slot;
+      await saveSystemMeta(meta);
+    }
+    return { posted, slot };
+  });
 }
 
 async function runSocialTick(nowMs = Date.now(), deps = {}) {
   const {
+    withQueueOperationLock = require('./dataService').withQueueOperationLock,
     loadSystemMeta = require('./dataService').loadSystemMeta,
     saveSystemMeta = require('./dataService').saveSystemMeta,
     guilds = global.discordClient?.guilds?.cache?.values?.() || [],
@@ -299,31 +310,37 @@ async function runSocialTick(nowMs = Date.now(), deps = {}) {
   const slot = socialSlot(nowMs, cfg);
   if (!slot) return { posted: 0, reason: 'fora de horário' };
 
-  const meta = (await loadSystemMeta()) || {};
-  if (meta.socialUltimoSlot === slot) return { posted: 0, reason: 'já postado nesse horário' };
+  // Janela meta na fila global (mesmo lock do torneio/sexta/lcl/pôster/prévia).
+  return withQueueOperationLock('evento:systemMeta', async () => {
+    const meta = (await loadSystemMeta()) || {};
+    if (meta.socialUltimoSlot === slot) return { posted: 0, reason: 'já postado nesse horário' };
 
-  const embed = buildSocialEmbed(cfg);
-  let posted = 0;
-  for (const guild of guilds) {
-    try {
-      const canal = findSocialChannel(guild, cfg);
-      if (!canal) continue;
-      await canal.send({ embeds: [embed] });
-      posted += 1;
-    } catch { /* próxima guild */ }
-  }
-  if (posted > 0) {
-    meta.socialUltimoSlot = slot;
-    await saveSystemMeta(meta);
-  }
-  return { posted, slot };
+    const embed = buildSocialEmbed(cfg);
+    let posted = 0;
+    for (const guild of guilds) {
+      try {
+        const canal = findSocialChannel(guild, cfg);
+        if (!canal) continue;
+        await canal.send({ embeds: [embed] });
+        posted += 1;
+      } catch { /* próxima guild */ }
+    }
+    if (posted > 0) {
+      meta.socialUltimoSlot = slot;
+      await saveSystemMeta(meta);
+    }
+    return { posted, slot };
+  });
 }
 
+// Ticks sequenciais: mesmo com a fila global, evita disparar os 3 ao mesmo tempo.
 function startSocialScheduler() {
   setInterval(() => {
-    runSocialTick(Date.now()).catch((err) => console.error('[SOCIAL] Erro na divulgação automática:', err.message));
-    runPosterTick(Date.now()).catch((err) => console.error('[SOCIAL] Erro no pôster agendado:', err.message));
-    runTorneioPreviewTick(Date.now()).catch((err) => console.error('[SOCIAL] Erro na prévia do torneio:', err.message));
+    (async () => {
+      await runSocialTick(Date.now()).catch((err) => console.error('[SOCIAL] Erro na divulgação automática:', err.message));
+      await runPosterTick(Date.now()).catch((err) => console.error('[SOCIAL] Erro no pôster agendado:', err.message));
+      await runTorneioPreviewTick(Date.now()).catch((err) => console.error('[SOCIAL] Erro na prévia do torneio:', err.message));
+    })();
   }, 60000).unref?.();
 }
 

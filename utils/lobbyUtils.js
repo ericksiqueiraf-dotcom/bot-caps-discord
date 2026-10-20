@@ -2606,24 +2606,27 @@ async function postMatchHistoryLog(guild, payload) {
 async function runClubePromoTick(now = new Date()) {
   const parts = getSaoPauloDateParts(now);
   if (!CLUBE_PROMO_HOURS.includes(parts.hour) || parts.minute !== 0) return { posted: 0, reason: 'fora de horário' };
-  const { loadSystemMeta, saveSystemMeta } = require('../services/dataService');
-  const systemMeta = await loadSystemMeta();
-  const lastTs = systemMeta?.clubePromoLastAt || null;
-  if (!shouldPostClubePromo(lastTs, now.getTime())) return { posted: 0, reason: 'intervalo mínimo' };
-  let posted = 0;
-  for (const guild of global.discordClient?.guilds?.cache?.values?.() || []) {
-    try {
-      const channel = findPromoChannel(guild);
-      if (!channel) continue;
-      await channel.send({ embeds: [buildClubePromoEmbed(config)] });
-      posted += 1;
-    } catch { /* próxima guild */ }
-  }
-  if (posted > 0) {
-    systemMeta.clubePromoLastAt = now.toISOString();
-    await saveSystemMeta(systemMeta);
-  }
-  return { posted };
+  const { loadSystemMeta, saveSystemMeta, withQueueOperationLock } = require('../services/dataService');
+  // Janela meta na fila global (mesmo lock dos demais ticks agendados).
+  return withQueueOperationLock('evento:systemMeta', async () => {
+    const systemMeta = await loadSystemMeta();
+    const lastTs = systemMeta?.clubePromoLastAt || null;
+    if (!shouldPostClubePromo(lastTs, now.getTime())) return { posted: 0, reason: 'intervalo mínimo' };
+    let posted = 0;
+    for (const guild of global.discordClient?.guilds?.cache?.values?.() || []) {
+      try {
+        const channel = findPromoChannel(guild);
+        if (!channel) continue;
+        await channel.send({ embeds: [buildClubePromoEmbed(config)] });
+        posted += 1;
+      } catch { /* próxima guild */ }
+    }
+    if (posted > 0) {
+      systemMeta.clubePromoLastAt = now.toISOString();
+      await saveSystemMeta(systemMeta);
+    }
+    return { posted };
+  });
 }
 
 function startClubePromoScheduler() {

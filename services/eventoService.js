@@ -109,7 +109,7 @@ async function runSextaTick(nowMs = Date.now(), deps = {}) {
     postOpen = defaultPostOpen,
     postClose = defaultPostClose
   } = deps;
-  return withQueueOperationLock('evento:sexta', async () => {
+  return withQueueOperationLock('evento:systemMeta', async () => {
   const { minutes, key } = getSPParts(nowMs);
   const friday = isFridaySP(nowMs);
   const meta = await loadSystemMeta();
@@ -264,7 +264,7 @@ async function runLclTick(nowMs = Date.now(), deps = {}) {
     postClose = defaultPostLclClose,
     setLclBot = defaultSetLclBot
   } = deps;
-  return withQueueOperationLock('evento:lcl', async () => {
+  return withQueueOperationLock('evento:systemMeta', async () => {
   const { startMs, endMs } = lclWeekendRange(nowMs);
   const fridayKey = spDateKey(startMs);
   const inWindow = isLclWeekendWindow(nowMs);
@@ -313,7 +313,7 @@ async function runTorneioTick(nowMs = Date.now(), deps = {}) {
     withQueueOperationLock = require('./dataService').withQueueOperationLock,
     post = defaultPostTorneio
   } = deps;
-  return withQueueOperationLock('evento:torneio', async () => {
+  return withQueueOperationLock('evento:systemMeta', async () => {
     const meta = await loadSystemMeta();
     const t = meta.torneio;
     if (!t) return meta;
