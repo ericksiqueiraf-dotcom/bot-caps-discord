@@ -386,3 +386,91 @@ describe('pôster agendado: tick automático', () => {
     assert.equal(r.posted, 4);
   });
 });
+
+// ------------------------------------------------- prévia agendada do torneio
+const CFG_PREVIEW = {
+  social: {
+    ...CFG.social,
+    torneioPreview: {
+      ativo: true,
+      canais: ['🤖・comandos'],
+      horas: [10, 16, 21],
+      banner: 'assets/torneio-banner.png'
+    }
+  }
+};
+
+function makeDepsPreview(guilds = [], meta = {}, cfg = CFG_PREVIEW) {
+  const salvos = [];
+  return {
+    meta,
+    salvos,
+    deps: {
+      loadSystemMeta: async () => meta,
+      saveSystemMeta: async (m) => { salvos.push({ ...m }); },
+      guilds,
+      cfg,
+      anexoFactory: (arquivo) => ({ attachment: arquivo, name: S.PREVIEW_ANEXO_NOME })
+    }
+  };
+}
+
+describe('prévia agendada do torneio: config e conteúdo', () => {
+  it('defaults: comandos + banner novo nos horários da divulgação', () => {
+    const p = S.getTorneioPreviewCfg({});
+    assert.equal(p.ativo, true);
+    assert.deepEqual(p.canais, ['🤖・comandos']);
+    assert.equal(p.banner, 'assets/torneio-banner.png');
+    assert.deepEqual(p.horas, [10, 16, 21]);
+  });
+
+  it('torneioPreviewSlot segue o mesmo formato do pôster', () => {
+    assert.equal(S.torneioPreviewSlot(sp(16, 5), CFG_PREVIEW), '2026-10-17#16');
+    assert.equal(S.torneioPreviewSlot(sp(15), CFG_PREVIEW), null);
+  });
+});
+
+describe('prévia agendada do torneio: tick', () => {
+  it('posta regras + bracket + banner no canal e grava slot por canal', async () => {
+    const comandos = makeCanal('🤖・comandos', 'x');
+    const { deps, meta, salvos } = makeDepsPreview([makeGuild([comandos])]);
+    const r = await S.runTorneioPreviewTick(sp(10), deps);
+    assert.equal(r.posted, 1);
+    assert.equal(comandos.sent.length, 1);
+    const msg = comandos.sent[0];
+    assert.equal(msg.embeds.length, 2, 'regras + bracket');
+    assert.match(msg.embeds[0].data.title, /TORNEIO CAPS ARENA/);
+    assert.equal(msg.embeds[0].data.image.url, `attachment://${S.PREVIEW_ANEXO_NOME}`);
+    assert.match(msg.embeds[1].data.title, /COMO FUNCIONA O BRACKET/);
+    assert.match(msg.embeds[1].data.description.toLowerCase(), /w\.o\./, 'cadeia v2 no texto do bracket');
+    assert.equal(msg.files.length, 1);
+    assert.deepEqual(meta.torneioPreviewSlots, { x: '2026-10-17#10' });
+    assert.equal(meta.torneioPreviewUltimoSlot, '2026-10-17#10');
+    assert.equal(salvos.length, 1);
+  });
+
+  it('não duplica no mesmo slot; posta no horário seguinte', async () => {
+    const comandos = makeCanal('🤖・comandos', 'x');
+    const { deps } = makeDepsPreview([makeGuild([comandos])]);
+    await S.runTorneioPreviewTick(sp(10), deps);
+    const d2 = await S.runTorneioPreviewTick(sp(10, 30), deps);
+    assert.equal(d2.posted, 0);
+    assert.equal(comandos.sent.length, 1);
+    const r3 = await S.runTorneioPreviewTick(sp(16), deps);
+    assert.equal(r3.posted, 1);
+    assert.equal(comandos.sent.length, 2);
+  });
+
+  it('fora de horário / ativo=false / banner ausente: nada posta nem grava', async () => {
+    const comandos = makeCanal('🤖・comandos', 'x');
+    const fora = makeDepsPreview([makeGuild([comandos])]);
+    assert.match((await S.runTorneioPreviewTick(sp(15), fora.deps)).reason, /fora de horário/);
+    const desat = makeDepsPreview([makeGuild([comandos])], {}, { social: { ...CFG_PREVIEW.social, torneioPreview: { ...CFG_PREVIEW.social.torneioPreview, ativo: false } } });
+    assert.match((await S.runTorneioPreviewTick(sp(10), desat.deps)).reason, /desativada/);
+    const semBanner = makeDepsPreview([makeGuild([comandos])], {}, { social: { ...CFG_PREVIEW.social, torneioPreview: { ...CFG_PREVIEW.social.torneioPreview, banner: 'x/nao-existe.png' } } });
+    const r = await S.runTorneioPreviewTick(sp(10), semBanner.deps);
+    assert.match(r.reason, /ausente/);
+    assert.equal(comandos.sent.length, 0);
+    assert.equal(semBanner.meta.torneioPreviewSlots, undefined);
+  });
+});

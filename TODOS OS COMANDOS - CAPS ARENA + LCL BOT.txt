@@ -386,6 +386,12 @@
   !social  /  /social
       Mostra os canais e as redes sociais oficiais da CAPS ARENA.
       Alias: !redes (o alias !redes funciona; a versao slash /redes nao existe)
+      Automacao social 3x/dia (10h/16h/21h SP, config social.):
+        - poster: poster do torneio IMAGENS/TORNEIO CAPS ARENA.png p/
+          comunicados + geral (social.poster).
+        - torneioPreview: PREVIA do torneio (embed regras + embed bracket +
+          banner assets/torneio-banner.png) p/ 🤖・comandos (social.torneioPreview;
+          canais/horas configuráveis; anti-duplicação por canal e slot).
       Acesso: publico
 
 

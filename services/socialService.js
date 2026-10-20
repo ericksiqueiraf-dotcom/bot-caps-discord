@@ -19,6 +19,11 @@ const POSTER_CANAIS_DEFAULT = ['📢┃comunicados', '💬・geral-leagueoflegen
 const POSTER_ARQUIVO_DEFAULT = 'IMAGENS/TORNEIO CAPS ARENA.png';
 const POSTER_ANEXO_NOME = 'torneio-caps-arena.png';
 
+// Prévia agendada do torneio (embeds de regras/bracket + banner novo) — `social.torneioPreview`.
+const PREVIEW_CANAIS_DEFAULT = ['🤖・comandos'];
+const PREVIEW_BANNER_DEFAULT = 'assets/torneio-banner.png';
+const PREVIEW_ANEXO_NOME = 'torneio-banner.png';
+
 const REDES = [
   { key: 'instagram', emoji: '📸', nome: 'Instagram' },
   { key: 'twitch', emoji: '🟣', nome: 'Twitch' },
@@ -209,6 +214,80 @@ async function runPosterTick(nowMs = Date.now(), deps = {}) {
   return { posted, slot };
 }
 
+// ─── Prévia agendada do torneio (`config.social.torneioPreview`) ────────────
+// 3x/dia (mesmos horários do pôster) nos canais configurados: regras + bracket
+// + banner anexado. Anti-duplicação por canal/slot em `systemMeta.torneioPreviewSlots`.
+function getTorneioPreviewCfg(cfg = config) {
+  const p = cfg?.social?.torneioPreview || {};
+  return {
+    ativo: p.ativo !== false,
+    canais: Array.isArray(p.canais) && p.canais.length ? p.canais.map(String) : [...PREVIEW_CANAIS_DEFAULT],
+    horas: Array.isArray(p.horas) && p.horas.length ? getHoras({ social: { horas: p.horas } }) : getHoras(cfg),
+    banner: String(p.banner || PREVIEW_BANNER_DEFAULT)
+  };
+}
+
+function bannerPreviewPath(cfg = config) {
+  const bruto = getTorneioPreviewCfg(cfg).banner;
+  return path.isAbsolute(bruto) ? bruto : path.join(__dirname, '..', bruto);
+}
+
+function torneioPreviewSlot(nowMs = Date.now(), cfg = config) {
+  const partes = getSPParts(nowMs);
+  const hora = Math.floor(partes.minutes / 60);
+  if (!getTorneioPreviewCfg(cfg).horas.includes(hora)) return null;
+  return `${partes.key}#${hora}`;
+}
+
+async function runTorneioPreviewTick(nowMs = Date.now(), deps = {}) {
+  const {
+    loadSystemMeta = require('./dataService').loadSystemMeta,
+    saveSystemMeta = require('./dataService').saveSystemMeta,
+    guilds = global.discordClient?.guilds?.cache?.values?.() || [],
+    cfg = config,
+    anexoFactory = (arquivo) => new AttachmentBuilder(arquivo, { name: PREVIEW_ANEXO_NOME })
+  } = deps;
+  // Require dentro (torneioChannels→torneioService carregam jogo; evita ordem pesada no boot).
+  const C = require('./torneioChannelsService');
+  const T = require('./torneioService');
+
+  const alvo = getTorneioPreviewCfg(cfg);
+  if (!alvo.ativo) return { posted: 0, reason: 'prévia desativada' };
+
+  const slot = torneioPreviewSlot(nowMs, cfg);
+  if (!slot) return { posted: 0, reason: 'fora de horário' };
+
+  const arquivo = bannerPreviewPath(cfg);
+  if (!fs.existsSync(arquivo)) return { posted: 0, reason: `banner ausente: ${alvo.banner}` };
+
+  const meta = (await loadSystemMeta()) || {};
+  const slots = meta.torneioPreviewSlots && typeof meta.torneioPreviewSlots === 'object' ? meta.torneioPreviewSlots : {};
+  // Edição real quando existe torneio no estado; senão demo com a última edição conhecida.
+  const torneio = meta.torneio?.edition ? { ...meta.torneio } : T.newTournament(1);
+  const embeds = [C.buildRegrasEmbed(torneio, true), C.buildIntroducaoBracketEmbed()];
+  const content = `🏆 **Prévia do Torneio CAPS ARENA (Edição #${torneio.edition})** — regulamento em \`!torneio info\` • inscrição: \`!torneio entrar\``;
+  let posted = 0;
+
+  for (const guild of guilds) {
+    for (const canal of findCanaisPorNomes(guild, alvo.canais)) {
+      const chave = String(canal.id);
+      if (slots[chave] === slot) continue;
+      try {
+        await canal.send({ content, embeds, files: [anexoFactory(arquivo)] });
+        slots[chave] = slot;
+        posted += 1;
+      } catch { /* próximo canal */ }
+    }
+  }
+
+  if (posted > 0) {
+    meta.torneioPreviewSlots = slots;
+    meta.torneioPreviewUltimoSlot = slot;
+    await saveSystemMeta(meta);
+  }
+  return { posted, slot };
+}
+
 async function runSocialTick(nowMs = Date.now(), deps = {}) {
   const {
     loadSystemMeta = require('./dataService').loadSystemMeta,
@@ -244,6 +323,7 @@ function startSocialScheduler() {
   setInterval(() => {
     runSocialTick(Date.now()).catch((err) => console.error('[SOCIAL] Erro na divulgação automática:', err.message));
     runPosterTick(Date.now()).catch((err) => console.error('[SOCIAL] Erro no pôster agendado:', err.message));
+    runTorneioPreviewTick(Date.now()).catch((err) => console.error('[SOCIAL] Erro na prévia do torneio:', err.message));
   }, 60000).unref?.();
 }
 
@@ -268,5 +348,11 @@ module.exports = {
   buildPosterEmbed,
   runSocialTick,
   runPosterTick,
+  runTorneioPreviewTick,
+  getTorneioPreviewCfg,
+  torneioPreviewSlot,
+  PREVIEW_CANAIS_DEFAULT,
+  PREVIEW_BANNER_DEFAULT,
+  PREVIEW_ANEXO_NOME,
   startSocialScheduler
 };

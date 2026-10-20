@@ -113,6 +113,18 @@
         16,
         21
       ]
+    },
+    "torneioPreview": {
+      "ativo": true,
+      "horas": [
+        10,
+        16,
+        21
+      ],
+      "canais": [
+        "🤖・comandos"
+      ],
+      "banner": "assets/torneio-banner.png"
     }
   }
 }
