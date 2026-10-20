@@ -8,8 +8,13 @@
 //   • texto só-leitura (- SendMessages para @everyone; staff e bot em allow);
 //   • lobby por jogo da rodada, limite 10, só os 10 sorteados conectam;
 //   • ausência: aviso T+5min, substituição T+10min (lógica pura no torneioService).
-const { ChannelType, EmbedBuilder } = require('discord.js');
+const { ChannelType, EmbedBuilder, AttachmentBuilder } = require('discord.js');
+const path = require('path');
+const fs = require('fs');
 const T = require('./torneioService');
+
+const BANNER_PATH = path.join(__dirname, '..', 'assets', 'torneio-banner.png');
+const BANNER_ANEXO = 'torneio-banner.png';
 
 const MIN = 60 * 1000;
 const AUSENCIA_AVISO_MS = T.AUSENCIA_AVISO_MIN * MIN;
@@ -87,7 +92,10 @@ async function ensureCategoriaTorneio(guild, t) {
   try {
     if (criados.includes('regras') && t.canais.regras) {
       const canal = await guild.channels.fetch(t.canais.regras);
-      if (canal) await canal.send({ embeds: [buildRegrasEmbed(t)] });
+      if (canal) {
+        const anexos = fs.existsSync(BANNER_PATH) ? [new AttachmentBuilder(BANNER_PATH, { name: BANNER_ANEXO })] : [];
+        await canal.send({ embeds: [buildRegrasEmbed(t, anexos.length > 0)], files: anexos });
+      }
     }
     if (criados.includes('bracket') && t.canais.bracket) {
       const canal = await guild.channels.fetch(t.canais.bracket);
@@ -113,12 +121,14 @@ async function arquivarPosCampeao(guild, t) {
 }
 
 // ─── Embeds ────────────────────────────────────────────────────────────────
-function buildRegrasEmbed(t) {
-  return new EmbedBuilder()
+function buildRegrasEmbed(t, withBanner = false) {
+  const embed = new EmbedBuilder()
     .setColor('#FFD700')
     .setTitle(`🏆 TORNEIO CAPS ARENA — Edição #${t?.edition ?? '?'}`)
     .setDescription(T.TORNEIO_INFO)
     .setFooter({ text: 'Caps Bot • dúvidas com a staff' });
+  if (withBanner) embed.setImage(`attachment://${BANNER_ANEXO}`);
+  return embed;
 }
 
 function buildIntroducaoBracketEmbed() {
@@ -126,12 +136,13 @@ function buildIntroducaoBracketEmbed() {
     .setColor('#FFD700')
     .setTitle('📊 COMO FUNCIONA O BRACKET')
     .setDescription(
-      'O **bracket** é a chave do mata-mata: cada rodada mostra os jogos (times 5x5, Δ MMR) e o resultado (✅ time vencedor).\n\n' +
-      '• Sorteou? O bot move os 10 de cada jogo para o lobby da rodada\n' +
-      '• Falta aos **5 min** → aviso; aos **10 min** → desistência automática e reserva assume (jogo re-balanceado)\n' +
-      '• Todos os jogos da rodada têm resultado → o bot avança os vencedores\n' +
-      '• Se os vencedores não fecham 10, os melhores perdedores entram em **repescagem**\n' +
-      '• **FINAL MD3**: mesmos times • J1 azul sorteado • J2 lados invertidos • J3 quem venceu o J1 escolhe\n' +
+      'O **bracket** é a chave do mata-mata: cada rodada mostra os jogos com os **nomes dos times** (`R1 TIME A` 🆚 `R1 TIME B`) e o resultado.\n\n' +
+      '• **Sorteou?** O bot move os 10 de cada jogo para o lobby da rodada — limite 10, só os sorteados conectam\n' +
+      '• **Ausência no lobby**: **5 min** = aviso → **10 min** = `reserva` (ou **reforço** de rodada anterior) assume e o jogo é re-balanceado → **20 min** sem alternativa = **W.O.** do lado do ausente (na final, só a staff registra)\n' +
+      '• **Rodada em aberto tem 90 min** de resultado — staff é avisada e pode `prorrogar` ⏳ ou `adiar⏸/retomar▶️` (pausa sem punir)\n' +
+      '• **Times nascem com nome no sorteio** e o nome mantém até a final — só o jogador muda (reserva/reforço)\n' +
+      '• Vencedores avançam; se não fecham 10, os **5 melhores perdedores** entram na **repescagem** (re-balance na próxima rodada)\n' +
+      '• **FINAL MD3**: mesmos times congelados • J1 azul sorteado • J2 lados invertidos • J3 quem venceu o J1 escolhe\n' +
       '• 🚫 **FEARLESS**: na final, proibido pickar campeão usado na partida anterior da série'
     );
 }
@@ -378,6 +389,8 @@ module.exports = {
   CATEGORIA_NOME,
   AUSENCIA_AVISO_MS,
   AUSENCIA_SUBSTITUICAO_MS,
+  buildRegrasEmbed,
+  buildIntroducaoBracketEmbed,
   ensureCategoriaTorneio,
   arquivarPosCampeao,
   buildRegrasEmbed,

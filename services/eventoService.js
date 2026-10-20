@@ -406,11 +406,30 @@ async function buscarStatsJogador(id) {
 // Só roda com bot conectado; em testes (sem client) é um no-op.
 async function finalizarTickTorneio(deps, meta, t, nowMs) {
   try {
+    if (t?.adiado?.em) return meta; // ⏸ adiado: ausência/timeout/substituições pausados
     const client = deps.getClient ? deps.getClient() : global.discordClient;
     if (!client?.readyAt || !t?.canais) return meta;
     const guild = await resolverGuildTorneio(client, t);
     if (!guild) return meta;
     await processarAusenciaTorneio(deps, meta, t, guild, nowMs);
+    // c) Timeout de rodada/final: aviso único quando cruza RODADA_TIMEOUT_MIN
+    // (staff registra `!torneio resultado` ou renova com `!torneio prorrogar`).
+    try {
+      const Canais = require('./torneioChannelsService');
+      const Torneio = require('./torneioService');
+      const postFn = deps.post || defaultPostTorneio;
+      const lastN = (t.rounds || []).length;
+      const marcador = (t.final && !t.champion) ? t.final : (lastN ? t.rounds[lastN - 1] : null);
+      const tor = Torneio.avaliarTimeoutRodada(t, nowMs);
+      if (tor.atrasada && marcador && !marcador.timeoutAvisadoEm) {
+        marcador.timeoutAvisadoEm = new Date(nowMs).toISOString();
+        const titulo = tor.alvo === 'FINAL' ? 'na **FINAL**' : `na **rodada ${tor.alvo}**`;
+        const texto = `⌛ **Timeout de ${Torneio.RODADA_TIMEOUT_MIN} min** ${titulo} (${tor.minutos} min em aberto). Staff: \`!torneio resultado\` ou \`!torneio prorrogar\`.`;
+        await Canais.logInscricoes(guild, t, texto);
+        await postFn(texto, meta);
+        await saveSystemMeta(meta);
+      }
+    } catch (err) { console.error('[TORNEIO] timeout rodada:', err.message); }
   } catch (err) { console.error('[TORNEIO] ausencia/salas:', err.message); }
   return meta;
 }
@@ -431,7 +450,7 @@ async function processarAusenciaTorneio(deps, meta, t, guild, nowMs) {
     }
   }
 
-  // b) Ausência: presença nos lobbies × lista dos jogos (aviso T+5 / substituição T+10).
+  // b) Ausência: presença nos lobbies × lista dos jogos (T+5 / T+10 / T+20).
   if (Array.isArray(t.canais.lobbies) && t.canais.lobbies.length) {
     const presente = await Canais.lerLobbiesConectados(guild, t);
     const aval = Torneio.avaliarAusencia(t, nowMs, presente);
@@ -440,7 +459,7 @@ async function processarAusenciaTorneio(deps, meta, t, guild, nowMs) {
       if (aval.fase === 'aviso') {
         marcador.avisoEm = new Date(nowMs).toISOString();
         const linhas = aval.alvos.map(({ gameId, ids }) => `• **${gameId}**: ${ids.map((id) => `<@${id}>`).join(' ')}`).join('\n');
-        const texto = `⏰ **Aviso de ausência** — ${T.AUSENCIA_SUBSTITUICAO_MIN - T.AUSENCIA_AVISO_MIN} min para entrar no lobby:\n${linhas}`;
+        const texto = `⏰ **Aviso de ausência** — entrada no lobby em ${T.AUSENCIA_SUBSTITUICAO_MIN - T.AUSENCIA_AVISO_MIN} min, senão a alternativa assume:\n${linhas}`;
         await post(texto, meta);
         await Canais.logInscricoes(guild, t, texto);
         mudou = true;
@@ -449,15 +468,16 @@ async function processarAusenciaTorneio(deps, meta, t, guild, nowMs) {
         const linhas = [];
         for (const { gameId, ids } of aval.alvos) {
           for (const idAusente of ids) {
-            const resId = Torneio.peakReserva(t);
-            if (!resId) {
-              linhas.push(`⚠️ **${gameId}**: <@${idAusente}> ausente — sem reservas na fila. Staff resolve via \`!torneio resultado\`.`);
+            const cand = aval.substituto;
+            if (!cand) {
+              linhas.push(`⚠️ **${gameId}**: <@${idAusente}> sem reserva/reforço disponível.`);
               continue;
             }
-            const stats = await buscarStatsJogador(resId);
+            const stats = await buscarStatsJogador(cand.id);
             const r = Torneio.substituirDesistente(t, idAusente, stats, (g) => require('./balanceService').createBalancedTeams(g));
             if (r.ok) {
-              linhas.push(`🔁 **${gameId}**: <@${idAusente}> ausente → <@${r.reserva}> assume e o jogo foi re-balanceado.`);
+              const tipo = cand.tipo === 'reforco' ? '🩹 reforço' : '🔁 reserva';
+              linhas.push(`${tipo} **${gameId}**: <@${idAusente}> ausente → <@${r.reserva}> assume e o jogo foi re-balanceado.`);
               try { await moverReservaParaLobby(guild, t, r.reserva, gameId); } catch { /* move é best-effort */ }
             } else {
               linhas.push(`⚠️ **${gameId}**: <@${idAusente}> ausente — ${r.message}`);
@@ -472,10 +492,42 @@ async function processarAusenciaTorneio(deps, meta, t, guild, nowMs) {
           await Canais.atualizarInscricoes(guild, t);
         }
         mudou = true;
+      } else if (aval.fase === 'wo') {
+        const r = Torneio.aplicarWalkover(t, aval.alvos, nowMs);
+        const linhas = [];
+        for (const { gameId, vencedor, alvos: ausentes } of r.aplicados) {
+          const ladoVencedor = Number(vencedor) === 1 ? 'time 1' : 'time 2';
+          linhas.push(`⚖️ **${gameId}**: W.O. — ${ausentes.map((id) => `<@${id}>`).join(' ')} não entraram e não havia reserva/reforço. **${ladoVencedor} vence de W.O.**`);
+        }
+        for (const a of r.ambiguos) {
+          linhas.push(`⚠️ **${a.gameId}**: ausência em ambos os lados (ou FINAL) — staff decide (\`!torneio resultado\` ou \`!torneio adiar\`).`);
+        }
+        if (linhas.length) {
+          const texto = `⚖️ **W.O. automático aplicado** (${T.AUSENCIA_WO_MIN} min sem entrada nem alternativa):\n${linhas.join('\n')}`;
+          await post(texto, meta);
+          await Canais.logInscricoes(guild, t, texto);
+          await Canais.atualizarBracket(guild, t);
+        }
+        marcador.aplicadoEm = new Date(nowMs).toISOString();
+        mudou = true;
       } else if (aval.fase === 'limpar') {
         marcador.aplicadoEm = new Date(nowMs).toISOString();
         mudou = true;
       }
+    }
+    // Aviso "W.O. pendente" (sem nenhum substituto, entre T+10 e T+20): uma vez só.
+    if (marcador && aval.wo?.length && aval.fase !== 'wo' && !marcador.woAvisadoEm) {
+      marcador.woAvisadoEm = new Date(nowMs).toISOString();
+      const linhas = aval.wo.map(({ gameId, ids, lado, final }) => {
+        const alvoTxt = final
+          ? 'staff registra na FINAL'
+          : lado ? 'o lado do ausente perde' : 'lado ambíguo — staff decide';
+        return `• **${gameId}**: ${ids.map((id) => `<@${id}>`).join(' ')} — ${alvoTxt}`;
+      }).join('\n');
+      const texto = `🚷 **Sem reserva/reforço disponível** — \`!torneio adiar\` pausa sem punir, ou **W.O. automático aos ${T.AUSENCIA_WO_MIN} min** do sorteio:\n${linhas}`;
+      await post(texto, meta);
+      await Canais.logInscricoes(guild, t, texto);
+      mudou = true;
     }
   }
 

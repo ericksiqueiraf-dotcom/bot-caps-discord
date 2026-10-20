@@ -425,6 +425,120 @@ describe('torneio CAPS ARENA', () => {
     assert.equal(T.avaliarAusencia(t, criado + 11 * 60000, presente).fase, null);
   });
 
+  it('reforco: sem reserva, pool morto de rodadas anteriores substitui (sem punir os 4)', () => {
+    const t = T.newTournament(2);
+    const players = pool(30);
+    for (const p of players) T.joinTournament(t, p.discordId);
+    const games = T.drawGames(players, balance, 'R1');
+    T.atribuirNomesTimes(t, games);
+    t.rounds.push({ n: 1, games });
+    for (const g of games) T.recordGameResult(t, g.id, '1');
+    const adv = T.advanceTournament(t, balance); // R2: 2 jogos (repescagem levou 5)
+    assert.equal(adv.type, 'round');
+    assert.equal(t.reservas.length, 0);
+    // Pool morto = 10 perdedores NÃO repescados, melhor elo primeiro.
+    const mortos = T.poolMortos(t);
+    assert.equal(mortos.length, 10);
+    const melhor = mortos[0].discordId;
+    // Candito da cadeia (sem reserva): reforço.
+    const cand = T.escolherSubstituto(t);
+    assert.equal(cand.tipo, 'reforco');
+    assert.equal(cand.id, melhor);
+    // Ausente em jogo aberto da R2 → reforço assume, re-balance mantém nome do time.
+    const gAberto = adv.games[0];
+    const alvo = gAberto.teamTwo[0].discordId;
+    const agora = Date.now();
+    t.rounds[1].ausencia = { criadoEm: new Date(agora - 10 * 60000).toISOString(), avisoEm: new Date(agora - 5 * 60000).toISOString(), aplicadoEm: null };
+    const presente = {};
+    for (const g of adv.games) presente[g.id] = [...g.teamOne, ...g.teamTwo].map((p) => p.discordId);
+    presente[gAberto.id] = presente[gAberto.id].filter((id) => id !== alvo);
+    const aval = T.avaliarAusencia(t, agora, presente);
+    assert.equal(aval.fase, 'substituir');
+    assert.equal(aval.substituto.tipo, 'reforco');
+    const r = T.substituirDesistente(t, alvo, { ...mortos[0] }, balance);
+    assert.equal(r.ok, true);
+    assert.equal(r.modo, 'jogo');
+    const g = t.rounds[1].games.find((x) => x.id === gAberto.id);
+    assert.ok([...g.teamOne, ...g.teamTwo].some((p) => p.discordId === melhor));
+    assert.ok(g.nomeTimeA && g.nomeTimeB);
+    for (const p of g.teamOne) assert.equal(p.timeNome, g.nomeTimeA);
+    for (const p of g.teamTwo) assert.equal(p.timeNome, g.nomeTimeB);
+    // Reforçado saiu do pool morto (agora é vivo).
+    assert.equal(T.poolMortos(t).some((p) => p.discordId === melhor), false);
+  });
+
+  it('wo: T+20 sem reserva nem reforco — lado do ausente perde; ambos os lados va pra staff', () => {
+    const t = T.newTournament(1);
+    const players = pool(20);
+    for (const p of players) T.joinTournament(t, p.discordId);
+    const games = T.drawGames(players, balance, 'R1');
+    T.atribuirNomesTimes(t, games);
+    t.rounds.push({ n: 1, games, ausencia: null });
+    const agora = Date.now();
+    t.rounds[0].ausencia = { criadoEm: new Date(agora - 20 * 60000).toISOString(), avisoEm: new Date(agora - 15 * 60000).toISOString(), aplicadoEm: null };
+    // J1: ausente só do time 2 → fase wo, lado '2'.
+    const game1 = games[0];
+    const presente = {};
+    presente[game1.id] = [...game1.teamOne.map((p) => p.discordId), ...game1.teamTwo.slice(1).map((p) => p.discordId)];
+    // J2: todos presentes (fechar o outro jogo p/provar que o W.O. é por jogo).
+    const game2 = games[1];
+    presente[game2.id] = [...game2.teamOne, ...game2.teamTwo].map((p) => p.discordId);
+    const aval = T.avaliarAusencia(t, agora, presente);
+    assert.equal(aval.fase, 'wo');
+    assert.equal(aval.substituto, null);
+    assert.equal(aval.alvos.length, 1);
+    assert.equal(aval.alvos[0].lado, '2');
+    const out = T.aplicarWalkover(t, aval.alvos, agora);
+    assert.equal(out.aplicados.length, 1);
+    assert.equal(out.aplicados[0].vencedor, '1');
+    assert.equal(game1.winner, '1');
+    // Ambos os lados ausentes: lado null → staff decide, jogo permanece em aberto.
+    const t2 = T.newTournament(1);
+    const players2 = pool(20);
+    for (const p of players2) T.joinTournament(t2, p.discordId);
+    const games2 = T.drawGames(players2, balance, 'R1');
+    T.atribuirNomesTimes(t2, games2);
+    t2.rounds.push({ n: 1, games: games2, ausencia: null });
+    const presente2 = {};
+    presente2[games2[0].id] = [...games2[0].teamOne.slice(0, 4), ...games2[0].teamTwo.slice(0, 4)].map((p) => p.discordId);
+    // J2 inteiramente presente (senão todo o jogo entra como ausente).
+    presente2[games2[1].id] = [...games2[1].teamOne, ...games2[1].teamTwo].map((p) => p.discordId);
+    const agora2 = Date.now();
+    t2.rounds[0].ausencia = { criadoEm: new Date(agora2 - 21 * 60000).toISOString(), avisoEm: new Date(agora2 - 16 * 60000).toISOString(), aplicadoEm: null };
+    const aval2 = T.avaliarAusencia(t2, agora2, presente2);
+    assert.equal(aval2.alvos.length, 1);
+    assert.equal(aval2.alvos[0].lado, null);
+    const out2 = T.aplicarWalkover(t2, aval2.alvos, agora2);
+    assert.equal(out2.aplicados.length, 0);
+    assert.equal(out2.ambiguos.length, 1);
+    assert.equal(games2[0].winner, null);
+  });
+
+  it('adiar/retomar: pausa avaliacao e renova janelas na volta', () => {
+    const t = T.newTournament(1);
+    const players = pool(20);
+    for (const p of players) T.joinTournament(t, p.discordId);
+    const games = T.drawGames(players, balance, 'R1');
+    t.rounds.push({ n: 1, games, ausencia: null });
+    const agora = Date.now();
+    t.rounds[0].ausencia = { criadoEm: new Date(agora - 30 * 60000).toISOString(), avisoEm: new Date(agora - 25 * 60000).toISOString(), aplicadoEm: null };
+    const presente = {};
+    for (const g of games) presente[g.id] = [...g.teamOne.slice(0, 4)].map((p) => p.discordId);
+    // Adiado: nenhum fase (nem timeout).
+    assert.equal(T.adiarTorneio(t, agora).ok, true);
+    assert.equal(T.avaliarAusencia(t, agora, presente).fase, null);
+    assert.equal(T.avaliarTimeoutRodada(t, agora).atrasada, false);
+    // Retomar: limpa, renova timeout e reinicia a janela de ausência.
+    const r = T.retomarTorneio(t, agora + 60000);
+    assert.equal(r.ok, true);
+    assert.equal(t.adiado, null);
+    assert.ok(new Date(t.rounds[0].ausencia.criadoEm).getTime() >= agora);
+    assert.ok(new Date(t.rounds[0].iniciadoEm).getTime() >= agora);
+    const novoPresente = {};
+    for (const g of games) novoPresente[g.id] = [...g.teamOne, ...g.teamTwo].map((p) => p.discordId);
+    assert.equal(T.avaliarAusencia(t, agora + 60000, novoPresente).fase, null);
+  });
+
   it('ausencia na final: usa o lobby FINAL e os times congelados', () => {
     const t = T.newTournament(1);
     t.final = {
@@ -437,7 +551,17 @@ describe('torneio CAPS ARENA', () => {
     quaseAlguem.FINAL = [...t.final.teamOne.slice(0, 4), ...t.final.teamTwo.slice(0, 4)].map((p) => p.discordId);
     const aviso = T.avaliarAusencia(t, criado + 5 * 60000, quaseAlguem);
     assert.equal(aviso.fase, 'aviso');
-    assert.deepEqual(aviso.alvos, [{ gameId: 'FINAL', ids: ['u14', 'u64'] }]);
+    assert.deepEqual(aviso.alvos, [{ gameId: 'FINAL', ids: ['u14', 'u64'], lado: null, final: true }]);
+    // FINAL nunca fecha por automação: T+20 entra em fase 'wo' SÓ para avisar a staff.
+    t.final.ausencia.avisoEm = new Date(criado + 5 * 60000).toISOString();
+    const t20 = T.avaliarAusencia(t, criado + 20 * 60000, quaseAlguem);
+    assert.equal(t20.fase, 'wo');
+    assert.equal(t20.wo.length, 1);
+    assert.equal(t20.wo[0].lado, null);
+    const out = T.aplicarWalkover(t, t20.alvos, criado + 20 * 60000);
+    assert.equal(out.aplicados.length, 0);
+    assert.equal(out.ambiguos.length, 1);
+    assert.equal(t.final.games.length, 0);
   });
 
   it('final: lado azul do J1 sorteado e ficha do J3 aponta o vencedor do J1', () => {
@@ -465,6 +589,48 @@ describe('torneio CAPS ARENA', () => {
     assert.match(recusa.message, /campe/i);
     t.champion = { team: ['a'], at: new Date().toISOString(), placar: '2x0' };
     assert.equal(T.podeEncerrar(t).ok, true);
+  });
+
+  it('timeout de rodada: avisa apos 90min, prorrogar renova, guard do off acompanha o ciclo', () => {
+    const agora = Date.now();
+    const t = T.newTournament(2);
+    // Sem inscritos: off livre (encerrar é para abortar antes do 1º sorteio).
+    assert.equal(T.podeDesativar(t).ok, true);
+    const players = pool(20);
+    for (const p of players) T.joinTournament(t, p.discordId);
+    // Com inscritos, PRÉ-sorteio: off segue livre (não apaga nada — handlers.test cobre).
+    assert.equal(T.podeDesativar(t).ok, true);
+    const games = T.drawGames(players, balance, 'R1');
+    T.atribuirNomesTimes(t, games);
+    const avisoMs = agora - (T.RODADA_TIMEOUT_MIN + 5) * 60000;
+    t.rounds.push({ n: 1, games, ausencia: null, iniciadoEm: new Date(avisoMs).toISOString() });
+    let tor = T.avaliarTimeoutRodada(t, agora);
+    assert.equal(tor.atrasada, true);
+    assert.equal(tor.alvo, 'R1');
+    assert.ok(tor.minutos >= T.RODADA_TIMEOUT_MIN);
+    assert.equal(T.podeDesativar(t).ok, false);
+    // Prorroga: janela renova e aviso fica limpo.
+    const r = T.prorrogarRodada(t, agora);
+    assert.equal(r.ok, true);
+    assert.equal(r.alvo, 'R1');
+    tor = T.avaliarTimeoutRodada(t, agora);
+    assert.equal(tor.atrasada, false);
+    // Rodada fechada: sem alvo de timeout, mas off segue bloqueado (sem campeao).
+    for (const g of games) T.recordGameResult(t, g.id, '1');
+    assert.equal(T.avaliarTimeoutRodada(t, agora).atrasada, false);
+    assert.equal(T.podeDesativar(t).ok, false);
+    // Final em aberto: alvo FINAL, minutos 0; coroacao libera o off.
+    const adv = T.advanceTournament(t, balance);
+    assert.equal(adv.type, 'final');
+    assert.ok(t.final.iniciadoEm);
+    tor = T.avaliarTimeoutRodada(t, agora);
+    assert.equal(tor.atrasada, false);
+    assert.equal(tor.alvo, 'FINAL');
+    assert.equal(T.podeDesativar(t).ok, false);
+    T.recordFinalGame(t, '1');
+    T.recordFinalGame(t, '1');
+    assert.ok(t.champion);
+    assert.equal(T.podeDesativar(t).ok, true);
   });
 });
 

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<style>
+  @font-face {}
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1200px; height: 675px; overflow: hidden; background: #0b0e17; }
+  body { font-family: 'Segoe UI', 'Arial Black', Arial, sans-serif; }
+  .banner {
+    width: 1200px; height: 675px; position: relative;
+    background:
+      radial-gradient(ellipse 900px 500px at 85% 10%, rgba(255,45,0,0.28), transparent 60%),
+      radial-gradient(ellipse 800px 450px at 10% 95%, rgba(255,191,0,0.16), transparent 60%),
+      linear-gradient(135deg, #0b0e17 0%, #131729 55%, #1a1024 100%);
+    display: flex; flex-direction: column;
+    padding: 38px 48px;
+  }
+  .banner::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+    background-size: 46px 46px;
+  }
+  .topo { display: flex; align-items: center; gap: 16px; z-index: 2; }
+  .trofeu { font-size: 58px; line-height: 1; filter: drop-shadow(0 0 18px rgba(255,191,0,0.55)); flex-shrink: 0; }
+  .titulo { font-weight: 900; font-size: 46px; letter-spacing: 2px; white-space: nowrap;
+    background: linear-gradient(90deg, #ffd75e, #ff9d2e 55%, #ff2d00);
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .sub { margin-left: auto; text-align: right; flex-shrink: 0; }
+  .sub b { display: block; font-size: 20px; color: #7de2ff; font-weight: 700; letter-spacing: 2px; white-space: nowrap; }
+  .sub span { font-size: 13.5px; color: rgba(255,255,255,0.65); letter-spacing: 1.5px; white-space: nowrap; }
+  .linha { height: 2px; margin: 20px 0 22px; z-index: 2;
+    background: linear-gradient(90deg, #ffd75e, #ff2d00 60%, transparent); border-radius: 2px; }
+  .formato { display: flex; gap: 14px; z-index: 2; align-items: stretch; }
+  .card {
+    flex: 1; background: linear-gradient(180deg, rgba(255,255,255,0.09), rgba(255,255,255,0.03));
+    border: 1px solid rgba(255,215,94,0.28); border-radius: 14px; padding: 22px 18px; min-height: 218px;
+    display: flex; flex-direction: column; gap: 9px;
+  }
+  .card.destaque { border-color: rgba(255,45,0,0.75); box-shadow: 0 0 26px rgba(255,45,0,0.22); }
+  .card .num { font-size: 14px; color: #ffd75e; font-weight: 800; letter-spacing: 3px; }
+  .card .h { font-size: 23px; font-weight: 900; color: #fff; white-space: pre-line; }
+  .card .d { font-size: 14.5px; color: rgba(255,255,255,0.78); line-height: 1.35; white-space: pre-line; }
+  .seta { align-self: center; color: #ff7a3d; font-size: 30px; font-weight: 900; }
+  .regras { display: flex; gap: 12px; margin-top: 26px; z-index: 2; }
+  .pill {
+    flex: 1; border-radius: 999px; padding: 14px 18px; font-size: 16.5px; font-weight: 700;
+    color: #fff; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.18);
+    text-align: center; white-space: nowrap;
+  }
+  .pill b { color: #ffd75e; }
+  .rodape { margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: 12px; z-index: 2; }
+  .cta { font-size: 21px; color: #fff; font-weight: 800; letter-spacing: 0.5px;
+    border: 2px solid rgba(255,215,94,0.55); border-radius: 16px; padding: 13px 34px;
+    background: linear-gradient(90deg, rgba(255,215,94,0.14), rgba(255,45,0,0.12)); }
+  .cta b { color: #ffd75e; font-family: Consolas, monospace; }
+  .marca { font-size: 15px; color: rgba(255,255,255,0.5); letter-spacing: 3px; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="banner">
+  <div class="topo">
+    <div class="trofeu">🏆</div>
+    <div class="titulo">TORNEIO CAPS ARENA</div>
+    <div class="sub">
+      <b>5v5 • ELO BALANCEADO</b>
+      <span>MATA-MATA INDIVIDUAL • INSCRIÇÃO ABERTA</span>
+    </div>
+  </div>
+  <div class="linha"></div>
+  <div class="formato">
+    <div class="card">
+      <div class="num">1 • INSCRIÇÃO</div>
+      <div class="h">Entre no<br>torneio</div>
+      <div class="d">Individual: mínimo 20 jogadores.<br>Sobras viram fila de reservas.</div>
+    </div>
+    <div class="seta">➜</div>
+    <div class="card">
+      <div class="num">2 • SORTEIO</div>
+      <div class="h">Times<br>balanceados</div>
+      <div class="d">R1 TIME A 🆚 R1 TIME B<br>lobby de voz por jogo — o<br>bot move os 10.</div>
+    </div>
+    <div class="seta">➜</div>
+    <div class="card">
+      <div class="num">3 • BATALHAS</div>
+      <div class="h">Perdeu?<br>Repescagem</div>
+      <div class="d">5 melhores perdedores<br>voltam a cada rodada,<br>re-balanceada por elo.</div>
+    </div>
+    <div class="seta">➜</div>
+    <div class="card destaque">
+      <div class="num">4 • FINAL MD3</div>
+      <div class="h">Times<br>congelados</div>
+      <div class="d">J1 azul sorteado • J2 inverte<br>• J3 vencedor do J1 escolhe<br>🚫 FEARLESS (sem repetir campeão)</div>
+    </div>
+  </div>
+  <div class="regras">
+    <div class="pill">⏱️ Ausência: <b>5'</b> aviso • <b>10'</b> reserva → <b>20'</b> W.O.</div>
+    <div class="pill">🎯 Resultado em <b>90 min</b> ou prorrogar</div>
+    <div class="pill">👑 Campeão: <b>cargo 🏆 + hall da fama</b></div>
+  </div>
+  <div class="rodape">
+    <div class="cta">🎮 INSCRIÇÕES ABERTAS — digite <b>!torneio entrar</b></div>
+    <div class="marca">CAPS BOT LOL • CAPS ARENA</div>
+  </div>
+</div>
+</body>
+</html>

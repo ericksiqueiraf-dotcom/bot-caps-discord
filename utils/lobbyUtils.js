@@ -1864,7 +1864,11 @@ const STAFF_SECTIONS = [
   },
   {
     name: '🏆 Torneio — abrir e agendar (só Staff)',
-    value: '`!torneioon [dias]` • Ativa o torneio e abre as inscrições (padrão 7 dias). Cria a categoria **🏆・TORNEIO CAPS ARENA** com `regras/inscrições/bracket/campeões`.\n`!torneiooff` • Desativa (membros não se inscrevem; `info/lista/status` seguem livres).\n`!torneioagenda sex,sab 19:00 [dias]` • Abre sozinho nos dias/hora (`!torneioagenda off` limpa).\n`!torneio sortear` • Sortea a rodada: 1 lobby por jogo, os **10 movidos** (ausência: aviso 5min, substituição 10min). Times nascem com nome (**R1 TIME A**, B, C...) — mantêm o nome até a final.\n`!torneio resultado <jogo> <1|2>` • Registra resultado (ou `FINAL <1|2>` na MD3 — lados: J1 sorteado, J2 inverte, J3 o vencedor do J1 escolhe; **Fearless**: sem repetir campeão da partida anterior). Repescagem: os 5 melhores perdedores voltam e a rodada é re-balanceada.\n`!torneio desistencia @user` • Reserva assume: jogo re-balanceado (pré-resultado) ou vaga na próxima rodada.\n`!torneio encerrar` • Só antes do 1º sorteio (em andamento só termina com campeão).'
+    value: '`!torneioon [dias]` • Ativa o torneio e abre as inscrições (padrão 7 dias). Cria a categoria **🏆・TORNEIO CAPS ARENA** (regras/inscrições/bracket/campeões).\n`!torneiooff` • Fecha inscrições (bloqueado com rodada/final em aberto).\n`!torneioagenda sex,sab 19:00 [dias]` • Abre sozinho nos dias/hora (`!torneioagenda off` limpa).\n`!torneio sortear` • Sortea a rodada: 1 lobby por jogo, os **10 movidos**. Times nascem com nome (**R1 TIME A**, B, C...) — mantêm o nome até a final.'
+  },
+  {
+    name: '🏆 Torneio — durante o ranqueio (só Staff)',
+    value: '`!torneio resultado <jogo> <1|2>` • Registra resultado (ou `FINAL <1|2>` na MD3 — J1 sorteado, J2 inverte, J3 vencedor do J1 escolhe; **Fearless**). Repescagem: 5 melhores perdedores.\n`!torneio prorrogar` • Resultado da rodada/FINAL em até **90 min** — renova a janela.\n`!torneio adiar` / `retomar` • Pausa tudo sem punir (ausência/W.O./timeout) / retoma e renova janelas.\n`!torneio desistencia @user` • Cadeia: **reserva** → **reforço** (perdedor de rodada anterior) → **W.O.** do lado dele.\nAusência no lobby: **5min** aviso • **10min** substituição • **20min** sem alternativa = **W.O.** (na FINAL, staff registra).\n`!torneio encerrar` • Só antes do 1º sorteio (em andamento só termina com campeão).'
   },
   {
     name: '📌 Fixar guias (staff)',

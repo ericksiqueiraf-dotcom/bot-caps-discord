@@ -1432,6 +1432,8 @@ async function handleTorneioCommand(message, args = []) {
     }
 
     if (sub === 'off') {
+      const guard = T.podeDesativar(t);
+      if (!guard.ok) return await replyToMessage(message, `❌ ${guard.message}`);
       systemMeta.torneioHabilitado = false;
       if (t) t.inscricoes = false;
       await save();
@@ -1487,6 +1489,37 @@ async function handleTorneioCommand(message, args = []) {
       return await replyToMessage(message, `Torneio #${t.edition} encerrado.`);
     }
 
+    if (sub === 'prorrogar') {
+      if (!t?.active) return await replyToMessage(message, '❌ Nenhum torneio ativo.');
+      const r = T.prorrogarRodada(t, Date.now());
+      if (!r.ok) return await replyToMessage(message, `❌ ${r.message}`);
+      await save();
+      const titulo = r.alvo === 'FINAL' ? '**FINAL**' : `**rodada ${r.alvo}**`;
+      return await replyToMessage(message, `⏳ ${titulo} prorrogada — nova janela de **${T.RODADA_TIMEOUT_MIN} min** para os resultados.`);
+    }
+
+    if (sub === 'adiar') {
+      if (!t?.active) return await replyToMessage(message, '❌ Nenhum torneio ativo.');
+      const r = T.adiarTorneio(t, Date.now());
+      if (!r.ok) return await replyToMessage(message, `❌ ${r.message}`);
+      await save();
+      try {
+        await TorneioCanais.logInscricoes(message.guild, t, '⏸ **Torneio adiado** pela staff — ausência/timeout/W.O. pausados até o retorno.');
+      } catch (err) { console.error('[TORNEIO] canais adiar:', err.message); }
+      return await replyToMessage(message, `⏸ **Torneio adiado.** Nada roda (ausência/W.O./timeout de ${T.RODADA_TIMEOUT_MIN} min) até \`!torneio retomar\`.`);
+    }
+
+    if (sub === 'retomar') {
+      if (!t?.active) return await replyToMessage(message, '❌ Nenhum torneio ativo.');
+      const r = T.retomarTorneio(t, Date.now());
+      if (!r.ok) return await replyToMessage(message, `❌ ${r.message}`);
+      await save();
+      try {
+        await TorneioCanais.logInscricoes(message.guild, t, `▶️ **Torneio retomado** — janelas renovadas (resultado em ${r.janela} min; ausência: aviso 5min, reserva/reforço 10min, W.O. 20min).`);
+      } catch (err) { console.error('[TORNEIO] canais retomar:', err.message); }
+      return await replyToMessage(message, `▶️ **Torneio retomado!** Janelas renovadas — resultado da rodada em **${r.janela} min**.`);
+    }
+
     if (sub === 'desistencia') {
       if (!t?.active) return await replyToMessage(message, '❌ Nenhum torneio ativo.');
       const alvo = String(rest[0] || '').replace(/[<@!>]/g, '');
@@ -1494,24 +1527,44 @@ async function handleTorneioCommand(message, args = []) {
       if (!t.players.includes(alvo) && !(t.final && !t.champion) && (t.rounds || []).length === 0) {
         return await replyToMessage(message, '❌ Esse jogador não está inscrito no torneio.');
       }
-      const resId = T.peakReserva(t);
-      if (!resId) return await replyToMessage(message, '❌ Não há reservas na fila para assumir a vaga.');
-      const [resStats] = await resolveTorneioPool(message.guild, [resId]);
-      const r = T.substituirDesistente(t, alvo, resStats, (g) => createBalancedTeams(g));
-      if (!r.ok) return await replyToMessage(message, `❌ ${r.message}`);
-      await save();
-      try {
-        if (r.modo === 'jogo') {
-          await TorneioCanais.logInscricoes(message.guild, t, `🔁 <@${alvo}> desistiu — <@${r.reserva}> assume e o jogo **${r.jogo}** foi re-balanceado!`);
-          await TorneioCanais.atualizarBracket(message.guild, t);
-        } else {
-          await TorneioCanais.logInscricoes(message.guild, t, `🔁 <@${alvo}> desistiu — <@${r.reserva}> assumiu a vaga (modo: ${r.modo}).`);
+      // Cadeia do substituto: reserva da fila → reforço (pool morto de rodadas anteriores).
+      const cand = T.escolherSubstituto(t);
+      if (cand) {
+        const [resStats] = await resolveTorneioPool(message.guild, [cand.id]);
+        const r = T.substituirDesistente(t, alvo, resStats, (g) => createBalancedTeams(g));
+        if (r.ok) {
+          await save();
+          await TorneioCanais.atualizarInscricoes(message.guild, t);
+          const rotulo = cand.tipo === 'reforco' ? '🩹 reforço' : '🔁 reserva';
+          try {
+            if (r.modo === 'jogo') {
+              await TorneioCanais.logInscricoes(message.guild, t, `${rotulo} <@${alvo}> desistiu — <@${r.reserva}> entra e o jogo **${r.jogo}** é re-balanceado!`);
+              await TorneioCanais.atualizarBracket(message.guild, t);
+            } else {
+              await TorneioCanais.logInscricoes(message.guild, t, `${rotulo} <@${alvo}> desistiu — <@${r.reserva}> assumiu a vaga (modo: ${r.modo}).`);
+            }
+          } catch (err) { console.error('[TORNEIO] canais desistencia:', err.message); }
+          return await replyToMessage(message, r.modo === 'jogo'
+            ? `${rotulo} **Desistência registrada.** <@${r.reserva}> entrou e **${r.jogo}** foi re-balanceado.`
+            : `${rotulo} **Desistência registrada.** <@${r.reserva}> assumiu a vaga (modo: ${r.modo}).`);
         }
-        await TorneioCanais.atualizarInscricoes(message.guild, t);
-      } catch (err) { console.error('[TORNEIO] canais desistencia:', err.message); }
-      return await replyToMessage(message, r.modo === 'jogo'
-        ? `🔁 **Desistência registrada.** <@${r.reserva}> entrou e **${r.jogo}** foi re-balanceado.`
-        : `🔁 **Desistência registrada.** <@${r.reserva}> assumiu a vaga (modo: ${r.modo}).`);
+      }
+      // Sem nenhum substituto: desistência é decisão humana → W.O. imediato.
+      const jogo = T.jogoAbertoDePlayer(t, alvo);
+      if (jogo) {
+        const ladoVencedor = jogo.lado === '1' ? '2' : '1';
+        T.recordGameResult(t, jogo.gameId, ladoVencedor);
+        await save();
+        try {
+          await TorneioCanais.logInscricoes(message.guild, t, `⚖️ <@${alvo}> desistiu **sem reserva/reforço** — **${jogo.gameId}** por W.O. (time ${ladoVencedor} vence).`);
+          await TorneioCanais.atualizarBracket(message.guild, t);
+        } catch (err) { console.error('[TORNEIO] canais desistencia WO:', err.message); }
+        return await replyToMessage(message, `⚖️ **W.O. aplicado.** <@${alvo}> desistiu sem substitute disponível — **${jogo.gameId}**: time ${ladoVencedor} vence.`);
+      }
+      if (t.final && !t.champion) {
+        return await replyToMessage(message, '❌ Sem reserva/reforço para a final. Registrar a concessão: `!torneio resultado FINAL <1|2>`.');
+      }
+      return await replyToMessage(message, '❌ Não há reservas nem reforços para assumir a vaga (jogador pré-sorteio ou já eliminado).');
     }
 
     if (sub === 'sortear') {
@@ -1530,7 +1583,7 @@ async function handleTorneioCommand(message, args = []) {
         const pool = await resolveTorneioPool(message.guild, t.players);
         const games = T.drawGames(pool, (g) => createBalancedTeams(g), 'R1');
         T.atribuirNomesTimes(t, games);
-        t.rounds.push({ n: 1, games, ausencia: null });
+        t.rounds.push({ n: 1, games, ausencia: null, iniciadoEm: new Date().toISOString() });
         try {
           await TorneioCanais.criarLobbies(message.guild, t, games);
           await TorneioCanais.logInscricoes(message.guild, t, `🔊 **Rodada 1 nos lobbies!** Entre no lobby do seu jogo — aviso de ausência em ${T.AUSENCIA_AVISO_MIN} min.`);
@@ -1618,7 +1671,7 @@ async function handleTorneioCommand(message, args = []) {
       return await replyToMessage(message, `✅ ${r.game.id}: venceu o **time ${r.game.winner}**.`);
     }
 
-    return await replyToMessage(message, '❌ Use: `!torneio entrar | sair | lista | info | status` (staff: `!torneioon`, `!torneiooff`, `!torneioagenda`, `novo | sortear | resultado | desistencia | encerrar`).');
+    return await replyToMessage(message, '❌ Use: `!torneio entrar | sair | lista | info | status` (staff: `!torneioon`, `!torneiooff`, `!torneioagenda`, `novo | sortear | resultado | prorrogar | adiar | retomar | desistencia | encerrar`).');
   } catch (error) {
     console.error('[ERRO] !torneio:', error);
     await replyToMessage(message, `❌ Erro no torneio: \`${error.message}\``);
