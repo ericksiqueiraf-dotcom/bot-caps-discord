@@ -899,10 +899,6 @@ async function processCommand(message, rawContent) {
       case 'votar':
         await handlers.handleVoteCommand(message, args);
         break;
-      case 'pause':
-      case 'pausa':
-        await handlers.handlePauseCommand(message, args);
-        break;
       case 'vitoria':
       case 'resultado':
         await handlers.handleVictoryCommand(message, args);

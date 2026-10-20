@@ -33,6 +33,7 @@ const TORNEIO_INFO =
   '• **Final**: 1 sorteio, mesmos times, **MD3** (melhor de 3) — 🚫 **FEARLESS**: proibido pickar campeão usado na partida anterior da série\n' +
   '• Lados na final: **J1 sorteado pelo bot** • **J2 lados invertidos** • **J3 quem venceu o J1 escolhe o lado**\n' +
   '• Rodada/final aberta precisa de resultado em **90 min** — a staff é avisada e pode `prorrogar` ou **adiar⏸/retomar▶️** (pausa sem punir)\n' +
+  '• **Pause**: cada time tem direito a **1 pause de até 5 min por jogo** — aciona pelo `/pause` dentro do jogo (personalizada); quem pausou não precisa avisar para despausar\n' +
   '• Campeões ganham o cargo 🏆; premiação extra anunciada pela staff a cada edição\n' +
   '• A staff abre/fecha o torneio com `!torneioon` / `!torneiooff`';
 

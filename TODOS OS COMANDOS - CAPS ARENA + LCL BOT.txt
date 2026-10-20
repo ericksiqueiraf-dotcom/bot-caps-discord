@@ -108,16 +108,6 @@
       (sem numero abre o painel de botoes).
       Acesso: jogador (em partida ativa)
 
-  !pause  /  (nao tem slash)
-      Pause de partida: 1 pause de ATE 5 min por time, por partida.
-      !pause [A] pede o pause do seu time (anuncia no canal de partidas);
-      !pause de novo (mesmo time) RETOMA na hora — sem precisar avisar
-      antes; aos 5 min a partida retoma sozinha. O outro time nao pode
-      retomar o pause alheio (aguarda o automatico).
-      Estado por guild/doc (currentMatch): sem conflito entre CAPS BOT e
-      CAPS BOT TESTE (discords/bancos separados).
-      Acesso: jogador (participante da partida)
-
 
 --------------------------------------------------------------------------------
   PARTIDA - CONDUZIR O JOGO
@@ -306,6 +296,9 @@
       o vencedor do J1 escolhe; FEARLESS (nao repita campeao da partida anterior).
       Prorrogar: rodada/final tem 90min de resultado (prorrogar renova).
       Adiar/retomar: pausa tudo sem punir (retomar renova as janelas).
+      Pause: cada time tem 1 pause de ate 5 min por jogo — acionado pelo
+      /pause DENTRO do jogo (personalizada); quem pausou nao precisa avisar
+      para despausar (regra publicada nos embeds de regras).
       !torneiooff nao apaga torneio sorteado: ele so termina com campeao.
       Acesso: jogador (inscricao) + staff (gestao)
 

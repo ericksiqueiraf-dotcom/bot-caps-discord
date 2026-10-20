@@ -140,6 +140,7 @@ function buildIntroducaoBracketEmbed() {
       '• **Sorteou?** O bot move os 10 de cada jogo para o lobby da rodada — limite 10, só os sorteados conectam\n' +
       '• **Ausência no lobby**: **5 min** = aviso → **10 min** = `reserva` (ou **reforço** de rodada anterior) assume e o jogo é re-balanceado → **20 min** sem alternativa = **W.O.** do lado do ausente (na final, só a staff registra)\n' +
       '• **Rodada em aberto tem 90 min** de resultado — staff é avisada e pode `prorrogar` ⏳ ou `adiar⏸/retomar▶️` (pausa sem punir)\n' +
+      '• ⏸️ **PAUSE**: cada time tem **1 pause de até 5 min por jogo** — aciona pelo `/pause` dentro do jogo (personalizada); quem pausou retoma quando quiser, sem aviso prévio\n' +
       '• **Times nascem com nome no sorteio** e o nome mantém até a final — só o jogador muda (reserva/reforço)\n' +
       '• Vencedores avançam; se não fecham 10, os **5 melhores perdedores** entram na **repescagem** (re-balance na próxima rodada)\n' +
       '• **FINAL MD3**: mesmos times congelados • J1 azul sorteado • J2 lados invertidos • J3 quem venceu o J1 escolhe\n' +

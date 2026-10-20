@@ -100,8 +100,6 @@ async function grantRegisteredPlayerRole(guild, userId) {
 
 // Armazena timeouts de auto-start pendentes: { [lobbyId]: timeoutId }
 const pendingAutoStarts = new Map();
-// Timers de retomada automática do pause: { [lobbyId]: timeoutId }
-const pauseTimers = new Map();
 let bulkEloSyncRunning = false;
 const BULK_ELO_SYNC_DELAY_MS = 2500;
 // Calcula o threshold de votos baseado no tamanho do time da partida
@@ -646,77 +644,6 @@ async function handleVoteCommand(message, args) {
     await replyToMessage(message, `❌ Erro ao votar: ${error.message}`);
   } finally {
     if (message.deletable) await message.delete().catch(() => null);
-  }
-}
-
-// ─── Pause de partida: 1 pause de até 5 min por time; quem pediu retoma na hora ──
-async function handlePauseCommand(message, args) {
-  try {
-    const Pause = require('../services/pauseService');
-    const arg0 = String(args[0] || '').toLowerCase();
-    const letra = ['retomar', 'status'].includes(arg0) ? String(args[1] || '') : arg0;
-    const userId = message.author.id;
-
-    const currentMatchData = await loadCurrentMatch();
-    const alvo = Pause.partidaDoPlayer(currentMatchData.matches, userId, letra || null);
-    if (!alvo) return await replyToMessage(message, '❌ Você não está em nenhuma partida em andamento (ou a sala não existe).');
-    const { lobbyId, entry, lado } = alvo;
-
-    const r = Pause.alternarPause(entry, userId, Date.now());
-    if (r.acao === 'sem-partida' || r.acao === 'nao-participante') {
-      return await replyToMessage(message, '❌ Você não está em nenhuma partida em andamento.');
-    }
-    if (r.acao === 'esgotado') {
-      return await replyToMessage(message, `❌ O **Time ${lado}** já usou o pause de **${Pause.PAUSE_DURACAO_MIN} min** nesta partida.`);
-    }
-    if (r.acao === 'aguardar') {
-      return await replyToMessage(message, `⏸️ O pause é do **Time ${r.ladoPausa}** (pedido por <@${r.porId}>) — só ele pode retomar. Volta automático em **${r.restamMin} min**.`);
-    }
-
-    await saveCurrentMatch(currentMatchData);
-
-    // Canal de anúncios da partida (⚔️・partidas).
-    const anuncioId = config.textChannels?.matchOngoingChannelId;
-    const canalAnuncio = anuncioId ? await message.guild.channels.fetch(anuncioId).catch(() => null) : null;
-    const anunciar = async (conteudo) => {
-      try { if (canalAnuncio?.isTextBased?.()) await canalAnuncio.send(conteudo); } catch (err) { console.error('[PAUSE] anúncio:', err.message); }
-    };
-
-    if (r.acao === 'pausar') {
-      // Retomada automática em 5 min (timer do processo; comando também resolve se expirar).
-      const timerExistente = pauseTimers.get(lobbyId);
-      if (timerExistente) clearTimeout(timerExistente);
-      const pauseToken = entry.pause?.iniciadoEm;
-      pauseTimers.set(lobbyId, setTimeout(async () => {
-        pauseTimers.delete(lobbyId);
-        try {
-          const dados = await loadCurrentMatch();
-          const e = dados.matches[lobbyId];
-          if (!e?.active || !e?.pause || e.pause.iniciadoEm !== pauseToken) return; // partida acabou/já retomou
-          const enc = Pause.expirarSeVencido(e, Date.now());
-          if (!enc) return;
-          await saveCurrentMatch(dados);
-          await anunciar(`⏰ **PARTIDA RETOMADA** — os **${Pause.PAUSE_DURACAO_MIN} min** de pause do **Time ${enc.lado}** acabaram. Boa game!`);
-        } catch (err) { console.error('[PAUSE] retomada automática:', err.message); }
-      }, Pause.PAUSE_DURACAO_MIN * 60 * 1000));
-      pauseTimers.get(lobbyId).unref?.();
-
-      const fimSP = new Date(r.fim).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
-      await anunciar(`⏸️ **PAUSE — Time ${lado}** (pedido por <@${userId}>)\nPartida pausada por até **${Pause.PAUSE_DURACAO_MIN} min** — volta automático às **${fimSP}** (horário de SP).\nO time que pediu retoma na hora com \`!pause\` (sem aviso prévio).`);
-      return await replyToMessage(message, `⏸️ **Pause do Time ${lado} iniciado** — retomada automática em ${Pause.PAUSE_DURACAO_MIN} min. Para voltar antes: \`!pause\` (sem precisar avisar).`);
-    }
-
-    if (r.acao === 'retomar') {
-      const timer = pauseTimers.get(lobbyId);
-      if (timer) { clearTimeout(timer); pauseTimers.delete(lobbyId); }
-      await anunciar(`▶️ **PARTIDA RETOMADA** — pause do **Time ${lado}** encerrado por <@${userId}> (durou **${r.duracaoMin} min**). Sem aviso prévio, como na regra.`);
-      return await replyToMessage(message, `▶️ **Partida retomada!** Pause do Time ${lado} encerrado (${r.duracaoMin} min).`);
-    }
-
-    return await replyToMessage(message, '❌ Não foi possível processar o pause agora.');
-  } catch (error) {
-    console.error('[ERRO] !pause:', error);
-    await replyToMessage(message, `❌ Erro no pause: ${error.message}`);
   }
 }
 
@@ -3156,7 +3083,7 @@ module.exports = {
   handleResetCommand, handleCleanupRoomsCommand, handleSeasonResetCommand, handleOfficialSeasonStartCommand,
   handleUndoSeasonResetCommand, handleRestoreArchivedPeriodCommand, handleCancelStartCommand, handleStartCommand,
   handleSyncAllRolesCommand, handleSyncAllPlayersEloCommand, handleVictoryCommand, handleOnboardingCommand, handleClearCommand,
-  handleRegisterCommand, handleNickUpdateCommand, handleSyncPlayerRankCommand, handleVoteCommand, handlePauseCommand, pendingAutoStarts, triggerAutoStart,
+  handleRegisterCommand, handleNickUpdateCommand, handleSyncPlayerRankCommand, handleVoteCommand, pendingAutoStarts, triggerAutoStart,
   handleRematchCommand, handleRouletteCommand, handleRoletaSairCommand, handleRulesCommand, handleStaffCommand, handlePdlCommand,
   handleResultVoteButton, handleClubeCommand, handleClubeAdminCommand, handleClubeFixarCommand, handleQueroLiveCommand, handleLiveCommand,
   handleSocialCommand,
