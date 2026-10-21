@@ -91,9 +91,7 @@
   "social": {
     "divulgacaoChannelId": "",
     "horas": [
-      10,
-      16,
-      21
+      10
     ],
     "links": {
       "instagram": "https://www.instagram.com/capsarenatv/",
@@ -108,17 +106,13 @@
         "💬・geral-leagueoflegends"
       ],
       "horas": [
-        10,
-        16,
-        21
+        10
       ]
     },
     "torneioPreview": {
       "ativo": true,
       "horas": [
-        10,
-        16,
-        21
+        10
       ],
       "canais": [
         "🤖・comandos"
