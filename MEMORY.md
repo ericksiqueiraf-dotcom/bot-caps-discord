@@ -7,17 +7,16 @@
 
 ## Estado Operacional — 2026-10-21
 
-- **Próximo torneio:** teste da **Fase de Pontos v1**. Código atualizado nesta sessão para grupos A/B dinâmicos e final agendada; precisa ser validado antes do uso. Não afirmar teste ou restart.
-- **Formato padrão confirmado no código:** `services/torneioService.js` define `TORNEIO_FORMATO_DEFAULT = 'F1'`. Torneios novos sem formato explícito seguem F1; estados com formato legado explícito continuam no motor mata-mata. A tag `formato-mata-mata-v1` é opção de rollback, não o padrão atual.
-- **Formato dinâmico:** inscritos divididos igualmente em Grupos A e B; equipes fixas de cinco e round-robin dentro do grupo. 30 = 15 por grupo/3 times; 40 = 20/4 times; 50 = 25/5 times; 60 = 30/6 times. Aplicar a mesma regra para cada múltiplo de 10; em rodadas com número ímpar de times haverá bye. Campeões de A e B avançam.
-- **Final:** MD3 dos líderes de A/B, iniciada manualmente no dia combinado pela staff com `!torneio final start`; J1 sorteado, J2 inverte, e em 1x1 o vencedor de J1 escolhe lado do J3.
-- **Substituições na final:** o código agora escolhe entre reservas (ou reforços elegíveis se a fila estiver vazia) pela menor diferença total de MMR entre os dois times após ocupar a vaga. É o melhor equilíbrio possível dentre os candidatos disponíveis; não promete MMR idêntico.
-- **Salas de voz:** capacidade de 10 por sala. Criar lobbies suficientes para os jogos simultâneos (ex.: 40 jogadores, quatro partidas paralelas = quatro salas de 10); o lobby de aquecimento dura 5 min e depois os participantes são movidos para as salas dos confrontos.
-- **Implementação:** `services/torneioService.js`, `commands/legacyCommands.js` e `services/torneioChannelsService.js` foram atualizados para o formato dinâmico, classificação separada e final pendente/início manual. Validar antes de usar em produção.
-- **Voz atual no código:** cria `LOBBY TORNEIO`; após 5 minutos move jogadores para sala por confronto (C1, C2…). A ausência conta depois da divisão.
-- **Comandos de staff:** `!torneioon`, `!torneio start`, `!torneio sortear`, `!torneio lider <A|B> <ID_DO_TIME>` em caso de desempate decidido pela staff, `!torneio final start` na data marcada, `!torneio resultado <jogo> <1|2>` e `!torneio lado <1|2> j3` se a final ficar 1x1.
-- **Duelo:** regra “quem matar primeiro vence”; staff declara com `!duelo vitoria @vitorioso @perdedor`.
-- **Bot:** última nota da sessão de 2026-10-21 reporta `caps-bot` online após restart. Estado não reconsultado nesta atualização da memória.
+- **⚠️ INCIDENTE RESOLVIDO:** um commit não-autorizado (`5edd36d feat(torneio): adota fase de pontos por grupos`, mesmo identity git — provavelmente OUTRA sessão de IA) mudou o motor para grupos A/B e deixou a suite 306/309 vermelha. O dono não reconheceu a mudança → **revertido** em `7b46a55`. Outro commit estranho (`b5f9951 feat(queue): add esperar alias`) foi mantido (inofensivo, suíte verde) e a reescrita do MEMORY.md desta sessão foi preservada, corrigida abaixo.
+- **Próximo torneio:** teste da **Fase de Pontos v1** com o formato **todos contra todos** (confirmado em produção): 4 TIMES FIXOS de 5 (20 inscritos), round-robin 3 rodadas × 2 confrontos MD2, final automática após a 3ª rodada fechada. Precisa ser validado ponta a ponta em ambiente isolado antes do uso real.
+- **Formato padrão confirmado no código:** `services/torneioService.js` define `TORNEIO_FORMATO_DEFAULT = 'F1'`. Torneios novos sem formato explícito seguem F1; estados com formato legado explícito continuam no motor mata-mata. A tag `formato-mata-mata-v1` (em `c792d8e`) é opção de rollback, não o padrão atual.
+- **Substituições na final:** reservas entram na vaga do ausente (fila de reservas → pool de reforços); na ausência do motor de grupos, não há lógica de "menor diferença de MMR entre times" — substituição é direta.
+- **Salas de voz:** "por confronto" (`lobby = { gameId: 'R1-C1', jogos: [...], canal }`); `LOBBY TORNEIO` de aquecimento 5 min e depois move para as salas dos confrontos (C1, C2…). Capacidade 10/sala.
+- **Comandos de staff:** `!torneioon`, `!torneio start`, `!torneio sortear` (avança rodada → final automática), `!torneio resultado <jogo> <1|2>` (+ `FINAL <1|2>` na MD3), `!torneio lado <1|2> [j3]`, `!torneio classificacao`. Empate no 2º lugar destravado por `!torneio sortear <LETRA>`.
+- **Final:** MD3 com os MESMOS times; `1º colocado escolhe o lado do J1` via `!torneio lado <1|2>`; J2 inverte; em 1x1 o vencedor do J1 escolhe o lado do J3 (`lado <1|2> j3`). `!torneio lider`/`!torneio final start` eram do formato de GRUPOS (revertidos — não existem mais).
+- **Duelo:** regra "quem matar primeiro vence"; staff declara com `!duelo vitoria @vitorioso @perdedor`.
+- **Bot:** `caps-bot` reiniciado APÓS o revert (18:47) — `CAPS BOT LOL#6241` online no motor ajustado (todos contra todos), suíte **309/309**.
+- **Segurança multi-sessão:** existiram DOIS commits de outra sessão no repo hoje (`b5f9951`, `5edd36d`). Recomendação: não rodar sessões de IA paralelas no mesmo repo — commit sempre com a suíte verde e revisar `git log` antes de assumir o estado.
 
 ### Próximos passos
 
