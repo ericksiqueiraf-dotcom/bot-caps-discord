@@ -282,80 +282,23 @@
   !torneio  /  /torneio
       Painel do torneio CAPS ARENA.
       jogador: !torneio entrar | sair | lista | info | status
-      staff:   !torneio > on | off | agenda | novo | start | sortear | lider | final start | resultado | lado | prorrogar | adiar | retomar | desistencia | encerrar
+      staff:   !torneio > on | off | agenda | novo | sortear | resultado | prorrogar | adiar | retomar | desistencia | encerrar
       (com o torneio OFF, so o "entrar" fica bloqueado; info/lista/status livres)
-      Formato padrao: Fase de Pontos, com times fixos de 5 jogadores.
-      A quantidade de inscritos deve ser no minimo 20 e multipla de 10.
-
-      FORMACAO DOS GRUPOS E TIMES
-      O bot ordena os jogadores por MMR para distribuir o nivel entre os
-      Grupos A e B. Cada grupo recebe metade dos inscritos; dentro de cada
-      grupo o bot forma times de 5. Os grupos jogam separadamente.
-        20 inscritos: Grupo A = 10 (2 times); Grupo B = 10 (2 times).
-        30 inscritos: Grupo A = 15 (3 times); Grupo B = 15 (3 times).
-        40 inscritos: Grupo A = 20 (4 times); Grupo B = 20 (4 times).
-        50 inscritos: Grupo A = 25 (5 times); Grupo B = 25 (5 times).
-        60 inscritos: Grupo A = 30 (6 times); Grupo B = 30 (6 times).
-      A mesma regra se repete para qualquer multiplo de 10: metade dos
-      jogadores em cada grupo, sempre em equipes de cinco.
-
-      CALENDARIO E FOLGAS
-      Em cada grupo, todos os times enfrentam todos os outros uma vez; nao ha
-      confronto entre Grupo A e Grupo B durante a fase de pontos. O calendario
-      cresce com o numero de times:
-        2 times/grupo = 1 rodada e 1 confronto por grupo.
-        3 times/grupo = 3 rodadas, 1 confronto por grupo em cada rodada;
-          um time de cada grupo folga por rodada.
-        4 times/grupo = 3 rodadas, 2 confrontos por grupo em cada rodada.
-        5 times/grupo = 5 rodadas, 2 confrontos por grupo em cada rodada;
-          um time de cada grupo folga por rodada.
-        6 times/grupo = 5 rodadas, 3 confrontos por grupo em cada rodada.
-      A folga e parte do calendario; o time nao perde pontos naquela rodada.
-      Cada confronto entre dois times e MD2: sao dois mapas. Vitoria por 2x0
-      vale 3 pontos; empate 1x1 vale 1 ponto para cada time. Classificacao por
-      grupo: pontos, saldo de mapas e confronto direto. Empate persistente na
-      lideranca e decidido pela staff com !torneio lider <A|B> <ID_DO_TIME>;
-      consulte o ID do time no comando !torneio classificacao.
-
-      VOZ E INICIO MANUAL
-      !torneioon cria a categoria dedicada (regras, inscricoes, bracket,
-      campeoes) e o lobby de torneio. Depois do sorteio, os jogadores ficam
-      cinco minutos no lobby; em seguida sao movidos para as salas dos jogos,
-      com limite de 10 jogadores por sala (dois times de cinco por confronto).
-      !torneio start fecha as inscricoes no multiplo de 10 valido, guarda os
-      excedentes como reservas e inicia o torneio. !torneio sortear avanca
-      para a proxima rodada, depois que todos os resultados forem registrados.
-
-      FINAL EM OUTRO DIA
-      Ao concluir a fase, o primeiro colocado de cada grupo fica salvo como
-      finalista: lider do Grupo A contra lider do Grupo B. A final nao comeca
-      automaticamente. No dia combinado, com staff e finalistas presentes,
-      a staff usa !torneio final start. A final e MD3 com os mesmos times;
-      o lado do J1 e sorteado, o J2 inverte os lados e, se ficar 1x1, o
-      vencedor do J1 escolhe o lado do J3. Registre resultados com
-      !torneio resultado FINAL <1|2>.
-
-      AUSENCIAS, RESERVAS E MMR
-      O excedente das inscricoes forma a fila de reservas (ex.: 43 inscritos
-      = 40 titulares + 3 reservas). Na fase de pontos, a reserva entra na vaga
-      do ausente mantendo o time fixo. Na final, para cada vaga, o bot escolhe
-      a reserva disponivel que deixa menor a diferenca de MMR total entre os
-      dois times; se nao houver reserva, pode usar um reforco elegivel das
-      rodadas anteriores. Com duas ausencias, recalcula a escolha depois de
-      cada troca. Essa regra minimiza a diferenca entre os candidatos disponiveis,
-      mas nao garante MMR identico se nao houver candidato compativel.
-      A staff pode registrar ausencia/desistencia com !torneio desistencia
-      @jogador. Apos 5 min ha aviso; aos 10 min o substituto pode entrar;
-      aos 20 min sem alternativa, a fase de pontos aplica W.O. ao lado ausente.
-      Na final, sem substituto, a staff decide e registra o resultado.
-
-      ADMINISTRACAO DA RODADA/FINAL
-      Prorrogar: rodada/final tem 90 min para resultado; prorrogar renova.
-      Adiar/retomar: pausa o torneio; retomar renova as janelas.
-      !torneio lado <1|2> j3 define quem fica no azul no J3 (somente em 1x1).
-      Cada time tem 1 pause de ate 5 min por jogo, acionado por /pause dentro
-      do jogo; quem pausou pode despausar sem aviso previo.
-      FEARLESS na final: nao repetir campeao usado na partida anterior.
+      Categoria dedicada: !torneioon cria "TORNEIO CAPS ARENA" (regras, inscricoes,
+      bracket, campeoes + 1 lobby de voz por jogo; os 10 sorteados sao movidos).
+      Reservas: excedente na inscricao vira fila (ex. 23 -> 20 + 3 reservas);
+      desistencia/ausente chama a reserva, depois reforco (perdedor de rodada
+      anterior) e, aos 20min sem alternativa, W.O. (lado do ausente perde;
+      na final o W.O. e da staff). Times nascem com nome no sorteio (R1 TIME A,
+      R1 TIME B...) e mantem o nome ate a final; re-balance por rodada ate
+      a final (vencedores + repescagem dos 5 melhores perdedores) e a MD3
+      mantem os mesmos times. Lados: J1 sorteados, J2 inverte, J3
+      o vencedor do J1 escolhe; FEARLESS (nao repita campeao da partida anterior).
+      Prorrogar: rodada/final tem 90min de resultado (prorrogar renova).
+      Adiar/retomar: pausa tudo sem punir (retomar renova as janelas).
+      Pause: cada time tem 1 pause de ate 5 min por jogo — acionado pelo
+      /pause DENTRO do jogo (personalizada); quem pausou nao precisa avisar
+      para despausar (regra publicada nos embeds de regras).
       !torneiooff nao apaga torneio sorteado: ele so termina com campeao.
       Acesso: jogador (inscricao) + staff (gestao)
 
@@ -440,7 +383,7 @@
   !duelo  /  /duelo
       Duelo de PDL: !duelo @usuario [10-200]
       e !duelo aceitar | recusar | lista | rank
-      !duelorank = Top 10 de vitorias em duelos (alias: !duelo rank; igual a !top10 duelo)
+      (!duelo rank = Top 10 dos duelos, igual a !top10 duelo)
       Acesso: jogador
 
   !social  /  /social

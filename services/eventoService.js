@@ -472,18 +472,7 @@ async function processarAusenciaTorneio(deps, meta, t, guild, nowMs) {
         const linhas = [];
         for (const { gameId, ids } of aval.alvos) {
           for (const idAusente of ids) {
-            let cand = aval.substituto;
-            if (t.final && !t.champion) {
-              const reserveIds = (t.reservas || []).length
-                ? [...t.reservas]
-                : Torneio.poolMortos(t).map((p) => p.discordId);
-              const candidates = await Promise.all(reserveIds.map(buscarStatsJogador));
-              const selected = Torneio.escolherSubstitutoFinalEquilibrado(t, idAusente, candidates);
-              cand = selected ? {
-                id: selected.discordId,
-                tipo: (t.reservas || []).includes(selected.discordId) ? 'reserva' : 'reforco'
-              } : null;
-            }
+            const cand = aval.substituto;
             if (!cand) {
               linhas.push(`⚠️ **${gameId}**: <@${idAusente}> sem reserva/reforço disponível.`);
               continue;

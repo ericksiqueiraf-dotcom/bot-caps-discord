@@ -137,15 +137,15 @@ function buildIntroducaoBracketEmbed() {
     .setTitle('📊 COMO FUNCIONA O TORNEIO')
     .setDescription(
       'O **bracket** registra a **fase de pontos** e a final: cada rodada lista os confrontos (`R1-C1`: TIME A 🆚 TIME B), os mapas e a tabela de classificação.\n\n' +
-      '• **Times fixos**: cada time tem 5 jogadores; os inscritos são divididos igualmente nos Grupos A e B (ex.: 40 = 2×20, 4 times por grupo; 60 = 2×30, 6 times por grupo)\n' +
-      '• **Fase de grupos**: todos contra todos dentro do próprio grupo; quantidade de rodadas e confrontos se adapta ao número de times (time de folga em rodada ímpar)\n' +
+      '• **Times fixos**: no sorteio o bot cria **4 times de 5** (balanceados por elo) — eles vencem/perdem JUNTOS a fase toda\n' +
+      '• **Fase 1 = todos contra todos**: 3 rodadas × 2 confrontos; cada vez que dois times se cruzam, vale **1 confronto MD2** (2 mapas)\n' +
       '• **Lados**: 1º mapa com lado sorteado • 2º mapa lados **invertidos** (mesmo time)\n' +
       '• **Pontos**: 2x0 = **3 pts** • 1x1 = **1 pt** pra cada • Classificação: pontos → saldo de mapas → confronto direto\n' +
-      '• **Sorteou?** Os inscritos ficam no **LOBBY TORNEIO** por 5 min; depois o bot separa nas salas dos confrontos — limite de 10 por sala\n' +
+      '• **Sorteou?** Os 20 ficam no **LOBBY TORNEIO** por 5 min; depois o bot separa na SALA do confronto (C1, C2…) — só os 10 conectam\n' +
       '• **Ausência após a divisão**: **5 min** = aviso → **10 min** = `reserva` (ou **reforço** = perdedor de mapa concluído) assume a vaga do próprio time (sem re-balance) → **20 min** sem alternativa = **W.O. técnico** do mapa\n' +
       '• ⏸️ **PAUSE**: cada time tem **1 pause de até 5 min por jogo** — aciona pelo `/pause` dentro do jogo (personalizada); quem pausou retoma quando quiser, sem aviso prévio\n' +
       '• **Rodada em aberto tem 90 min** de resultado — staff é avisada e pode `prorrogar` ⏳ ou `adiar⏸/retomar▶️`\n' +
-      '• **FINAL MD3** entre os campeões dos Grupos A e B, com os **mesmos times**: staff inicia no dia marcado com `!torneio final start`; J1 tem lado sorteado • J2 inverte • em 1x1, vencedor do J1 escolhe J3\n' +
+      '• **FINAL MD3** entre os 2 primeiros, com os **mesmos times**: 🎨 o 1º colocado escolhe o lado do J1 • J2 inverte • J3 quem venceu o J1 escolhe\n' +
       '• 🚫 **FEARLESS**: na final, proibido pickar campeão usado na partida anterior da série'
     );
 }
@@ -192,7 +192,7 @@ function buildRodadaEmbed(t) {
       const st1 = g1.winner ? `✅ **${g1.winner === '1' ? g1.nomeTimeA : g1.nomeTimeB} venceu ${g1.id}**` : `⏳ ${g1.id} aguardando`;
       const st2 = g2.winner ? `✅ **${g2.winner === '1' ? g2.nomeTimeA : g2.nomeTimeB} venceu ${g2.id}**` : `⏳ ${g2.id} aguardando (lados invertidos)`;
       const pontos = c.resultado ? `\n📊 Placar do confronto ${c.resultado.wa}x${c.resultado.wb} → **${nome(c.timeA)} +${c.resultado.ptsA} pts** • **${nome(c.timeB)} +${c.resultado.ptsB} pts**` : '';
-      return `⚔️ **${c.grupo ? `Grupo ${c.grupo} • ` : ''}${c.id} — ${nome(c.timeA)} 🆚 ${nome(c.timeB)}**\n${st1}\n${st2}${pontos}`;
+      return `⚔️ **${c.id} — ${nome(c.timeA)} 🆚 ${nome(c.timeB)}**\n${st1}\n${st2}${pontos}`;
     });
     embed.setDescription(linhas.join('\n\n'));
     return embed;
@@ -218,13 +218,16 @@ function buildRodadaEmbed(t) {
 // Tabela da fase de pontos (pontos → saldo → confronto direto).
 function buildClassificacaoEmbed(t) {
   const cls = T.calcClassificacao(t);
-  const linhas = ['A', 'B'].flatMap((grupo) => [`**GRUPO ${grupo}**`, ...cls.filter((c) => c.grupo === grupo).map((c, i) => `${i === 0 ? '🥇' : '▫️'} **${c.nome}** (ID ${c.id}) — **${c.pontos} pts** • mapas ${c.mapasV}x${c.mapasP}`)]);
+  const linhas = cls.map((c, i) => {
+    const destaque = i === 0 ? '🥇' : i === 1 ? '🥈' : '▫️';
+    return `${destaque} **${c.nome}** — **${c.pontos} pts** • mapas ${c.mapasV}x${c.mapasP}`;
+  });
   return new EmbedBuilder()
     .setColor('#FFD700')
     .setTitle(`📊 FASE DE PONTOS — Classificação (Torneio #${t.edition})`)
     .setDescription(
       `${linhas.join('\n')}\n\n` +
-      '🏆 **O líder de cada grupo vai à FINAL MD3**\n' +
+      '🥈🥇 **Os 2 primeiros fazem a FINAL MD3**\n' +
       'Desempate: saldo de mapas → confronto direto → staff'
     )
     .setFooter({ text: `Pts: 2x0 = ${T.F1_PTS_VITORIA} • 1x1 = ${T.F1_PTS_EMPATE} cada` });
