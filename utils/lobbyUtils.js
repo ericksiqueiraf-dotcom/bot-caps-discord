@@ -1863,20 +1863,24 @@ const STAFF_SECTIONS = [
     value: '`!clubeadmin` • Assinaturas ativas por tier, com vencimento de cada uma.\n`!clubefixar` • Posta e fixa os benefícios detalhados no #clube-vip.\n`!presentear @u <tier> [dias]` • Dá dias de clube de presente (só Admin).\n`!clube` • O que o jogador vê (tiers, preços, botões de assinar).'
   },
   {
-    name: '🏆 Torneio — abrir e agendar (só Staff)',
-    value: '`!torneioon [dias]` • Ativa o torneio e abre as inscrições (padrão 7 dias). Cria a categoria **🏆・TORNEIO CAPS ARENA** (regras/inscrições/bracket/campeões).\n`!torneiooff` • Fecha inscrições (bloqueado com rodada/final em aberto).\n`!torneioagenda sex,sab 19:00 [dias]` • Abre sozinho nos dias/hora (`!torneioagenda off` limpa).\n`!torneio sortear` • Fase de pontos: sorteia os **4 TIMES FIXOS de 5** e abre a rodada 1 (todos contra todos, 3 rodadas); a cada rodada completa, o próximo `sortear` avança. Na fase inteira os times não se refazem.'
-  },
-  {
-    name: '🏆 Torneio — durante a fase de pontos (só Staff)',
-    value: '`!torneio resultado <jogo> <1|2>` • Registra o mapa; fechou o confronto MD2 → pontos automáticos (2x0 = 3 pts • 1x1 = 1 pt cada) e tabela atualizada no bracket. `FINAL <1|2>` na MD3.\n`!torneio classificacao` • Tabela completa (jogadores podem consultar).\n`!torneio lado <1|2> [j3]` • Lado da final: 1º colocado escolhe o J1 (1 = azul, 2 = vermelho); `j3` quando 1x1 (vencedor do J1 escolhe).\n`!torneio prorrogar` • Rodada/final em aberto tem **90 min** — renova a janela.\n`!torneio adiar` / `retomar` • Pausa tudo sem punir / retoma e renova janelas.\n`!torneio desistencia @user` • Cadeia: **reserva** → **reforço** (perdedor de mapa concluído) → **W.O. técnico** do lado dele.\nAusência no lobby: **5min** aviso • **10min** substituição (na vaga do próprio time) • **20min** sem alternativa = **W.O. técnico** (na FINAL, staff registra).\n`!torneio encerrar` • Só antes do 1º sorteio (em andamento só termina com campeão).\n⚡ **Empate no 2º lugar** sem desempate automático: `!torneio sortear <LETRA>` classifica o time indicado.'
-  },
-  {
     name: '📌 Fixar guias (staff)',
     value: '`!ajudafixar` • Posta e fixa `!ajuda` + `!ajuda2` no #infos-lol.\n`!clubefixar` • Posta e fixa os benefícios no #clube-vip.'
   },
   {
     name: '📊 Temporada — só Admin, com fila vazia',
     value: '`!temporadas` • Ver períodos arquivados.\n`!resetgeral` • Arquiva o período e ZERA os pontos (sem volta!).\n`!iniciartemporada` (ou `!iniciarseason`) • Liga a fase oficial.\nAbertura: `!resetgeral` e depois `!iniciartemporada`, antes dos primeiros jogos.'
+  }
+];
+
+// Página 2 do guia (comando `!staff2`): torneio completo + clube + temporada.
+const STAFF2_SECTIONS = [
+  {
+    name: '🏆 Torneio — abrir e agendar (só Staff)',
+    value: '`!torneioon [dias]` • Abre as inscrições e cria a categoria **🏆・TORNEIO CAPS ARENA** (padrão 7 dias).\n`!torneiooff` • Fecha inscrições (bloqueado com rodada/final em aberto).\n`!torneioagenda sex,sab 19:00 [dias]` • Abre sozinho nos dias/hora (`!torneioagenda off` limpa).\n`!torneio sortear` • Fase de pontos: sorteia os **4 TIMES FIXOS de 5** (balanceados por elo) e abre a rodada 1; cada `sortear` seguinte avança a rodada — **3 rodadas, todos contra todos**, e as salas de voz são **por confronto**.'
+  },
+  {
+    name: '🏆 Torneio — durante a fase de pontos (só Staff)',
+    value: '`!torneio resultado <jogo> <1|2>` • Fecha o mapa; confronto MD2 completo → pontos automáticos (2x0 = 3 pts • 1x1 = 1 pt) e tabela no bracket. `FINAL <1|2>` na MD3.\n`!torneio classificacao` • Tabela completa (público).\n`!torneio lado <1|2> [j3]` • Lado da final: **1º colocado escolhe o J1** (1 = azul, 2 = vermelho); `j3` quando 1x1 (vencedor do J1 escolhe).\n`!torneio prorrogar` • Rodada/final em aberto tem **90 min** — renova a janela.\n`!torneio adiar` / `retomar` • Pausa tudo sem punir / retoma e renova janelas.\n`!torneio desistencia @user` • Cadeia: **reserva** → **reforço** (perdedor de mapa concluído) → **W.O. técnico** do lado dele.\nAusência: **5min** aviso • **10min** substitui **na vaga do próprio time** • **20min** sem alternativa = W.O. (na FINAL, staff registra).\n`!torneio encerrar` • Só pré-1º-sorteio. ⚡ Empate no 2º lugar: `!torneio sortear <LETRA>` classifica o time indicado.'
   }
 ];
 
@@ -1920,10 +1924,23 @@ function buildStaffEmbed() {
   const embed = new EmbedBuilder()
     .setColor(THEME.WARNING)
     .setTitle('🛠️ Guia da Staff — CAPS Arena')
-    .setDescription('Quando e como usar cada comando. Jogadores: usem `!regras`.')
+    .setDescription('Condução de partidas, filas, roleta, elos e clube. Guia do torneio (fase de pontos): `!staff2`.')
     .setFooter({ text: `${FOOTER_PREFIX} • Staff` })
     .setTimestamp();
   for (const section of STAFF_SECTIONS) {
+    embed.addFields({ name: section.name, value: section.value });
+  }
+  return embed;
+}
+
+function buildStaff2Embed() {
+  const embed = new EmbedBuilder()
+    .setColor(THEME.WARNING)
+    .setTitle('🛠️ Guia da Staff (2/2) — CAPS Arena')
+    .setDescription('Torneio CAPS ARENA — fase de pontos v1 (comando completo: `!staff`).')
+    .setFooter({ text: `${FOOTER_PREFIX} • Staff` })
+    .setTimestamp();
+  for (const section of STAFF2_SECTIONS) {
     embed.addFields({ name: section.name, value: section.value });
   }
   return embed;
@@ -3397,7 +3414,9 @@ module.exports = {
   buildRulesEmbed,
   RULES_SECTIONS,
   buildStaffEmbed,
+  buildStaff2Embed,
   STAFF_SECTIONS,
+  STAFF2_SECTIONS,
   buildOnboardingGuideEmbed,
   ONBOARDING_SECTIONS,
   buildSeasonHistoryEmbed,

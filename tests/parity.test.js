@@ -68,11 +68,12 @@ const KNOWN_EXPORT_GAPS = {
       'AO_VIVO_ROLE_NAME', 'CLUBE_PROMO_HOURS', 'LIVE_COOLDOWN_MS', 'ONBOARDING_SECTIONS',
       'QUEUE_JOIN_BUTTON_IDS', 'VIP_TIERS', 'buildClubeDetalEmbed', 'buildClubeEmbed', 'buildClubePromoEmbed',
       'buildLiveEmbed', 'buildOnboardingGuideEmbed', 'buildQueueFeedText', 'buildQueueJoinActionRow',
-      'buildVipTierResolver', 'ensureAoVivoRole', 'findPromoChannel', 'findRankRole',
+      'buildStaff2Embed', 'buildVipTierResolver', 'ensureAoVivoRole', 'findPromoChannel', 'findRankRole',
       'formatCooldownRemaining', 'getConfiguredRankRoleId', 'getLiveCooldownRemainingMs', 'getMemberVipTier',
       'getQueueFeedChannelId', 'getRankTierFromRoleName', 'getVipSeal', 'isRankRole',
       'isRecentVipSubscription', 'parseLiveLink', 'parseQueueJoinButtonId', 'postQueueFeedMessage',
-      'runClubePromoTick', 'shouldPostClubePromo', 'startClubePromoScheduler'
+      'runClubePromoTick', 'shouldPostClubePromo', 'startClubePromoScheduler',
+      'STAFF2_SECTIONS'
     ],
     lcl: [
       'DESAFIO_RULES_SECTIONS', 'LCL_QUEUE_BUTTON_IDS', 'LCL_TEAM_SIZE', 'addLclPresence',

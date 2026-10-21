@@ -780,6 +780,10 @@ function weekdayIndex(weekdayStr) {
 // Times de 5 sorteados UMA VEZ (fixos até a final). Cada rodada: confrontos
 // MD2 = 2 mapas (lados invertidos), 2x0=3pts, 1x1=1pt. Top 2 na soma → final
 // MD3 com os MESMOS times, 1º colocado escolhe o lado do J1.
+// ROLLBACK: se a staff/quem quiser voltar ao mata-mata v1 (repescagem), troque
+// para 'legado' — o motor antigo segue intacto (estado novo adota o default).
+const TORNEIO_FORMATO_DEFAULT = 'F1';
+
 function ehF1(t) {
   return t?.formato === 'F1';
 }
@@ -1113,6 +1117,7 @@ module.exports = {
   fase1Concluida,
   concluirFase1,
   definirLadoFinal,
+  TORNEIO_FORMATO_DEFAULT,
   F1_PTS_VITORIA,
   F1_PTS_EMPATE
 };

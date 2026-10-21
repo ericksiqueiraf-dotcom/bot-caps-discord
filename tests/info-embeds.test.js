@@ -2,7 +2,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
 
-const { buildRulesEmbed, buildStaffEmbed, buildOnboardingGuideEmbed, RULES_SECTIONS, STAFF_SECTIONS, ONBOARDING_SECTIONS } = require('../utils/lobbyUtils');
+const { buildRulesEmbed, buildStaffEmbed, buildStaff2Embed, buildOnboardingGuideEmbed, RULES_SECTIONS, STAFF_SECTIONS, STAFF2_SECTIONS, ONBOARDING_SECTIONS } = require('../utils/lobbyUtils');
 
 function assertDiscordLimits(embed, label) {
   const json = embed.toJSON();
@@ -73,6 +73,15 @@ describe('embeds informativos por sala', () => {
     assert.strictEqual(embed.data.title, '🛠️ Guia da Staff — CAPS Arena');
     assert.strictEqual(embed.data.fields.length, STAFF_SECTIONS.length);
     assertDiscordLimits(embed, 'staff');
+  });
+
+  it('staff2: guia do torneio + dentro dos limites (sem guild)', () => {
+    const embed = buildStaff2Embed().toJSON();
+    assert.strictEqual(embed.title, '🛠️ Guia da Staff (2/2) — CAPS Arena');
+    assert.strictEqual(embed.fields.length, STAFF2_SECTIONS.length);
+    for (const f of embed.fields) assert.ok(f.value.length <= 1024, `campo > 1024: ${f.name}`);
+    assert.ok(JSON.stringify(embed).length < 6000);
+    assert.ok(embed.fields.some((f) => f.value.includes('!torneio sortear')));
   });
 
   it('pattern so usa tipos de embed conhecidos', () => {

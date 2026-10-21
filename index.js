@@ -886,6 +886,9 @@ async function processCommand(message, rawContent) {
       case 'staffhelp':
         await handlers.handleStaffCommand(message);
         break;
+      case 'staff2':
+        await handlers.handleStaff2Command(message);
+        break;
       case 'cadastrar':
         await handlers.handleRegisterCommand(message, args);
         break;
@@ -1337,6 +1340,9 @@ client.on('interactionCreate', async (interaction) => {
         break;
       case 'staff':
         await handlers.handleStaffCommand(context);
+        break;
+      case 'staff2':
+        await handlers.handleStaff2Command(context);
         break;
       case 'roletasair': {
         const salaSair = interaction.options.getString('sala');

@@ -1588,9 +1588,11 @@ async function handleTorneioCommand(message, args = []) {
       if (t.final) return await replyToMessage(message, '🔥 A final já está rolando. Use `!torneio resultado FINAL <1|2>`.');
 
       // ─── Fase de Pontos v1 (formato F1) ───
-      // Estado novo (sem formato) adota F1 no primeiro sorteio; estados antigos
-      // com outro formato explícito seguem no mata-mata legado.
-      if (!t.formato || t.formato === 'F1') {
+      // Estado novo (sem formato) segue TORNEIO_FORMATO_DEFAULT; estados com
+      // formato explícito não-F1 seguem no mata-mata legado (rollback = 1 linha
+      // em torneioService.js: TORNEIO_FORMATO_DEFAULT = 'legado').
+      const usaF1 = t.formato ? t.formato === 'F1' : T.TORNEIO_FORMATO_DEFAULT === 'F1';
+      if (usaF1) {
         t.formato = 'F1';
         if ((t.rounds || []).length === 0) {
           const total = (t.players || []).length;
@@ -3000,6 +3002,20 @@ async function handleStaffCommand(message) {
   }
 }
 
+async function handleStaff2Command(message) {
+  try {
+    if (!isStaffOnly(message.member)) {
+      return await replyToMessage(message, '❌ Guia restrito à staff. Jogadores: usem `!regras`. *(página 2 do guia: `!staff2`)*');
+    }
+    await sendToMessageChannel(message, { embeds: [buildStaff2Embed()] });
+  } catch (error) {
+    console.error('[ERRO] !staff2:', error);
+    await replyToMessage(message, `❌ Erro ao mostrar guia da staff (2/2): \`${error.message}\``);
+  } finally {
+    if (message.deletable) await message.delete().catch(() => null);
+  }
+}
+
 // --- Temp Voice Management Commands ---
 
 const {
@@ -3226,7 +3242,7 @@ module.exports = {
   handleUndoSeasonResetCommand, handleRestoreArchivedPeriodCommand, handleCancelStartCommand, handleStartCommand,
   handleSyncAllRolesCommand, handleSyncAllPlayersEloCommand, handleVictoryCommand, handleOnboardingCommand, handleClearCommand,
   handleRegisterCommand, handleNickUpdateCommand, handleSyncPlayerRankCommand, handleVoteCommand, pendingAutoStarts, triggerAutoStart,
-  handleRematchCommand, handleRouletteCommand, handleRoletaSairCommand, handleRulesCommand, handleStaffCommand, handlePdlCommand,
+  handleRematchCommand, handleRouletteCommand, handleRoletaSairCommand, handleRulesCommand, handleStaffCommand, handleStaff2Command, handlePdlCommand,
   handleResultVoteButton, handleClubeCommand, handleClubeAdminCommand, handleClubeFixarCommand, handleQueroLiveCommand, handleLiveCommand,
   handleSocialCommand,
   handleConviteCommand, handleTopConvitesCommand, handleTorneioCommand, handleTempoCommand, handleTopVozCommand,
