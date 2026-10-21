@@ -25,10 +25,12 @@ const RODADA_TIMEOUT_MIN = 90;
 const TORNEIO_INFO =
   '🏆 **TORNEIO CAPS ARENA** — mata-mata com sorteio por rodada.\n' +
   '• Inscrição individual: `!torneio entrar` (mínimo 20, múltiplo de 10)\n' +
+  '• Staff: `!torneio start` inicia manualmente com os inscritos; fecha no múltiplo de 10 e envia excedentes para reservas\n' +
+  '• No início, os jogadores ficam no **LOBBY TORNEIO** por 5 min; depois são movidos para as salas A, B, C, D… por partida\n' +
   '• A cada rodada o bot monta partidas **5x5 balanceadas**; quem perde sai, quem ganha avança\n' +
   '• Se os vencedores não fecharem 10, entra a **repescagem** (melhores perdedores da rodada)\n' +
-  '• Ao sortear, o bot move os 10 de cada jogo para o **lobby de voz** da rodada\n' +
-  '• **Presença**: só o lobby da rodada vale. Falta aos **5 min** = aviso; aos **10 min** = entra a **reserva** (sem reserva: **reforço** das rodadas anteriores); aos **20 min** sem alternativa = **W.O.** (lado do ausente perde — na final, a staff registra)\n' +
+  '• Ao sortear, os jogadores ficam no **LOBBY TORNEIO** por 5 min; depois o bot os separa nas salas de voz A, B, C, D… por partida\n' +
+  '• Após a divisão, falta por **5 min** = aviso; aos **10 min** = entra a **reserva** (sem reserva: **reforço** das rodadas anteriores); aos **20 min** sem alternativa = **W.O.** (lado do ausente perde — na final, a staff registra)\n' +
   '• Reserva assume a vaga de desistente/ausente e o jogo é **re-balanceado** (`!torneio desistencia @user` registra desistência)\n' +
   '• **Final**: 1 sorteio, mesmos times, **MD3** (melhor de 3) — 🚫 **FEARLESS**: proibido pickar campeão usado na partida anterior da série\n' +
   '• Lados na final: **J1 sorteado pelo bot** • **J2 lados invertidos** • **J3 quem venceu o J1 escolhe o lado**\n' +

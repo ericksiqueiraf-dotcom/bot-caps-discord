@@ -137,8 +137,8 @@ function buildIntroducaoBracketEmbed() {
     .setTitle('📊 COMO FUNCIONA O BRACKET')
     .setDescription(
       'O **bracket** é a chave do mata-mata: cada rodada mostra os jogos com os **nomes dos times** (`R1 TIME A` 🆚 `R1 TIME B`) e o resultado.\n\n' +
-      '• **Sorteou?** O bot move os 10 de cada jogo para o lobby da rodada — limite 10, só os sorteados conectam\n' +
-      '• **Ausência no lobby**: **5 min** = aviso → **10 min** = `reserva` (ou **reforço** de rodada anterior) assume e o jogo é re-balanceado → **20 min** sem alternativa = **W.O.** do lado do ausente (na final, só a staff registra)\n' +
+      '• **Sorteou?** Os jogadores ficam no **LOBBY TORNEIO** por 5 min; depois o bot separa cada partida em sua sala de voz (A, B, C, D…) — só os sorteados conectam\n' +
+      '• **Ausência após a divisão**: **5 min** = aviso → **10 min** = `reserva` (ou **reforço** de rodada anterior) assume e o jogo é re-balanceado → **20 min** sem alternativa = **W.O.** do lado do ausente (na final, só a staff registra)\n' +
       '• **Rodada em aberto tem 90 min** de resultado — staff é avisada e pode `prorrogar` ⏳ ou `adiar⏸/retomar▶️` (pausa sem punir)\n' +
       '• ⏸️ **PAUSE**: cada time tem **1 pause de até 5 min por jogo** — aciona pelo `/pause` dentro do jogo (personalizada); quem pausou retoma quando quiser, sem aviso prévio\n' +
       '• **Times nascem com nome no sorteio** e o nome mantém até a final — só o jogador muda (reserva/reforço)\n' +
@@ -328,10 +328,19 @@ async function criarLobbies(guild, t, jogos, nowMs = Date.now()) {
   if (!categoria) return null;
   const bot = guild.members.me;
   const lobbies = [];
-  for (const jogo of jogos) {
+  const participantesRodada = [...new Set(jogos.flatMap((jogo) => [...jogo.teamOne, ...jogo.teamTwo].map((p) => String(p.discordId))))];
+  const lobbyGeral = await guild.channels.create({
+    name: '🔊・LOBBY-TORNEIO', type: ChannelType.GuildVoice, parent: categoria.id,
+    permissionOverwrites: [
+      { id: guild.roles.everyone.id, type: 0, allow: ['ViewChannel'], deny: ['Connect'] },
+      ...(bot ? [{ id: bot.id, type: 1, allow: ['ViewChannel', 'Connect', 'MoveMembers'] }] : []),
+      ...participantesRodada.map((id) => ({ id, type: 1, allow: ['ViewChannel', 'Connect'] }))
+    ]
+  }).catch((err) => { console.error('[TORNEIO] lobby geral:', err.message); return null; });
+  for (const [gameIndex, jogo] of jogos.entries()) {
     const participantes = [...jogo.teamOne, ...jogo.teamTwo].map((p) => p.discordId);
     const ch = await guild.channels.create({
-      name: `🔊・lobby-${String(jogo.id).toLowerCase()}-torneio`,
+      name: `🔊・SALA-${String.fromCharCode(65 + gameIndex)}-TORNEIO`,
       type: ChannelType.GuildVoice,
       parent: categoria.id,
       userLimit: 10,
@@ -343,16 +352,18 @@ async function criarLobbies(guild, t, jogos, nowMs = Date.now()) {
     }).catch((err) => { console.error(`[TORNEIO] lobby ${jogo.id}:`, err.message); return null; });
     if (!ch) continue;
     lobbies.push({ gameId: jogo.id, canal: ch.id });
-    for (const id of participantes) {
-      const member = await guild.members.fetch(id).catch(() => null);
-      if (member?.voice?.channelId && member.voice.channelId !== ch.id) {
-        await member.voice.setChannel(ch, 'Torneio CAPS ARENA — movido para o lobby da rodada').catch(() => null);
-      }
-    }
   }
   t.canais.lobbies = lobbies;
+  t.canais.lobbyGeral = lobbyGeral?.id || null;
+  t.canais.dividirEm = new Date(nowMs + 5 * MIN).toISOString();
+  for (const id of participantesRodada) {
+    const member = await guild.members.fetch(id).catch(() => null);
+    if (member?.voice?.channelId && lobbyGeral && member.voice.channelId !== lobbyGeral.id) {
+      await member.voice.setChannel(lobbyGeral, 'Torneio CAPS ARENA — lobby de aquecimento (5 min)').catch(() => null);
+    }
+  }
   // Marcador de ausência (una copia compartilhada nos jogos da rodada / final).
-  const marcador = { criadoEm: new Date(nowMs).toISOString(), avisoEm: null, aplicadoEm: null };
+  const marcador = { criadoEm: new Date(nowMs + 5 * MIN).toISOString(), avisoEm: null, aplicadoEm: null };
   const lastN = (t.rounds || []).length;
   if (lastN && t.rounds[lastN - 1]?.games?.some((g) => jogos.some((j) => j.id === g.id))) {
     rodadaAtribuirAusencia(t.rounds[lastN - 1], marcador);
@@ -360,6 +371,28 @@ async function criarLobbies(guild, t, jogos, nowMs = Date.now()) {
     t.final.ausencia = { ...marcador };
   }
   return lobbies;
+}
+
+async function separarLobbies(guild, t, nowMs = Date.now()) {
+  const divide = Date.parse(t?.canais?.dividirEm || '');
+  if (!guild || !Number.isFinite(divide) || nowMs < divide) return false;
+  const staging = await guild.channels.fetch(String(t.canais.lobbyGeral || '')).catch(() => null);
+  for (const lobby of t.canais.lobbies || []) {
+    const ch = await guild.channels.fetch(String(lobby.canal)).catch(() => null);
+    if (!ch) continue;
+    for (const [, member] of staging?.members || []) {
+      const game = (t.final && lobby.gameId === 'FINAL')
+        ? { teamOne: t.final.teamOne, teamTwo: t.final.teamTwo }
+        : (t.rounds || []).flatMap((r) => r.games || []).find((g) => String(g.id) === String(lobby.gameId));
+      if (game && [...game.teamOne, ...game.teamTwo].some((p) => String(p.discordId) === member.id)) {
+        await member.voice.setChannel(ch, 'Torneio CAPS ARENA — divisão após 5 minutos').catch(() => null);
+      }
+    }
+  }
+  if (staging) await staging.delete('Lobby de aquecimento encerrado após divisão dos times').catch(() => null);
+  t.canais.lobbyGeral = null;
+  t.canais.dividirEm = null;
+  return true;
 }
 
 function rodadaAtribuirAusencia(round, marcador) {
@@ -378,6 +411,12 @@ async function apagarLobbyDoJogo(guild, t, gameId) {
 
 // Fecha TODOS os lobbies (fim da rodada completa / encerramento).
 async function apagarLobbies(guild, t) {
+  if (t?.canais?.lobbyGeral) {
+    const staging = guild ? await guild.channels.fetch(String(t.canais.lobbyGeral)).catch(() => null) : null;
+    if (staging) await staging.delete('Lobby de aquecimento do torneio encerrado').catch(() => null);
+    t.canais.lobbyGeral = null;
+  }
+  if (t?.canais) t.canais.dividirEm = null;
   if (!t?.canais?.lobbies || !t.canais.lobbies.length) return;
   for (const lobby of t.canais.lobbies) {
     const ch = guild ? await guild.channels.fetch(String(lobby.canal)).catch(() => null) : null;
@@ -406,6 +445,7 @@ module.exports = {
   postarCampeoes,
   lerLobbiesConectados,
   criarLobbies,
+  separarLobbies,
   apagarLobbyDoJogo,
   apagarLobbies
 };

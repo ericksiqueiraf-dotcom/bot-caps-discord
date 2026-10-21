@@ -411,6 +411,10 @@ async function finalizarTickTorneio(deps, meta, t, nowMs) {
     if (!client?.readyAt || !t?.canais) return meta;
     const guild = await resolverGuildTorneio(client, t);
     if (!guild) return meta;
+    try {
+      const Canais = require('./torneioChannelsService');
+      if (await Canais.separarLobbies(guild, t, nowMs)) await saveSystemMeta(meta);
+    } catch (err) { console.error('[TORNEIO] divisão das salas:', err.message); }
     await processarAusenciaTorneio(deps, meta, t, guild, nowMs);
     // c) Timeout de rodada/final: aviso único quando cruza RODADA_TIMEOUT_MIN
     // (staff registra `!torneio resultado` ou renova com `!torneio prorrogar`).
@@ -459,7 +463,7 @@ async function processarAusenciaTorneio(deps, meta, t, guild, nowMs) {
       if (aval.fase === 'aviso') {
         marcador.avisoEm = new Date(nowMs).toISOString();
         const linhas = aval.alvos.map(({ gameId, ids }) => `• **${gameId}**: ${ids.map((id) => `<@${id}>`).join(' ')}`).join('\n');
-        const texto = `⏰ **Aviso de ausência** — entrada no lobby em ${T.AUSENCIA_SUBSTITUICAO_MIN - T.AUSENCIA_AVISO_MIN} min, senão a alternativa assume:\n${linhas}`;
+        const texto = `⏰ **Aviso de ausência** — entrada no lobby em ${Torneio.AUSENCIA_SUBSTITUICAO_MIN - Torneio.AUSENCIA_AVISO_MIN} min, senão a alternativa assume:\n${linhas}`;
         await post(texto, meta);
         await Canais.logInscricoes(guild, t, texto);
         mudou = true;
@@ -485,7 +489,7 @@ async function processarAusenciaTorneio(deps, meta, t, guild, nowMs) {
           }
         }
         if (linhas.length) {
-          const texto = `🚫 **Ausência aplicada** (${T.AUSENCIA_SUBSTITUICAO_MIN} min após o sorteio):\n${linhas.join('\n')}`;
+          const texto = `🚫 **Ausência aplicada** (${Torneio.AUSENCIA_SUBSTITUICAO_MIN} min após o sorteio):\n${linhas.join('\n')}`;
           await post(texto, meta);
           await Canais.logInscricoes(guild, t, texto);
           await Canais.atualizarBracket(guild, t);
@@ -503,7 +507,7 @@ async function processarAusenciaTorneio(deps, meta, t, guild, nowMs) {
           linhas.push(`⚠️ **${a.gameId}**: ausência em ambos os lados (ou FINAL) — staff decide (\`!torneio resultado\` ou \`!torneio adiar\`).`);
         }
         if (linhas.length) {
-          const texto = `⚖️ **W.O. automático aplicado** (${T.AUSENCIA_WO_MIN} min sem entrada nem alternativa):\n${linhas.join('\n')}`;
+          const texto = `⚖️ **W.O. automático aplicado** (${Torneio.AUSENCIA_WO_MIN} min sem entrada nem alternativa):\n${linhas.join('\n')}`;
           await post(texto, meta);
           await Canais.logInscricoes(guild, t, texto);
           await Canais.atualizarBracket(guild, t);
@@ -524,7 +528,7 @@ async function processarAusenciaTorneio(deps, meta, t, guild, nowMs) {
           : lado ? 'o lado do ausente perde' : 'lado ambíguo — staff decide';
         return `• **${gameId}**: ${ids.map((id) => `<@${id}>`).join(' ')} — ${alvoTxt}`;
       }).join('\n');
-      const texto = `🚷 **Sem reserva/reforço disponível** — \`!torneio adiar\` pausa sem punir, ou **W.O. automático aos ${T.AUSENCIA_WO_MIN} min** do sorteio:\n${linhas}`;
+      const texto = `🚷 **Sem reserva/reforço disponível** — \`!torneio adiar\` pausa sem punir, ou **W.O. automático aos ${Torneio.AUSENCIA_WO_MIN} min** do sorteio:\n${linhas}`;
       await post(texto, meta);
       await Canais.logInscricoes(guild, t, texto);
       mudou = true;

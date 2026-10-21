@@ -45,6 +45,19 @@ function refuseDuel(duelos, userId, nowMs = Date.now()) {
   return { ok: true, duelos: pending, duel };
 }
 
+function completeDuel(duelos, winnerId, loserId, nowMs = Date.now()) {
+  const pending = expireDuels(duelos, nowMs);
+  const winner = String(winnerId || ''), loser = String(loserId || '');
+  const duel = [...pending].reverse().find((d) => d?.status === 'aceito' &&
+    ((d.a === winner && d.b === loser) || (d.a === loser && d.b === winner)));
+  if (!duel) return { ok: false, duelos: pending, message: 'Não encontrei duelo aceito entre esses dois jogadores.' };
+  duel.status = 'concluido';
+  duel.winnerId = winner;
+  duel.loserId = loser;
+  duel.completedAt = new Date(nowMs).toISOString();
+  return { ok: true, duelos: pending, duel };
+}
+
 // Liquida duelos aceitos quando os dois caem em lados opostos da partida.
 function settleDuels(duelos, teamOneIds = [], teamTwoIds = [], winningTeam, nowMs = Date.now()) {
   const pending = expireDuels(duelos, nowMs);
@@ -76,5 +89,6 @@ module.exports = {
   createDuel,
   acceptDuel,
   refuseDuel,
+  completeDuel,
   settleDuels
 };
