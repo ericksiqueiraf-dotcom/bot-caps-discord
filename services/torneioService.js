@@ -23,18 +23,19 @@ const AUSENCIA_WO_MIN = 20;
 const RODADA_TIMEOUT_MIN = 90;
 
 const TORNEIO_INFO =
-  '🏆 **TORNEIO CAPS ARENA** — mata-mata com sorteio por rodada.\n' +
+  '🏆 **TORNEIO CAPS ARENA** — fase de pontos + final MD3.\n' +
   '• Inscrição individual: `!torneio entrar` (mínimo 20, múltiplo de 10)\n' +
+  '• No início o bot sorteia **4 times de 5** (balanceados por elo) — times **FIXOS** até a final\n' +
   '• Staff: `!torneio start` inicia manualmente com os inscritos; fecha no múltiplo de 10 e envia excedentes para reservas\n' +
-  '• No início, os jogadores ficam no **LOBBY TORNEIO** por 5 min; depois são movidos para as salas A, B, C, D… por partida\n' +
-  '• A cada rodada o bot monta partidas **5x5 balanceadas**; quem perde sai, quem ganha avança\n' +
-  '• Se os vencedores não fecharem 10, entra a **repescagem** (melhores perdedores da rodada)\n' +
-  '• Ao sortear, os jogadores ficam no **LOBBY TORNEIO** por 5 min; depois o bot os separa nas salas de voz A, B, C, D… por partida\n' +
-  '• Após a divisão, falta por **5 min** = aviso; aos **10 min** = entra a **reserva** (sem reserva: **reforço** das rodadas anteriores); aos **20 min** sem alternativa = **W.O.** (lado do ausente perde — na final, a staff registra)\n' +
-  '• Reserva assume a vaga de desistente/ausente e o jogo é **re-balanceado** (`!torneio desistencia @user` registra desistência)\n' +
-  '• **Final**: 1 sorteio, mesmos times, **MD3** (melhor de 3) — 🚫 **FEARLESS**: proibido pickar campeão usado na partida anterior da série\n' +
-  '• Lados na final: **J1 sorteado pelo bot** • **J2 lados invertidos** • **J3 quem venceu o J1 escolhe o lado**\n' +
-  '• Rodada/final aberta precisa de resultado em **90 min** — a staff é avisada e pode `prorrogar` ou **adiar⏸/retomar▶️** (pausa sem punir)\n' +
+  '• **Fase 1**: todos contra todos — **3 rodadas** x 2 confrontos (todo time encara os 3 rivais)\n' +
+  '• Cada confronto é **MD2** (2 mapas): 1º mapa com lado sorteado, 2º mapa com lados invertidos, MESMO time\n' +
+  '• **Pontos**: 2x0 = **3 pts** • 1x1 = **1 pt** pra cada\n' +
+  '• **Ausência** (por mapa): aviso em **5 min**; **10 min** = entra **reserva** (sem fila: **reforço** = perdedor de mapa concluído); **20 min** sem alternativa = **W.O. técnico** (o mapa conta pro lado presente)\n' +
+  '• Rodada em aberto: **90 min** de resultado — a staff pode `prorrogar` ou **adiar⏸/retomar▶️**\n' +
+  '• Classificação: **pontos → saldo de mapas → confronto direto** (empate do 2º lugar entre 3 iguais: staff decide)\n' +
+  '• Os **2 melhores** somando pontos fazem a **FINAL MD3** com os **mesmos times**\n' +
+  '• Lados na final: **1º colocado escolhe o lado do J1** (`!torneio lado 1|2`) • **J2 inverte** • **J3** (em 1x1): o time que venceu o **J1** escolhe\n' +
+  '• 🚫 **FEARLESS na final**: proibido pickar campeão usado na partida anterior da série\n' +
   '• **Pause**: cada time tem direito a **1 pause de até 5 min por jogo** — aciona pelo `/pause` dentro do jogo (personalizada); quem pausou não precisa avisar para despausar\n' +
   '• Campeões ganham o cargo 🏆; premiação extra anunciada pela staff a cada edição\n' +
   '• A staff abre/fecha o torneio com `!torneioon` / `!torneiooff`';
@@ -415,6 +416,28 @@ function substituirDesistente(t, alvoId, reservaPlayer, balanceFn) {
       [...g.teamOne, ...g.teamTwo].some((p) => p.discordId === alvo));
     if (gameAberto) {
       const reservaId = pegarReservaId();
+      if (ehF1(t)) {
+        // Fase de pontos: times são FIXOS — a reserva entra NA VAGA do ausente,
+        // no mesmo lado (sem re-balance). O swap vale pra TODOS os mapas em
+        // aberto da rodada e nos times canônicos (senão consome 2 reservas).
+        const rodada = t.rounds[t.rounds.length - 1];
+        const fatia = { ...reserva, discordId: reservaId, timeNome: null };
+        for (const g of rodada.games || []) {
+          if (g.winner) continue;
+          for (const key of ['teamOne', 'teamTwo']) {
+            const idx = (g[key] || []).findIndex((p) => p.discordId === alvo);
+            if (idx >= 0) {
+              fatia.timeNome = g[key][idx]?.timeNome || (key === 'teamOne' ? g.nomeTimeA : g.nomeTimeB);
+              g[key][idx] = { ...fatia };
+            }
+          }
+        }
+        for (const time of t.times || []) {
+          const idx = (time.players || []).findIndex((p) => String(p.discordId) === alvo);
+          if (idx >= 0) time.players[idx] = { ...fatia };
+        }
+        return { ok: true, modo: 'jogo-f1', jogo: gameAberto.id, alvo, reserva: reservaId, rebalanceado: false };
+      }
       const pool = [...gameAberto.teamOne, ...gameAberto.teamTwo]
         .map((p) => (p.discordId === alvo ? { ...reserva, discordId: reservaId } : p));
       const teams = balanceFn(pool);
@@ -433,6 +456,12 @@ function substituirDesistente(t, alvoId, reservaPlayer, balanceFn) {
       const idx = gameFechado[lista].findIndex((p) => p.discordId === alvo);
       const slot = gameFechado[lista][idx];
       gameFechado[lista][idx] = { ...reserva, discordId: reservaId, timeNome: slot?.timeNome };
+      if (ehF1(t)) {
+        for (const time of t.times || []) {
+          const i = (time.players || []).findIndex((p) => String(p.discordId) === alvo);
+          if (i >= 0) time.players[i] = { ...reserva, discordId: reservaId, timeNome: slot?.timeNome };
+        }
+      }
       return { ok: true, modo: 'proxima-rodada', jogo: gameFechado.id, alvo, reserva: reservaId };
     }
     return { ok: false, message: 'O desistente já está eliminado — a reserva permanece na fila.' };
@@ -525,6 +554,32 @@ function avaliarAusencia(t, nowMs = Date.now(), presenteMap = {}) {
 function poolMortos(t) {
   const lastN = (t.rounds || []).length;
   if (!lastN) return [];
+  const sortMmr = (a, b) => Number(b.baseMmr || 0) - Number(a.baseMmr || 0);
+  if (ehF1(t)) {
+    // F1: reforço = perdedor de mapa CONCLUÍDO (qualquer rodada, a corrente
+    // inclui) que NÃO esteja escalado em jogo em aberto (dele ou da final).
+    const emAberto = new Set();
+    for (let n = 1; n <= lastN; n++) {
+      for (const g of roundGames(t, n)) {
+        if (g.winner) continue;
+        for (const p of [...g.teamOne, ...g.teamTwo]) emAberto.add(p.discordId);
+      }
+    }
+    if (t.final && !t.champion) {
+      for (const p of [...t.final.teamOne, ...t.final.teamTwo]) emAberto.add(p.discordId);
+    }
+    const seen = new Set();
+    const mortos = [];
+    for (let n = 1; n <= lastN; n++) {
+      for (const p of roundLosers(t, n)) {
+        if (seen.has(p.discordId) || emAberto.has(p.discordId)) continue;
+        seen.add(p.discordId);
+        mortos.push(p);
+      }
+    }
+    return mortos.sort(sortMmr);
+  }
+  // Mata-mata (legado): vivos = TODOS escalados da última rodada + final.
   const vivos = new Set();
   for (const g of t.rounds[lastN - 1].games || []) {
     for (const p of [...g.teamOne, ...g.teamTwo]) vivos.add(p.discordId);
@@ -541,7 +596,7 @@ function poolMortos(t) {
       mortos.push(p);
     }
   }
-  return mortos.sort((a, b) => Number(b.baseMmr || 0) - Number(a.baseMmr || 0));
+  return mortos.sort(sortMmr);
 }
 
 // Próximo substituto disponível na cadeia (reserva da fila → reforço do pool).
@@ -721,6 +776,250 @@ function weekdayIndex(weekdayStr) {
   const wd = String(weekdayStr || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z]/g, '');
   return map[wd] ?? -1;
 }
+// ─── FASE DE PONTOS v1 (formato 'F1') ──────────────────────────────────────
+// Times de 5 sorteados UMA VEZ (fixos até a final). Cada rodada: confrontos
+// MD2 = 2 mapas (lados invertidos), 2x0=3pts, 1x1=1pt. Top 2 na soma → final
+// MD3 com os MESMOS times, 1º colocado escolhe o lado do J1.
+function ehF1(t) {
+  return t?.formato === 'F1';
+}
+
+// Sorteia os times fixos: agrupa por elo (serpentina em metades) e balanceia
+// cada grupo de 10 com balanceFn → 4 times de 5 com força pareada.
+function drawFixedTeams(t, pool, balanceFn, nTimes = 4) {
+  const sorted = [...(pool || [])].sort((a, b) => Number(b.baseMmr || 0) - Number(a.baseMmr || 0));
+  const gruposDe10 = Math.max(1, Math.floor(nTimes / 2));
+  const groups = Array.from({ length: gruposDe10 }, () => []);
+  sorted.forEach((p, idx) => {
+    const volta = Math.floor(idx / gruposDe10);
+    const g = volta % 2 === 0 ? idx % gruposDe10 : gruposDe10 - 1 - (idx % gruposDe10);
+    groups[g].push(p);
+  });
+  t.timeSeq ||= 0;
+  const times = [];
+  for (const group of groups) {
+    const duo = balanceFn(group);
+    times.push(duo.teamOne, duo.teamTwo);
+  }
+  return times.slice(0, nTimes).map((players, i) => {
+    const nome = `TIME ${nomeLetraTime(t.timeSeq++)}`;
+    for (const p of players) p.timeNome = nome;
+    return {
+      id: String(i + 1),
+      nome,
+      players: slimPlayers(players).map((p) => ({ ...p, timeNome: nome })),
+      pontos: 0, mapasV: 0, mapasP: 0
+    };
+  });
+}
+
+// Grade round-robin clássica (círculo): n par → n-1 rodadas, n/2 confrontos.
+// Retorna [[{ timeA: id, timeB: id }]] por rodada.
+function gerarGradeRoundRobin(ids = []) {
+  if (!ids || ids.length < 2 || ids.length % 2 !== 0) return [];
+  const lista = [...ids];
+  const fixo = lista[0];
+  const rot = lista.slice(1);
+  const rodadas = [];
+  for (let r = 0; r < lista.length - 1; r++) {
+    const confrontos = [{ timeA: fixo, timeB: rot[rot.length - 1] }];
+    for (let i = 0; i < Math.floor(rot.length / 2); i++) {
+      confrontos.push({ timeA: rot[i], timeB: rot[rot.length - 2 - i] });
+    }
+    rodadas.push(confrontos);
+    rot.unshift(rot.pop());
+  }
+  return rodadas;
+}
+
+const F1_PTS_VITORIA = 3;
+const F1_PTS_EMPATE = 1;
+
+// Cria a próxima rodada da fase 1 (mapas dos confrontos) — os rosters vêm dos
+// times FIXOS; o 1º mapa do confronto tem lado aleatório, o 2º inverte (cosmético
+// — rosts ficam teamOne/timeA fixos pra identidade).
+function gerarJogosFase1(t, numRodada) {
+  const gradeRodada = t.fase1?.grade?.[numRodada - 1] || [];
+  let seq = 0;
+  const games = [];
+  const confrontos = gradeRodada.map((par, ci) => {
+    const idC = `R${numRodada}-C${ci + 1}`;
+    const timeA = (t.times || []).find((x) => x.id === String(par.timeA));
+    const timeB = (t.times || []).find((x) => x.id === String(par.timeB));
+    if (!timeA || !timeB) throw new Error(`Time ausente na grade: ${par.timeA}/${par.timeB}`);
+    const jogos = [1, 2].map((k) => {
+      seq += 1;
+      const id = `R${numRodada}-J${seq}`;
+      const g = {
+        id, confronto: idC, mapa: k,
+        nomeTimeA: timeA.nome, nomeTimeB: timeB.nome,
+        teamOne: slimPlayers(timeA.players), teamTwo: slimPlayers(timeB.players),
+        winner: null
+      };
+      for (const p of g.teamOne) p.timeNome = timeA.nome;
+      for (const p of g.teamTwo) p.timeNome = timeB.nome;
+      return g;
+    });
+    games.push(...jogos);
+    return { id: idC, timeA: timeA.id, timeB: timeB.id, jogo1: jogos[0].id, jogo2: jogos[1].id, resultado: null };
+  });
+  return { games, confrontos };
+}
+
+// Sortear/avançar: nova rodada OU (fase concluída) a FINAL. `forcarSegundo`
+// destrava empate no 2º lugar: a staff indica o time classificado por letra.
+function sortearFase1(t, { forcarSegundo = null } = {}, nowMs = Date.now()) {
+  if (!ehF1(t)) return { ok: false, message: 'Este torneio não é do formato de fase de pontos.' };
+  if (!t.fase1?.grade?.length) return { ok: false, message: 'Nenhum torneio sorteado ainda.' };
+  if (t.final) return { ok: false, message: 'A final já está rolando.' };
+
+  const rodadasFeitas = (t.rounds || []).length;
+  if (rodadasFeitas > 0) {
+    // Auto-consistência: confrontos com os 2 mapas fechados ganham resultado
+    // (o comando `!torneio resultado` já faz isso; aqui cobre estados manuais).
+    fecharConfrontosRodada(t);
+    const atual = t.rounds[rodadasFeitas - 1];
+    if (!(atual.confrontos || []).every((c) => c.resultado)) {
+      return { ok: false, message: `A rodada ${rodadasFeitas} ainda tem confrontos em aberto — registre com \`!torneio resultado\`.` };
+    }
+  }
+  if (rodadasFeitas >= t.fase1.grade.length) {
+    return concluirFase1(t, { forcarSegundo }, nowMs);
+  }
+  const { games, confrontos } = gerarJogosFase1(t, rodadasFeitas + 1);
+  t.rounds.push({
+    n: rodadasFeitas + 1, games, confrontos, ausencia: null,
+    iniciadoEm: new Date(nowMs).toISOString()
+  });
+  return { ok: true, type: 'round', round: rodadasFeitas + 1, games };
+}
+
+// Fecha confrontos (de todas as rodadas, ou da rodada `roundN`) cujos 2 mapas
+// já têm vencedor → calcula os pontos.
+function fecharConfrontosRodada(t, roundN = null) {
+  const rounds = roundN ? (t.rounds || []).filter((r) => r.n === roundN) : (t.rounds || []);
+  const novos = [];
+  for (const round of rounds) {
+    const jogosDe = (id) => (round.games || []).find((g) => g.id === id);
+    for (const c of round.confrontos || []) {
+      if (c.resultado) continue;
+      const j1 = jogosDe(c.jogo1);
+      const j2 = jogosDe(c.jogo2);
+      if (!j1?.winner || !j2?.winner) continue;
+      const wa = (j1.winner === '1' ? 1 : 0) + (j2.winner === '1' ? 1 : 0);
+      const wb = 2 - wa;
+      const ptsde = (w) => (w === 2 ? F1_PTS_VITORIA : w === 1 ? F1_PTS_EMPATE : 0);
+      c.resultado = { wa, wb, ptsA: ptsde(wa), ptsB: ptsde(wb) };
+      novos.push({ confronto: c, wa, wb, ptsA: c.resultado.ptsA, ptsB: c.resultado.ptsB });
+    }
+  }
+  return novos;
+}
+
+function confrontoEntre(t, idA, idB) {
+  for (const round of t.rounds || []) {
+    for (const c of round.confrontos || []) {
+      if ((c.timeA === String(idA) && c.timeB === String(idB)) ||
+          (c.timeA === String(idB) && c.timeB === String(idA))) return c;
+    }
+  }
+  return null;
+}
+
+// Classificação: pontos → saldo de mapas → confronto direto → ordem estável.
+function calcClassificacao(t) {
+  const base = (t.times || []).map((time, idx) => ({
+    id: time.id, nome: time.nome, pontos: 0, mapasV: 0, mapasP: 0, idx
+  }));
+  for (const round of t.rounds || []) {
+    for (const c of round.confrontos || []) {
+      if (!c.resultado) continue;
+      const A = base.find((b) => b.id === c.timeA);
+      const B = base.find((b) => b.id === c.timeB);
+      if (A) { A.pontos += c.resultado.ptsA; A.mapasV += c.resultado.wa; A.mapasP += c.resultado.wb; }
+      if (B) { B.pontos += c.resultado.ptsB; B.mapasV += c.resultado.wb; B.mapasP += c.resultado.wa; }
+    }
+  }
+  base.sort((x, y) => {
+    if (y.pontos !== x.pontos) return y.pontos - x.pontos;
+    const sx = x.mapasV - x.mapasP;
+    const sy = y.mapasV - y.mapasP;
+    if (sy !== sx) return sy - sx;
+    const c = confrontoEntre(t, x.id, y.id);
+    if (c?.resultado) {
+      const dx = x.id === c.timeA ? c.resultado.ptsA - c.resultado.ptsB : c.resultado.ptsB - c.resultado.ptsA;
+      if (dx) return dx;
+    }
+    return x.idx - y.idx;
+  });
+  return base;
+}
+
+// Fase 1 acabou quando todo confronto de toda rodada tem resultado.
+function fase1Concluida(t) {
+  const rodadas = t?.rounds || [];
+  return rodadas.length >= (t?.fase1?.grade?.length || 0) &&
+    rodadas.every((r) => (r.confrontos || []).every((c) => c.resultado));
+}
+
+// Fim da fase: top 2 → FINAL congelada. `forcarSegundo` (id do time) resolve
+// empate no 2º lugar que os critérios não desempataram.
+function concluirFase1(t, { forcarSegundo = null } = {}, nowMs = Date.now()) {
+  if (t.final) return { ok: false, message: 'A final já está rolando.' };
+  if (!fase1Concluida(t)) return { ok: false, message: 'A fase 1 ainda não terminou — confrontos em aberto.' };
+  const cls = calcClassificacao(t);
+  const primeiro = cls[0];
+  let segundo = cls[1];
+  if (forcarSegundo) {
+    segundo = cls.find((c) => c.id === String(forcarSegundo));
+    if (!segundo) return { ok: false, message: `Time "${forcarSegundo}" não existe na classificação.` };
+    if (segundo.id === primeiro.id) return { ok: false, message: 'O 2º classificado não pode ser o próprio 1º.' };
+  } else if (cls[2] && segundo.pontos === cls[2].pontos &&
+      (segundo.mapasV - segundo.mapasP) === (cls[2].mapasV - cls[2].mapasP)) {
+    // empate no corte: confronto direto já foi critério; sem desempate automático
+    const c = confrontoEntre(t, segundo.id, cls[2].id);
+    if (!c?.resultado || c.resultado.ptsA === c.resultado.ptsB) {
+      return {
+        ok: false, message: 'Empate no 2º lugar sem desempate automático — staff decide:',
+        classificacao: cls,
+        exemplo: `\`!torneio sortear ${segundo.nome.replace('TIME ', '')}\` classifica o ${segundo.nome}`
+      };
+    }
+  }
+  const time1 = (t.times || []).find((x) => x.id === primeiro.id);
+  const time2 = (t.times || []).find((x) => x.id === segundo.id);
+  t.final = {
+    teamOne: slimPlayers(time1.players),
+    teamTwo: slimPlayers(time2.players),
+    nomeTime1: time1.nome, nomeTime2: time2.nome,
+    // 1º colocado escolhe o lado do J1 (staff: `!torneio lado 1|2`).
+    sides: { j1: null },
+    games: [], wins1: 0, wins2: 0, ausencia: null,
+    iniciadoEm: new Date(nowMs).toISOString()
+  };
+  t.fase1.concluidaEm = new Date(nowMs).toISOString();
+  return { ok: true, type: 'final', final: t.final, classificacao: cls };
+}
+
+// Lado da final: `lado` ('1'|'2') = qual time fica AZUL no mapa.
+// j1 = escolha do 1º colocado; j3 = escolha do vencedor do J1 (só em 1x1).
+function definirLadoFinal(t, lado, mapa = 'j1') {
+  if (!t?.final || t.champion) return { ok: false, message: 'Não há final em andamento.' };
+  const v = String(lado);
+  if (!['1', '2'].includes(v)) {
+    return { ok: false, message: 'Use `!torneio lado <1|2>` [j3] — 1 = 1º colocado/time 1 no azul e 2 = o lado fica com o time 2.' };
+  }
+  if (mapa === 'j3') {
+    if (!(t.final.wins1 === 1 && t.final.wins2 === 1)) {
+      return { ok: false, message: 'O J3 só acontece em 1x1 — registre o resultado antes.' };
+    }
+  } else if (t.final.games.length > 0) {
+    return { ok: false, message: 'O lado do J1 já está definido (o J1 já teve resultado).' };
+  }
+  t.final.sides[mapa] = v;
+  return { ok: true, mapa, lado: v };
+}
+
 function getStatus(t) {
   if (!t?.active) return { active: false };
   const lastN = (t.rounds || []).length;
@@ -728,6 +1027,7 @@ function getStatus(t) {
   normalizarReservas(t);
   return {
     active: true,
+    formato: t.formato || 'F1',
     edition: t.edition,
     inscritos: (t.players || []).length,
     inscricoes: t.inscricoes !== false,
@@ -739,6 +1039,7 @@ function getStatus(t) {
     jogosPendentes: pending,
     final: Boolean(t.final),
     placarFinal: t.final ? `${t.final.wins1}x${t.final.wins2}` : null,
+    finalEscolhaLado: Boolean(t.final && !t.champion && t.final.sides?.j1 == null),
     champion: t.champion
   };
 }
@@ -801,5 +1102,17 @@ module.exports = {
   jogoAbertoDePlayer,
   aplicarWalkover,
   adiarTorneio,
-  retomarTorneio
+  retomarTorneio,
+  // Fase de Pontos v1 (formato 'F1')
+  ehF1,
+  drawFixedTeams,
+  gerarGradeRoundRobin,
+  sortearFase1,
+  fecharConfrontosRodada,
+  calcClassificacao,
+  fase1Concluida,
+  concluirFase1,
+  definirLadoFinal,
+  F1_PTS_VITORIA,
+  F1_PTS_EMPATE
 };

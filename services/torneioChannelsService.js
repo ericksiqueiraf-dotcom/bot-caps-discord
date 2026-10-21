@@ -134,16 +134,18 @@ function buildRegrasEmbed(t, withBanner = false) {
 function buildIntroducaoBracketEmbed() {
   return new EmbedBuilder()
     .setColor('#FFD700')
-    .setTitle('📊 COMO FUNCIONA O BRACKET')
+    .setTitle('📊 COMO FUNCIONA O TORNEIO')
     .setDescription(
-      'O **bracket** é a chave do mata-mata: cada rodada mostra os jogos com os **nomes dos times** (`R1 TIME A` 🆚 `R1 TIME B`) e o resultado.\n\n' +
-      '• **Sorteou?** Os jogadores ficam no **LOBBY TORNEIO** por 5 min; depois o bot separa cada partida em sua sala de voz (A, B, C, D…) — só os sorteados conectam\n' +
-      '• **Ausência após a divisão**: **5 min** = aviso → **10 min** = `reserva` (ou **reforço** de rodada anterior) assume e o jogo é re-balanceado → **20 min** sem alternativa = **W.O.** do lado do ausente (na final, só a staff registra)\n' +
-      '• **Rodada em aberto tem 90 min** de resultado — staff é avisada e pode `prorrogar` ⏳ ou `adiar⏸/retomar▶️` (pausa sem punir)\n' +
+      'O **bracket** registra a **fase de pontos** e a final: cada rodada lista os confrontos (`R1-C1`: TIME A 🆚 TIME B), os mapas e a tabela de classificação.\n\n' +
+      '• **Times fixos**: no sorteio o bot cria **4 times de 5** (balanceados por elo) — eles vencem/perdem JUNTOS a fase toda\n' +
+      '• **Fase 1 = todos contra todos**: 3 rodadas × 2 confrontos; cada vez que dois times se cruzam, vale **1 confronto MD2** (2 mapas)\n' +
+      '• **Lados**: 1º mapa com lado sorteado • 2º mapa lados **invertidos** (mesmo time)\n' +
+      '• **Pontos**: 2x0 = **3 pts** • 1x1 = **1 pt** pra cada • Classificação: pontos → saldo de mapas → confronto direto\n' +
+      '• **Sorteou?** Os 20 ficam no **LOBBY TORNEIO** por 5 min; depois o bot separa na SALA do confronto (C1, C2…) — só os 10 conectam\n' +
+      '• **Ausência após a divisão**: **5 min** = aviso → **10 min** = `reserva` (ou **reforço** = perdedor de mapa concluído) assume a vaga do próprio time (sem re-balance) → **20 min** sem alternativa = **W.O. técnico** do mapa\n' +
       '• ⏸️ **PAUSE**: cada time tem **1 pause de até 5 min por jogo** — aciona pelo `/pause` dentro do jogo (personalizada); quem pausou retoma quando quiser, sem aviso prévio\n' +
-      '• **Times nascem com nome no sorteio** e o nome mantém até a final — só o jogador muda (reserva/reforço)\n' +
-      '• Vencedores avançam; se não fecham 10, os **5 melhores perdedores** entram na **repescagem** (re-balance na próxima rodada)\n' +
-      '• **FINAL MD3**: mesmos times congelados • J1 azul sorteado • J2 lados invertidos • J3 quem venceu o J1 escolhe\n' +
+      '• **Rodada em aberto tem 90 min** de resultado — staff é avisada e pode `prorrogar` ⏳ ou `adiar⏸/retomar▶️`\n' +
+      '• **FINAL MD3** entre os 2 primeiros, com os **mesmos times**: 🎨 o 1º colocado escolhe o lado do J1 • J2 inverte • J3 quem venceu o J1 escolhe\n' +
       '• 🚫 **FEARLESS**: na final, proibido pickar campeão usado na partida anterior da série'
     );
 }
@@ -179,6 +181,23 @@ function buildRodadaEmbed(t) {
   const embed = new EmbedBuilder()
     .setColor('#FFD700')
     .setTitle(`🎲 RODADA ${rodada.n} — ${rodada.games.length} jogo(s)${rodada.repechage?.length ? ' (com repescagem)' : ''}`);
+
+  // Fase de pontos: agrupa por confronto (MD2) com os pontos do resultado.
+  if (T.ehF1(t) && (rodada.confrontos || []).length) {
+    embed.setTitle(`🎲 RODADA ${rodada.n} — Fase de Pontos (MD2 por confronto)`);
+    const nome = (id) => (t.times || []).find((x) => x.id === id)?.nome || id;
+    const linhas = (rodada.confrontos || []).map((c) => {
+      const g1 = rodada.games.find((g) => g.id === c.jogo1) || {};
+      const g2 = rodada.games.find((g) => g.id === c.jogo2) || {};
+      const st1 = g1.winner ? `✅ **${g1.winner === '1' ? g1.nomeTimeA : g1.nomeTimeB} venceu ${g1.id}**` : `⏳ ${g1.id} aguardando`;
+      const st2 = g2.winner ? `✅ **${g2.winner === '1' ? g2.nomeTimeA : g2.nomeTimeB} venceu ${g2.id}**` : `⏳ ${g2.id} aguardando (lados invertidos)`;
+      const pontos = c.resultado ? `\n📊 Placar do confronto ${c.resultado.wa}x${c.resultado.wb} → **${nome(c.timeA)} +${c.resultado.ptsA} pts** • **${nome(c.timeB)} +${c.resultado.ptsB} pts**` : '';
+      return `⚔️ **${c.id} — ${nome(c.timeA)} 🆚 ${nome(c.timeB)}**\n${st1}\n${st2}${pontos}`;
+    });
+    embed.setDescription(linhas.join('\n\n'));
+    return embed;
+  }
+
   const linhas = rodada.games.map((g) => {
     const nomeA = g.nomeTimeA || 'Time 1';
     const nomeB = g.nomeTimeB || 'Time 2';
@@ -196,15 +215,40 @@ function buildRodadaEmbed(t) {
   return embed;
 }
 
+// Tabela da fase de pontos (pontos → saldo → confronto direto).
+function buildClassificacaoEmbed(t) {
+  const cls = T.calcClassificacao(t);
+  const linhas = cls.map((c, i) => {
+    const destaque = i === 0 ? '🥇' : i === 1 ? '🥈' : '▫️';
+    return `${destaque} **${c.nome}** — **${c.pontos} pts** • mapas ${c.mapasV}x${c.mapasP}`;
+  });
+  return new EmbedBuilder()
+    .setColor('#FFD700')
+    .setTitle(`📊 FASE DE PONTOS — Classificação (Torneio #${t.edition})`)
+    .setDescription(
+      `${linhas.join('\n')}\n\n` +
+      '🥈🥇 **Os 2 primeiros fazem a FINAL MD3**\n' +
+      'Desempate: saldo de mapas → confronto direto → staff'
+    )
+    .setFooter({ text: `Pts: 2x0 = ${T.F1_PTS_VITORIA} • 1x1 = ${T.F1_PTS_EMPATE} cada` });
+}
+
 function buildFinalEmbed(t) {
   const f = t.final;
   const nome1 = f.nomeTime1 || 'Time 1';
   const nome2 = f.nomeTime2 || 'Time 2';
   const soma = (team) => team.reduce((s, p) => s + Number(p.baseMmr || 0), 0);
   const diff = Math.abs(soma(f.teamOne) - soma(f.teamTwo));
-  const azul = f.sides?.j1 === '1' ? `${nome1} começa no AZUL 🟦` : `${nome2} começa no AZUL 🟦`;
   const jogo1 = (f.games || [])[0];
-  const escolheJ3 = jogo1 === '1' ? nome1 : jogo1 === '2' ? nome2 : null;
+  const vencedorJ1 = jogo1?.winner === '1' ? nome1 : jogo1?.winner === '2' ? nome2 : null;
+  const ladoJ1 = f.sides?.j1 != null
+    ? (f.sides.j1 === '1' ? `${nome1} começa no AZUL 🟦${nome2 ? ` • ${nome2} no VERMELHO 🟥` : ''}` : `${nome2} começa no AZUL 🟦 • ${nome1} no VERMELHO 🟥`)
+    : `🎨 **${nome1}** (1º colocado) escolhe o lado do J1 — staff: \`!torneio lado 1\` (azul) ou \`!torneio lado 2\` (vermelho)`;
+  const ladoJ3 = f.sides?.j3 != null
+    ? (f.sides.j3 === '1' ? `${nome1} no azul do J3 🟦` : `${nome2} no azul do J3 🟦`)
+    : vencedorJ1
+      ? `J3 (se 1x1): **${vencedorJ1}** escolhe o lado — \`!torneio lado 1|2 j3\``
+      : 'J3 (se 1x1): o vencedor do J1 escolhe o lado';
   const linhas = f.games?.length
     ? `Placar: **${f.wins1} x ${f.wins2}** (${f.games.length} jogo(s))`
     : 'Placar: **0 x 0**';
@@ -215,7 +259,7 @@ function buildFinalEmbed(t) {
       `🟦 **${nome1}**\n${f.teamOne.map((p) => `<@${p.discordId}>`).join(' ')}\n\n` +
       `🟥 **${nome2}**\n${f.teamTwo.map((p) => `<@${p.discordId}>`).join(' ')}\n\n` +
       `${linhas} • Δ MMR **${diff}**\n\n` +
-      `Lados: ${azul} (J1) • J2 inverte • ${escolheJ3 ? `${escolheJ3} escolhe o lado no J3` : 'J3: o vencedor do J1 escolhe o lado'}\n` +
+      `Lados J1: ${ladoJ1}\nLados J2: invertidos do J1\n${ladoJ3}\n` +
       '🚫 **FEARLESS**: proibido pickar campeão usado na partida anterior\n\n' +
       'Staff: `!torneio resultado FINAL <1|2>`'
     );
@@ -271,6 +315,7 @@ async function logInscricoes(guild, t, texto) {
 }
 
 // Posta/refresh o embed da rodada atual (ou final) no bracket.
+// Fase de pontos: mantém também a TABELA fixa (editada a cada resultado).
 async function atualizarBracket(guild, t, texto = null) {
   if (!guild || !t?.canais?.bracket) return;
   const canal = await canalGuild(guild, t.canais.bracket);
@@ -279,6 +324,21 @@ async function atualizarBracket(guild, t, texto = null) {
     const embedFinal = t.champion ? buildResultadoFinalEmbed(t) : buildRodadaEmbed(t);
     if (embedFinal) {
       await canal.send({ embeds: [embedFinal] });
+    }
+    if (T.ehF1(t) && (t.rounds || []).length && !t.champion && (t.times || []).length) {
+      const embedCls = buildClassificacaoEmbed(t);
+      if (t.canais.classificacaoMsg) {
+        const msg = await canal.messages.fetch(t.canais.classificacaoMsg).catch(() => null);
+        if (msg) {
+          await msg.edit({ embeds: [embedCls] }).catch(() => null);
+        } else {
+          const nova = await canal.send({ embeds: [embedCls] }).catch(() => null);
+          t.canais.classificacaoMsg = nova?.id || null;
+        }
+      } else {
+        const nova = await canal.send({ embeds: [embedCls] }).catch(() => null);
+        t.canais.classificacaoMsg = nova?.id || null;
+      }
     }
     if (texto) await canal.send(String(texto).slice(0, 1900));
   } catch (err) { console.error('[TORNEIO] atualizarBracket:', err.message); }
@@ -314,12 +374,16 @@ async function lerLobbiesConectados(guild, t) {
     const ch = guild ? await guild.channels.fetch(String(lobby.canal)).catch(() => null) : null;
     if (!ch?.members) continue;
     presente[lobby.gameId] = [...ch.members.keys()];
+    // Sala por CONFRONTO (F1): a mesma presença vale pros 2 mapas da série.
+    for (const gid of lobby.jogos || []) presente[gid] = [...ch.members.keys()];
   }
   return presente;
 }
 
-// Cria 1 lobby de voz por jogo (limite 10, só os sorteados conectam), move os
-// jogadores e grava o marcador de ausência (criadoEm) — a checagem é no tick.
+// Cria o lobby geral de aquecimento + as salas de voz:
+//   • mata-mata: 1 sala por jogo;
+//   • fase de pontos (F1): 1 sala por CONFRONTO (os 2 mapas da série compartilham).
+// Move os jogadores e grava o marcador de ausência (criadoEm) — a checagem é no tick.
 async function criarLobbies(guild, t, jogos, nowMs = Date.now()) {
   if (!guild) return null;
   await apagarLobbies(guild, t);
@@ -337,10 +401,25 @@ async function criarLobbies(guild, t, jogos, nowMs = Date.now()) {
       ...participantesRodada.map((id) => ({ id, type: 1, allow: ['ViewChannel', 'Connect'] }))
     ]
   }).catch((err) => { console.error('[TORNEIO] lobby geral:', err.message); return null; });
-  for (const [gameIndex, jogo] of jogos.entries()) {
-    const participantes = [...jogo.teamOne, ...jogo.teamTwo].map((p) => p.discordId);
+  // Agrupa jogos em salas: por confronto (F1) ou por jogo (legado).
+  const salas = [];
+  if (T.ehF1(t)) {
+    const porConfronto = new Map();
+    for (const jogo of jogos) {
+      const key = jogo.confronto || jogo.id;
+      if (!porConfronto.has(key)) porConfronto.set(key, []);
+      porConfronto.get(key).push(jogo);
+    }
+    for (const [key, grupo] of porConfronto) {
+      salas.push({ etiqueta: key, jogos: grupo });
+    }
+  } else {
+    for (const jogo of jogos) salas.push({ etiqueta: jogo.id, jogos: [jogo] });
+  }
+  for (const [salaIndex, sala] of salas.entries()) {
+    const participantes = [...new Set(sala.jogos.flatMap((jogo) => [...jogo.teamOne, ...jogo.teamTwo].map((p) => p.discordId)))];
     const ch = await guild.channels.create({
-      name: `🔊・SALA-${String.fromCharCode(65 + gameIndex)}-TORNEIO`,
+      name: `🔊・SALA-${String.fromCharCode(65 + salaIndex)}-TORNEIO`,
       type: ChannelType.GuildVoice,
       parent: categoria.id,
       userLimit: 10,
@@ -349,9 +428,9 @@ async function criarLobbies(guild, t, jogos, nowMs = Date.now()) {
         ...(bot ? [{ id: bot.id, type: 1, allow: ['ViewChannel', 'Connect', 'MoveMembers', 'MuteMembers'] }] : []),
         ...participantes.map((id) => ({ id, type: 1, allow: ['ViewChannel', 'Connect'] }))
       ]
-    }).catch((err) => { console.error(`[TORNEIO] lobby ${jogo.id}:`, err.message); return null; });
+    }).catch((err) => { console.error(`[TORNEIO] sala ${sala.etiqueta}:`, err.message); return null; });
     if (!ch) continue;
-    lobbies.push({ gameId: jogo.id, canal: ch.id });
+    lobbies.push({ gameId: sala.etiqueta, jogos: sala.jogos.map((j) => j.id), canal: ch.id });
   }
   t.canais.lobbies = lobbies;
   t.canais.lobbyGeral = lobbyGeral?.id || null;
@@ -373,6 +452,18 @@ async function criarLobbies(guild, t, jogos, nowMs = Date.now()) {
   return lobbies;
 }
 
+// Roster total da sala (F1: união dos mapas da série; legado/final: o jogo).
+function jogosDoLobby(t, lobby) {
+  if (lobby.jogos?.length) {
+    const all = (t.rounds || []).flatMap((r) => r.games || []);
+    const jogos = lobby.jogos.map((gid) => all.find((g) => String(g.id) === String(gid))).filter(Boolean);
+    if (jogos.length) return jogos;
+  }
+  if (t.final && lobby.gameId === 'FINAL') return [{ teamOne: t.final.teamOne, teamTwo: t.final.teamTwo }];
+  const game = (t.rounds || []).flatMap((r) => r.games || []).find((g) => String(g.id) === String(lobby.gameId));
+  return game ? [game] : null;
+}
+
 async function separarLobbies(guild, t, nowMs = Date.now()) {
   const divide = Date.parse(t?.canais?.dividirEm || '');
   if (!guild || !Number.isFinite(divide) || nowMs < divide) return false;
@@ -380,11 +471,11 @@ async function separarLobbies(guild, t, nowMs = Date.now()) {
   for (const lobby of t.canais.lobbies || []) {
     const ch = await guild.channels.fetch(String(lobby.canal)).catch(() => null);
     if (!ch) continue;
+    const jogos = jogosDoLobby(t, lobby);
+    if (!jogos?.length) continue;
+    const rosters = jogos.flatMap((g) => [...g.teamOne, ...g.teamTwo]).map((p) => String(p.discordId));
     for (const [, member] of staging?.members || []) {
-      const game = (t.final && lobby.gameId === 'FINAL')
-        ? { teamOne: t.final.teamOne, teamTwo: t.final.teamTwo }
-        : (t.rounds || []).flatMap((r) => r.games || []).find((g) => String(g.id) === String(lobby.gameId));
-      if (game && [...game.teamOne, ...game.teamTwo].some((p) => String(p.discordId) === member.id)) {
+      if (rosters.includes(member.id)) {
         await member.voice.setChannel(ch, 'Torneio CAPS ARENA — divisão após 5 minutos').catch(() => null);
       }
     }
@@ -399,10 +490,12 @@ function rodadaAtribuirAusencia(round, marcador) {
   round.ausencia = { ...marcador };
 }
 
-// Excluir lobby de um jogo específico (re-balance não precisa; fim da rodada sim).
+// Excluir a sala (fim da rodada). F1: apagar por MAPA derruba a sala do CONFRONTO.
 async function apagarLobbyDoJogo(guild, t, gameId) {
   if (!guild || !t?.canais?.lobbies) return;
-  const idx = t.canais.lobbies.findIndex((l) => l.gameId === String(gameId).toUpperCase());
+  const alvo = String(gameId).toUpperCase();
+  const idx = t.canais.lobbies.findIndex((l) =>
+    String(l.gameId).toUpperCase() === alvo || (l.jogos || []).map((j) => String(j).toUpperCase()).includes(alvo));
   if (idx < 0) return;
   const [lobby] = t.canais.lobbies.splice(idx, 1);
   const ch = await guild.channels.fetch(String(lobby.canal)).catch(() => null);

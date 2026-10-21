@@ -637,3 +637,211 @@ describe('torneio CAPS ARENA', () => {
 function slim5(base) {
   return Array.from({ length: 5 }, (_, i) => ({ discordId: `${base}${i}`, nickname: `${base}${i}`, baseMmr: 1000 }));
 }
+
+// ─── Fase de Pontos v1 (formato 'F1') ─────────────────────────────────────────
+describe('torneio F1: gerarGradeRoundRobin', () => {
+  it('4 times = 3 rodadas, todos encaram todos, 6 confrontos únicos', () => {
+    const grade = T.gerarGradeRoundRobin(['A', 'B', 'C', 'D']);
+    assert.equal(grade.length, 3);
+    grade.forEach((r) => assert.equal(r.length, 2));
+    const pares = grade.flat().map((c) => [c.timeA, c.timeB].sort().join(''));
+    assert.equal(new Set(pares).size, 6, 'C(4,2) sem repetição');
+  });
+
+  it('quantidade ímpar ou insuficiente → grade vazia', () => {
+    assert.deepEqual(T.gerarGradeRoundRobin(['A']), []);
+    assert.deepEqual(T.gerarGradeRoundRobin(['A', 'B', 'C']), []);
+  });
+});
+
+describe('torneio F1: fluxo completo (20 inscritos → final)', () => {
+  // Monta um torneio F1 com times sorteados (pool de 20 por elo decrescente).
+  function torneioF1() {
+    const t = T.newTournament(1);
+    const times = T.drawFixedTeams(t, pool(20), balance, 4);
+    t.formato = 'F1';
+    t.times = times;
+    t.fase1 = { grade: T.gerarGradeRoundRobin(times.map((x) => x.id)) };
+    return t;
+  }
+
+  it('drawFixedTeams: 4 times de 5, jogadores únicos, nomes sequenciais', () => {
+    const t = T.newTournament(1);
+    const times = T.drawFixedTeams(t, pool(20), balance, 4);
+    assert.equal(times.length, 4);
+    const ids = times.flatMap((x) => x.players.map((p) => p.discordId));
+    assert.equal(new Set(ids).size, 20);
+    times.forEach((x) => assert.equal(x.players.length, 5));
+    assert.match(times[0].nome, /TIME/);
+  });
+
+  it('sortearFase1: cria rodada 1 com 4 mapas e confrontos R1-C1/C2', () => {
+    const t = torneioF1();
+    const r = T.sortearFase1(t);
+    assert.equal(r.ok, true);
+    assert.equal(r.type, 'round');
+    assert.equal(t.rounds.length, 1);
+    assert.equal(t.rounds[0].games.length, 4);
+    assert.equal(t.rounds[0].confrontos.length, 2);
+    assert.ok(t.rounds[0].confrontos[0].jogo1 !== t.rounds[0].confrontos[0].jogo2);
+  });
+
+  it('2x0 = 3 pts; 1x1 = 1 pt pra cada; rosters não mudam entre mapas', () => {
+    const t = torneioF1();
+    T.sortearFase1(t);
+    const r1 = t.rounds[0];
+    const c1 = r1.confrontos[0];
+    const g1 = r1.games.find((g) => g.id === c1.jogo1);
+    const g2 = r1.games.find((g) => g.id === c1.jogo2);
+    assert.deepEqual(g1.teamOne.map((p) => p.discordId), g2.teamOne.map((p) => p.discordId), 'mesmo time nos 2 mapas');
+    const idVencedor = g1.teamOne[0].discordId;
+    T.recordGameResult(t, c1.jogo1, '1');
+    T.recordGameResult(t, c1.jogo2, '1');
+    const [fechado] = T.fecharConfrontosRodada(t, 1);
+    assert.equal(fechado.wa, 2);
+    assert.equal(fechado.ptsA, 3, '2x0 = 3 pts');
+    assert.equal(fechado.ptsB, 0);
+  });
+
+  it('1x1 dá 1 ponto a cada time', () => {
+    const t = torneioF1();
+    T.sortearFase1(t);
+    const r1 = t.rounds[0];
+    const c = r1.confrontos[0];
+    T.recordGameResult(t, c.jogo1, '1');
+    T.recordGameResult(t, c.jogo2, '2');
+    const [fechado] = T.fecharConfrontosRodada(t, 1);
+    assert.equal(fechado.ptsA, 1);
+    assert.equal(fechado.ptsB, 1);
+  });
+
+  it('classificação: pontos > saldo > confronto direto', () => {
+    const t = torneioF1();
+    T.sortearFase1(t);
+    const [c1, c2] = t.rounds[0].confrontos;
+    // C1: time A 2x0 time B (3 pts, saldo +2)
+    T.recordGameResult(t, c1.jogo1, '1');
+    T.recordGameResult(t, c1.jogo2, '1');
+    // C2: 1x1 (1 pt cada)
+    T.recordGameResult(t, c2.jogo1, '1');
+    T.recordGameResult(t, c2.jogo2, '2');
+    T.fecharConfrontosRodada(t, 1);
+    const cls = T.calcClassificacao(t);
+    assert.equal(cls.length, 4);
+    const time1 = cls.find((c) => c.id === c1.timeA);
+    assert.equal(time1.pontos, 3);
+    assert.equal(time1.mapasV, 2);
+    assert.equal(time1.mapasP, 0);
+    const segundoEmpate = cls[1].pontos;
+    assert.ok(segundoEmpate <= 1, 'ninguém mais passou de 1 pt na R1');
+  });
+
+  it('phases: rodada em aberto trava o sortear', () => {
+    const t = torneioF1();
+    T.sortearFase1(t);
+    const r = T.sortearFase1(t);
+    assert.equal(r.ok, false);
+    assert.match(r.message, /em aberto/);
+  });
+
+  it('fase completa → sortear gera a FINAL com top2 e mesmos times; lado do J1 pendente', () => {
+    const t = torneioF1();
+    // Fecha as 3 rodadas na ordem ( todas 2x0 pro lado A do confronto ).
+    for (let n = 0; n < 3; n++) {
+      const r = T.sortearFase1(t);
+      assert.equal(r.ok, true, `rodada ${n + 1} criada`);
+      const round = t.rounds[t.rounds.length - 1];
+      for (const c of round.confrontos) {
+        T.recordGameResult(t, c.jogo1, '1');
+        T.recordGameResult(t, c.jogo2, '1');
+      }
+    }
+    assert.equal(t.rounds.length, 3);
+    T.fecharConfrontosRodada(t);
+    assert.equal(T.fase1Concluida(t), true);
+    const cls = T.calcClassificacao(t);
+    assert.equal(cls[0].pontos, 9, '1º colocado venceu os 3 confrontos 2x0');
+    assert.equal(cls[0].mapasV, 6);
+    const r = T.sortearFase1(t);
+    assert.equal(r.type, 'final', 'fase fechada + rodadas esgotadas → final');
+    assert.equal(t.final.teamOne.length, 5);
+    assert.equal(t.final.teamTwo.length, 5);
+    const nomes = new Set([t.final.nomeTime1, t.final.nomeTime2]);
+    assert.ok(nomes.has(cls[0].nome) && nomes.has(cls[1].nome), 'final entre os 2 melhores');
+    assert.equal(t.final.sides.j1, null, '1º colocado ainda não escolheu o lado');
+    // Escolha do lado: J1 antes de qualquer resultado.
+    const lado = T.definirLadoFinal(t, '2');
+    assert.equal(lado.ok, true);
+    assert.equal(t.final.sides.j1, '2');
+    assert.equal(T.definirLadoFinal(t, '1', 'j3').ok, false, 'j3 só em 1x1');
+  });
+
+  it('forcarSegundo destrava empate no 2º lugar', () => {
+    const t = torneioF1();
+    // Empate total: todas as rodadas em 1-1 → todos com 3 pts e saldo 0.
+    for (let n = 0; n < 3; n++) {
+      const r = T.sortearFase1(t);
+      assert.equal(r.ok, true);
+      const round = t.rounds[t.rounds.length - 1];
+      for (const c of round.confrontos) {
+        T.recordGameResult(t, c.jogo1, '1');
+        T.recordGameResult(t, c.jogo2, '2');
+      }
+    }
+    T.fecharConfrontosRodada(t);
+    const cls = T.calcClassificacao(t);
+    assert.ok(new Set(cls.map((c) => c.pontos)).size === 1, 'todos empatados');
+    const r = T.sortearFase1(t);
+    assert.equal(r.ok, false, 'empate no 2º exige staff');
+    assert.ok(r.classificacao, 'classificação apresentada ao staff');
+    assert.ok(r.exemplo, 'exemplo de comando p/ destravar');
+    const alvo = r.classificacao[1]; // staff classifica o segundo listado
+    const letra = alvo.nome.replace('TIME ', '');
+    const r2 = T.sortearFase1(t, { forcarSegundo: alvo.id });
+    assert.equal(r2.type, 'final', `staff: !torneio sortear ${letra}`);
+    assert.equal(t.final.nomeTime2, alvo.nome);
+  });
+
+  it('poolMortos F1: perdedor de mapa concluído disponível como reforço', () => {
+    const t = torneioF1();
+    T.sortearFase1(t);
+    const r1 = t.rounds[0];
+    const [c1, c2] = r1.confrontos;
+    // Fecha só o confronto C2 (os perdedores dele viram recurso); C1 segue aberto.
+    T.recordGameResult(t, c2.jogo1, '1');
+    T.recordGameResult(t, c2.jogo2, '1');
+    T.fecharConfrontosRodada(t, 1);
+    const pool = T.poolMortos(t);
+    assert.equal(pool.length, 5, 'os 5 perdedores do confronto fechado');
+    const perdedorId = r1.games[2].teamTwo[0].discordId;
+    assert.ok(pool.some((p) => p.discordId === perdedorId));
+  });
+
+  it('substituirDesistente F1: entra na vaga do próprio time em todos os mapas abertos', () => {
+    const t = torneioF1();
+    T.sortearFase1(t);
+    const r1 = t.rounds[0];
+    const c1 = r1.confrontos[0];
+    const jogo1 = r1.games.find((g) => g.id === c1.jogo1);
+    const jogo2 = r1.games.find((g) => g.id === c1.jogo2);
+    const alvo = jogo1.teamOne[0];
+    const timeNome = alvo.timeNome;
+    const reserva = { discordId: 'reserva-x', nickname: 'Reserva X', baseMmr: 1000 };
+    const r = T.substituirDesistente(t, alvo.discordId, reserva, balance);
+    assert.equal(r.ok, true);
+    assert.equal(r.modo, 'jogo-f1');
+    assert.equal(r.rebalanceado, false);
+    // Os 2 mapas do CONFRONTO dele têm o substituto no lugar do ausente.
+    for (const g of [jogo1, jogo2]) {
+      const membros = [...g.teamOne, ...g.teamTwo].map((p) => p.discordId);
+      assert.ok(membros.includes('reserva-x'), `${g.id} tem o reserva`);
+      assert.ok(!membros.includes(alvo.discordId), `${g.id} sem o ausente`);
+    }
+    // Confrontos paralelos não são tocados.
+    const outros = [...r1.games.filter((g) => g.confronto !== c1.id)].flatMap((g) => [...g.teamOne, ...g.teamTwo].map((p) => p.discordId));
+    assert.ok(!outros.includes('reserva-x'), 'outros confrontos intocados');
+    // Time canônico atualizado (próximas rodadas herdam o reserva).
+    const timeCanonico = t.times.find((x) => x.nome === timeNome);
+    assert.ok(timeCanonico.players.some((p) => p.discordId === 'reserva-x'));
+  });
+});

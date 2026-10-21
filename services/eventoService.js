@@ -481,7 +481,7 @@ async function processarAusenciaTorneio(deps, meta, t, guild, nowMs) {
             const r = Torneio.substituirDesistente(t, idAusente, stats, (g) => require('./balanceService').createBalancedTeams(g));
             if (r.ok) {
               const tipo = cand.tipo === 'reforco' ? '🩹 reforço' : '🔁 reserva';
-              linhas.push(`${tipo} **${gameId}**: <@${idAusente}> ausente → <@${r.reserva}> assume e o jogo foi re-balanceado.`);
+              linhas.push(`${tipo} **${gameId}**: <@${idAusente}> ausente → <@${r.reserva}> assume a vaga${r.rebalanceado ? ' e o jogo foi re-balanceado' : ' no próprio time'}.`);
               try { await moverReservaParaLobby(guild, t, r.reserva, gameId); } catch { /* move é best-effort */ }
             } else {
               linhas.push(`⚠️ **${gameId}**: <@${idAusente}> ausente — ${r.message}`);
@@ -542,12 +542,14 @@ async function processarAusenciaTorneio(deps, meta, t, guild, nowMs) {
 // Move a reserva recém-substituída para o lobby do jogo (se já estiver em voz).
 async function moverReservaParaLobby(guild, t, playerId, gameId) {
   const Canais = require('./torneioChannelsService');
-  const lobby = (t.canais?.lobbies || []).find((l) => l.gameId === String(gameId).toUpperCase());
+  const alvo = String(gameId).toUpperCase();
+  const lobby = (t.canais?.lobbies || []).find((l) =>
+    String(l.gameId).toUpperCase() === alvo || (l.jogos || []).map((j) => String(j).toUpperCase()).includes(alvo));
   if (!lobby) return;
   const ch = await guild.channels.fetch(String(lobby.canal)).catch(() => null);
   const member = await guild.members.fetch(String(playerId)).catch(() => null);
   if (ch && member?.voice?.channelId) {
-    await member.voice.setChannel(ch, 'Torneio — reserva assumiu a vaga').catch(() => null);
+    await member.voice.setChannel(ch, 'Torneio - reserva assumiu a vaga').catch(() => null);
   }
 }
 

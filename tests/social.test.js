@@ -444,7 +444,7 @@ describe('prévia agendada do torneio: tick', () => {
     assert.equal(msg.embeds.length, 2, 'regras + bracket');
     assert.match(msg.embeds[0].data.title, /TORNEIO CAPS ARENA/);
     assert.equal(msg.embeds[0].data.image.url, `attachment://${S.PREVIEW_ANEXO_NOME}`);
-    assert.match(msg.embeds[1].data.title, /COMO FUNCIONA O BRACKET/);
+    assert.match(msg.embeds[1].data.title, /COMO FUNCIONA O TORNEIO/);
     assert.match(msg.embeds[1].data.description.toLowerCase(), /w\.o\./, 'cadeia v2 no texto do bracket');
     assert.equal(msg.files.length, 1);
     assert.deepEqual(meta.torneioPreviewSlots, { x: '2026-10-17#10' });

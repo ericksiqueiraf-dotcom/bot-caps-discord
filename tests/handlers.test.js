@@ -163,10 +163,11 @@ describe('handler !torneio: sortear', () => {
 
     const out = await run(['sortear'], ROLE_STAFF);
 
-    assert.match(out, /Rodada 1 sorteada/);
+    assert.match(out, /Times FIXOS sorteados/);
     assert.match(out, /Δ MMR/);
     assert.equal(state.meta.torneio.rounds.length, 1);
-    assert.equal(state.meta.torneio.rounds[0].games.length, 2, '20 jogadores = 2 jogos de 5v5');
+    assert.equal(state.meta.torneio.times.length, 4, '20 jogadores = 4 times de 5');
+    assert.equal(state.meta.torneio.rounds[0].games.length, 4, 'rodada com 2 confrontos MD2 = 4 mapas');
     assert.equal(state.meta.torneio.reservas.length, 0);
   });
 
@@ -188,8 +189,9 @@ describe('handler !torneio: sortear', () => {
     const sorteaveis = state.meta.torneio.rounds[0].games
       .flatMap((g) => [...g.teamOne, ...g.teamTwo].map((p) => p.discordId));
 
-    assert.match(out, /Rodada 1 sorteada/);
-    assert.equal(sorteaveis.length, 20);
+    assert.match(out, /Times FIXOS sorteados/);
+    assert.equal(sorteaveis.length, 40, '20 jogadores × 2 mapas cada confronto');
+    assert.equal(new Set(sorteaveis).size, 20, 'os mesmos 20 primeiros, sem reservas nos mapas');
     assert.deepEqual([...state.meta.torneio.reservas].sort(), ['p21', 'p22', 'p23']);
     assert.ok(sorteaveis.every((id) => !state.meta.torneio.reservas.includes(id)), 'reserva não pode jogar');
   });
