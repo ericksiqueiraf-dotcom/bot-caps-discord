@@ -192,7 +192,6 @@ const CFG_POSTER = {
     ...CFG.social,
     poster: {
       ativo: true,
-      arquivo: 'IMAGENS/TORNEIO CAPS ARENA.png',
       canais: ['📢┃comunicados', '💬・geral-leagueoflegends'],
       horas: [10, 16, 21]
     }
@@ -209,7 +208,7 @@ function makeDepsPoster(guilds = [], meta = {}, cfg = CFG_POSTER) {
       saveSystemMeta: async (m) => { salvos.push({ ...m }); },
       guilds,
       cfg,
-      anexoFactory: (arquivo) => ({ attachment: arquivo, name: S.POSTER_ANEXO_NOME })
+      anexoFactory: (arquivo) => ({ attachment: arquivo, name: S.PREVIEW_ANEXO_NOME })
     }
   };
 }
@@ -220,14 +219,12 @@ describe('pôster agendado: config e canais', () => {
     assert.equal(p.ativo, true);
     assert.deepEqual(p.canais, S.POSTER_CANAIS_DEFAULT);
     assert.deepEqual(p.canais, ['📢┃comunicados', '💬・geral-leagueoflegends']);
-    assert.equal(p.arquivo, S.POSTER_ARQUIVO_DEFAULT);
     assert.deepEqual(p.horas, [10, 16, 21]);
   });
 
-  it('lê canais/arquivo/horas da config e respeita ativo=false', () => {
-    const p = S.getPosterCfg({ social: { poster: { ativo: false, arquivo: 'x.png', canais: ['só-esse'], horas: [21, 7] } } });
+  it('lê canais/horas da config e respeita ativo=false', () => {
+    const p = S.getPosterCfg({ social: { poster: { ativo: false, canais: ['só-esse'], horas: [21, 7] } } });
     assert.equal(p.ativo, false);
-    assert.equal(p.arquivo, 'x.png');
     assert.deepEqual(p.canais, ['só-esse']);
     assert.deepEqual(p.horas, [7, 21], 'ordena as horas');
   });
@@ -288,12 +285,17 @@ describe('pôster agendado: config e canais', () => {
     assert.equal(S.posterSlot(sp(10, 0, 18), CFG_POSTER), '2026-10-18#10');
   });
 
-  it('embed do pôster: título do torneio + imagem do anexo', () => {
-    const e = S.buildPosterEmbed(CFG_POSTER).toJSON();
-    assert.match(e.title, /TORNEIO CAPS ARENA/);
-    assert.equal(e.image.url, `attachment://${S.POSTER_ANEXO_NOME}`);
-    assert.match(e.description, /!torneio entrar/);
-    assert.match(e.description, /MD3/);
+  it('payload canônico: pôster e prévia postam o MESMO regulamento (2 embeds + banner)', () => {
+    const payload = S.buildTorneioPayload({});
+    assert.equal(payload.embeds.length, 2, 'regras + bracket');
+    const regras = payload.embeds[0].toJSON();
+    assert.match(regras.title, /TORNEIO CAPS ARENA/);
+    assert.equal(regras.image.url, `attachment://${S.PREVIEW_ANEXO_NOME}`, 'banner do anexo');
+    assert.match(regras.description, /!torneio entrar/);
+    assert.match(regras.description, /MD3/);
+    assert.match(regras.description, /pause/i, 'regra de pause está no regulamento');
+    const payload2 = S.buildTorneioPayload({ torneio: { edition: 7 } });
+    assert.match(payload2.embeds[0].toJSON().title, /Edição #7/, 'usa a edição real do estado');
   });
 });
 
@@ -306,8 +308,9 @@ describe('pôster agendado: tick automático', () => {
     assert.equal(r.posted, 2);
     assert.equal(geral.sent.length, 1);
     assert.equal(comun.sent.length, 1);
-    assert.equal(geral.sent[0].embeds.length, 1);
-    assert.equal(geral.sent[0].files.length, 1, 'vai o pôster anexado');
+    assert.equal(geral.sent[0].embeds.length, 2, 'regras + bracket (payload canônico)');
+    assert.equal(geral.sent[0].content, comun.sent[0].content, 'mesmo texto nos canais');
+    assert.equal(geral.sent[0].files.length, 1, 'vai o banner anexado');
     assert.deepEqual(meta.posterSlots, { c: '2026-10-17#10', g: '2026-10-17#10' });
     assert.equal(meta.posterUltimoSlot, '2026-10-17#10');
     assert.equal(salvos.length, 1);
@@ -351,13 +354,13 @@ describe('pôster agendado: tick automático', () => {
     assert.equal(salvos.length, 0);
   });
 
-  it('pôster ausente no disco: não posta e não marca o slot', async () => {
+  it('banner ausente no disco: não posta e não marca o slot', async () => {
     const geral = makeCanal('💬・geral-leagueoflegends', 'g');
-    const cfg = { social: { ...CFG_POSTER.social, poster: { ...CFG_POSTER.social.poster, arquivo: 'imagens/nao-existe.png' } } };
+    const cfg = { social: { ...CFG_POSTER.social, torneioPreview: { ...CFG.social.torneioPreview, banner: 'imagens/nao-existe.png' } } };
     const { deps, meta } = makeDepsPoster([makeGuild([geral])], {}, cfg);
     const r = await S.runPosterTick(sp(10), deps);
     assert.equal(r.posted, 0);
-    assert.match(r.reason, /ausente/);
+    assert.match(r.reason, /banner ausente/);
     assert.equal(geral.sent.length, 0);
     assert.equal(meta.posterSlots, undefined);
   });

@@ -16,8 +16,6 @@ const FALLBACK_NOME_RE = /comunicado|an[úu]ncio|announcement/i;
 
 // Pôster agendado do torneio: vai p/ comunicados + geral, nos mesmos horários.
 const POSTER_CANAIS_DEFAULT = ['📢┃comunicados', '💬・geral-leagueoflegends'];
-const POSTER_ARQUIVO_DEFAULT = 'IMAGENS/TORNEIO CAPS ARENA.png';
-const POSTER_ANEXO_NOME = 'torneio-caps-arena.png';
 
 // Prévia agendada do torneio (embeds de regras/bracket + banner novo) — `social.torneioPreview`.
 const PREVIEW_CANAIS_DEFAULT = ['🤖・comandos'];
@@ -121,7 +119,6 @@ function getPosterCfg(cfg = config) {
   const p = cfg?.social?.poster || {};
   return {
     ativo: p.ativo !== false,
-    arquivo: String(p.arquivo || POSTER_ARQUIVO_DEFAULT),
     canais: Array.isArray(p.canais) && p.canais.length ? p.canais.map(String) : [...POSTER_CANAIS_DEFAULT],
     horas: Array.isArray(p.horas) && p.horas.length ? getHoras({ social: { horas: p.horas } }) : getHoras(cfg)
   };
@@ -136,12 +133,6 @@ function findPosterChannels(guild, cfg = config) {
   return fallback ? [fallback] : [];
 }
 
-// Caminho absoluto do pôster (config relativa à raiz do bot).
-function posterPath(cfg = config) {
-  const bruto = getPosterCfg(cfg).arquivo;
-  return path.isAbsolute(bruto) ? bruto : path.join(__dirname, '..', bruto);
-}
-
 // Slot do pôster ("AAAA-MM-DD#HH") ou null se não for hora de postar.
 function posterSlot(nowMs = Date.now(), cfg = config) {
   const partes = getSPParts(nowMs);
@@ -150,23 +141,19 @@ function posterSlot(nowMs = Date.now(), cfg = config) {
   return `${partes.key}#${hora}`;
 }
 
-function buildPosterEmbed(cfg = config) {
-  return new EmbedBuilder()
-    .setColor('#e8b84b')
-    .setTitle('🏆 TORNEIO CAPS ARENA — MATA-MATA 5X5')
-    .setDescription([
-      '**1.** Inscrição: `!torneio entrar` — mínimo de 20 inscritos',
-      '**2.** Sorteio: grupos de 10 com **times 5x5 equilibrados** pela soma de elo',
-      '**3.** Rodada: quem vence avança, quem perde está fora',
-      '**4.** Repescagem: sem 10 vencedores, os **melhores perdedores** voltam',
-      '**5.** Final: 10 classificados em **MD3** — melhor de 3, mesmos times',
-      '**6.** O time campeão leva o cargo **🏆 Campeão CAPS** + premiação a definir',
-      '',
-      '`!torneio info` mostra o regulamento • `!torneio status` mostra a rodada atual'
-    ].join('\n'))
-    .setImage(`attachment://${POSTER_ANEXO_NOME}`)
-    .setFooter({ text: 'Caps Bot • Torneio oficial • !torneio entrar' })
-    .setTimestamp();
+// Payload CANÔNICO do torneio para os posts automáticos: pôster (comunicados/
+// geral) e prévia (comandos) usam os MESMOS embeds — fonte única no
+// TORNEIO_INFO — para nunca circularem dois regulamentos diferentes.
+// Edição real quando existe torneio no estado; senão demo (edição 1).
+function buildTorneioPayload(meta = {}) {
+  // Require dentro (torneioChannels→torneioService carregam jogo; evita ordem pesada no boot).
+  const C = require('./torneioChannelsService');
+  const T = require('./torneioService');
+  const torneio = meta.torneio?.edition ? { ...meta.torneio } : T.newTournament(1);
+  return {
+    content: `🏆 **Torneio CAPS ARENA (Edição #${torneio.edition})** — regulamento em \`!torneio info\` • inscrição: \`!torneio entrar\``,
+    embeds: [C.buildRegrasEmbed(torneio, true), C.buildIntroducaoBracketEmbed()]
+  };
 }
 
 // Posta o pôster nos canais configurados. Anti-duplicação por canal/slot em
@@ -174,6 +161,8 @@ function buildPosterEmbed(cfg = config) {
 // A janela load→save roda na fila global 'evento:systemMeta' — sem ela, ticks
 // concorrentes (social/pôster/prévia/torneio) sobrescrevem o meta inteiro e o
 // slot se perde → post duplicado no minuto seguinte.
+// Conteúdo: MESMO payload canônico da prévia (regras + bracket + banner) —
+// nunca dois regulamentos diferentes no servidor.
 async function runPosterTick(nowMs = Date.now(), deps = {}) {
   const {
     withQueueOperationLock = require('./dataService').withQueueOperationLock,
@@ -181,7 +170,7 @@ async function runPosterTick(nowMs = Date.now(), deps = {}) {
     saveSystemMeta = require('./dataService').saveSystemMeta,
     guilds = global.discordClient?.guilds?.cache?.values?.() || [],
     cfg = config,
-    anexoFactory = (arquivo) => new AttachmentBuilder(arquivo, { name: POSTER_ANEXO_NOME })
+    anexoFactory = (arquivo) => new AttachmentBuilder(arquivo, { name: PREVIEW_ANEXO_NOME })
   } = deps;
 
   const alvo = getPosterCfg(cfg);
@@ -190,13 +179,13 @@ async function runPosterTick(nowMs = Date.now(), deps = {}) {
   const slot = posterSlot(nowMs, cfg);
   if (!slot) return { posted: 0, reason: 'fora de horário' };
 
-  const arquivo = posterPath(cfg);
-  if (!fs.existsSync(arquivo)) return { posted: 0, reason: `pôster ausente: ${alvo.arquivo}` };
+  const arquivo = bannerPreviewPath(cfg);
+  if (!fs.existsSync(arquivo)) return { posted: 0, reason: `banner ausente: ${getTorneioPreviewCfg(cfg).banner}` };
 
-  const embed = buildPosterEmbed(cfg);
   return withQueueOperationLock('evento:systemMeta', async () => {
     const meta = (await loadSystemMeta()) || {};
     const slots = meta.posterSlots && typeof meta.posterSlots === 'object' ? meta.posterSlots : {};
+    const { content, embeds } = buildTorneioPayload(meta);
     let posted = 0;
 
     for (const guild of guilds) {
@@ -204,7 +193,7 @@ async function runPosterTick(nowMs = Date.now(), deps = {}) {
         const chave = String(canal.id);
         if (slots[chave] === slot) continue;
         try {
-          await canal.send({ embeds: [embed], files: [anexoFactory(arquivo)] });
+          await canal.send({ content, embeds, files: [anexoFactory(arquivo)] });
           slots[chave] = slot;
           posted += 1;
         } catch { /* próximo canal */ }
@@ -254,9 +243,6 @@ async function runTorneioPreviewTick(nowMs = Date.now(), deps = {}) {
     cfg = config,
     anexoFactory = (arquivo) => new AttachmentBuilder(arquivo, { name: PREVIEW_ANEXO_NOME })
   } = deps;
-  // Require dentro (torneioChannels→torneioService carregam jogo; evita ordem pesada no boot).
-  const C = require('./torneioChannelsService');
-  const T = require('./torneioService');
 
   const alvo = getTorneioPreviewCfg(cfg);
   if (!alvo.ativo) return { posted: 0, reason: 'prévia desativada' };
@@ -271,10 +257,8 @@ async function runTorneioPreviewTick(nowMs = Date.now(), deps = {}) {
   return withQueueOperationLock('evento:systemMeta', async () => {
     const meta = (await loadSystemMeta()) || {};
     const slots = meta.torneioPreviewSlots && typeof meta.torneioPreviewSlots === 'object' ? meta.torneioPreviewSlots : {};
-    // Edição real quando existe torneio no estado; senão demo com a última edição conhecida.
-    const torneio = meta.torneio?.edition ? { ...meta.torneio } : T.newTournament(1);
-    const embeds = [C.buildRegrasEmbed(torneio, true), C.buildIntroducaoBracketEmbed()];
-    const content = `🏆 **Prévia do Torneio CAPS ARENA (Edição #${torneio.edition})** — regulamento em \`!torneio info\` • inscrição: \`!torneio entrar\``;
+    // MESMO payload canônico do pôster — um regulamento só no servidor.
+    const { content, embeds } = buildTorneioPayload(meta);
     let posted = 0;
 
     for (const guild of guilds) {
@@ -348,8 +332,6 @@ module.exports = {
   HORAS_DEFAULT,
   CANAIS_PADRAO,
   POSTER_CANAIS_DEFAULT,
-  POSTER_ARQUIVO_DEFAULT,
-  POSTER_ANEXO_NOME,
   REDES,
   getRedes,
   linkDaRede,
@@ -360,9 +342,8 @@ module.exports = {
   findCanaisPorNomes,
   getPosterCfg,
   findPosterChannels,
-  posterPath,
   posterSlot,
-  buildPosterEmbed,
+  buildTorneioPayload,
   runSocialTick,
   runPosterTick,
   runTorneioPreviewTick,
