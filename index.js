@@ -704,6 +704,7 @@ async function processCommand(message, rawContent) {
         await handlers.handleListCommand(message, args);
         break;
       case 'espera':
+      case 'esperar':
         await handlers.handleWaitingListCommand(message, args);
         break;
       case 'esperatiers':
@@ -873,6 +874,9 @@ async function processCommand(message, rawContent) {
         break;
       case 'duelo':
         await handlers.handleDueloCommand(message, args);
+        break;
+      case 'duelorank':
+        await handlers.handleDueloCommand(message, ['rank']);
         break;
       case 'presentear':
         await handlers.handlePresentearCommand(message, args);
@@ -1218,6 +1222,7 @@ client.on('interactionCreate', async (interaction) => {
         await handlers.handleListCommand(context, selectorArgs);
         break;
       case 'espera':
+      case 'esperar':
         await handlers.handleWaitingListCommand(context, selectorArgs);
         break;
       case 'esperatiers':

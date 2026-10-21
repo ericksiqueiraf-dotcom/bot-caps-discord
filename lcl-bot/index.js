@@ -592,6 +592,7 @@ async function processCommand(message, rawContent) {
         await handlers.handleListCommand(message, args);
         break;
       case 'espera':
+      case 'esperar':
         await handlers.handleWaitingListCommand(message, args);
         break;
       case 'esperatiers':
@@ -1032,6 +1033,7 @@ client.on('interactionCreate', async (interaction) => {
         await handlers.handleListCommand(context, selectorArgs);
         break;
       case 'espera':
+      case 'esperar':
         await handlers.handleWaitingListCommand(context, selectorArgs);
         break;
       case 'esperatiers':

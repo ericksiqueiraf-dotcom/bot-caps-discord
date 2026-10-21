@@ -5,55 +5,43 @@
 
 ---
 
-## 🗓️ Última Sessão
+## Estado Operacional — 2026-10-21
 
-- **Data:** 2026-10-21
-- **Foco:** **Torneio — FORMATO NOVO "Fase de Pontos v1" IMPLEMENTADO** ✅ + limpeza do teste de ontem. **Formato:** inscrição (mín. 20, múltiplo de 10) → `!torneio start`/`sortear` sorteia **4 TIMES FIXOS de 5** (drawFixedTeams: 2 grupos de 10 por elo → balance 5v5; nomes `TIME A`... na sequência `t.timeSeq`) + grade **round-robin** (`gerarGradeRoundRobin`, círculo clássico — 3 rodadas × 2 confrontos) → cada confronto = **MD2** (`R{n}-C{i}` com `jogo1`/`jogo2` = `R{n}-J1..J4`, rosters FIXOS dos times; lado só cosmético) → **2x0 = 3 pts, 1x1 = 1 pt** (`fecharConfrontosRodada` auto ao registrar resultado) → classificação (`calcClassificacao`: **pontos → saldo → confronto direto**, estável) → fase fechada (`fase1Concluida`) + `sortear` = **FINAL MD3 automática** com top 2 e os MESMOS times (`concluirFase1`). **Lados da final: 1º colocado ESCOLHE o lado do J1** (`sides.j1 = null` até staff `!torneio lado 1|2`; J2 inverte; **J3 em 1x1: quem venceu o J1 escolhe** → `!torneio lado 1|2 j3` — `definirLadoFinal`). **Empate no 2º lugar** sem desempate automático → `sortearFase1` recusa com classificação na mão e staff destrava com `!torneio sortear <LETRA>` (`forcarSegundo`).
-- **Como está no serviço:** rodadas F1 vivem **no MESMO `t.rounds[]`** (shape legado + `round.confrontos`) — ausência/timeout/lobbies/herança do mata-mata funcionam sem mudanças. Gate por `t.formato === 'F1'` (`ehF1`); `newTournament` NÃO seta formato — o branch do `!torneio sortear` adota `'F1'` no estado novo (`!t.formato` → F1), estados antigos explícitos seguem legado (zero retrabalho nos 296 testes antigos). **Salas por CONFRONTO** (`criarLobbies` agrupa por `jogo.confronto`; `lobby = { gameId: 'R1-C1', jogos: [...], canal }`) — `lerLobbiesConectados` copia a presença pros 2 mapas, `separarLobbies` via `jogosDoLobby` (união dos rosters), `apagarLobbyDoJogo`/`moverReservaParaLobby` resolvem sala pelo mapa. **Substituição F1 INA VAGA (sem re-balance)**: `substituirDesistente` modo `jogo-f1` troca o ausente em TODOS os mapas abertos da rodada + `t.times[].players` (canonico — evita consumir 2 reservas p/ o mesmo ausente); desistência pós-resultado também atualiza o canônico. **Reforço F1** (`poolMortos`): perdedor de QUALQUER mapa concluído que não esteja escalado em jogo aberto. Embeds: `buildRodadaEmbed` F1 por confronto (MD2 + pontos), **`buildClassificacaoEmbed`** (tabela fixa editável via `t.canais.classificacaoMsg` no `atualizarBracket`), `buildFinalEmbed` com escolha de lado/vencedor-J1, `TORNEIO_INFO` + `buildIntroducaoBracketEmbed` reescritas p/ fase de pontos. Comandos: **`!torneio classificacao`** (público), **`!torneio lado`** (staff), status mostra formato/pendência de lado. Suite **308/308** (12 testes F1 novos em `tests/torneio.test.js`; `handlers/social` ajustados: "Times FIXOS sorteados", "COMO FUNCIONA O TORNEIO").
-- **Limpeza do teste (2026-10-20):** script temporário (REST + Mongo) deletou categoria `🏆・TORNEIO CAPS ARENA` + bracket/campeões + lobby-final de voz, removeu o cargo **🏆 Campeão CAPS** dos 4 campeões teste e deletou o cargo; Mongo `systemMeta.torneio = null`, `torneioHistorico = []`. **Estado limpo — próxima `!torneioon` começa do zero com F1.** Script deletado (não comitar).
-- **Commit:** `f2abfec feat(torneio): formato Fase de Pontos v1` na branch **`feat/torneio-onoff`** + `pm2 restart caps-bot` — online (`CAPS BOT LOL#6241`, Mongo Atlas), sem `[TORNEIO]` no error.log. Backups `database/backup-2026-10-1{8,9,20}.json` ficam FORA do commit.
-- **Rollback do formato (2026-10-21, mesma sessão):** o mata-mata v1 (repescagem) segue **100% intacto no motor** — rollback = **1 linha**: `TORNEIO_FORMATO_DEFAULT = 'legado'` em `services/torneioService.js` (estado novo sem `t.formato` passa por `usaF1 = default === 'F1'` no `!torneio sortear` e cai no branch legado; estados que já são F1 continuam F1). **Tag `formato-mata-mata-v1`** criada em `c792d8e` = snapshot completo do formato antigo incl. texts/embeds (`git show formato-mata-mata-v1:services/torneioService.js` tem o TORNEIO_INFO antigo).
-- **Banner regenerado (2026-10-21):** `assets/torneio-banner.png` (1200×675) agora com o fluxo NOVO: Inscrição → **4 times fixos de 5** → Fase de Pontos (3 rodadas × 2 confrontos MD2, 2x0 = 3 pts • 1x1 = 1 pt, tabela no bracket) → Final MD3 (mesmos times, 1º escolhe lado do J1, 🚫 FEARLESS). Fonte editável: `assets/torneio-banner.html`. Render: servidor estático node na porta 2741 (root = `assets/`) + browser.tools screenshot fullPage (⚠️ sai 1200×714 → recortar 675px com System.Drawing) — mesma técnica de 2026-10-20. ⚠️ LIÇÃO: `Stop-Process -Name node` derruba o pm2 INTEIRO — recuperei com `pm2 resurrect`; parar servidor temporário SÓ por PID da porta (`Get-NetTCPConnection -LocalPort X → Stop-Process -Id`).
-- **`!staff2` (2026-10-21):** o guia da staff virou 2 páginas — `!staff` = partida/filas/roleta/elos/clube/temporada (7 seções, cada campo ≤1024) e **`!staff2` = guia completo do TORNEIO** (2 campos: abrir/agendar + durante a fase, com detalhe de confronto MD2, pontos, `!torneio lado`, cadeia de ausência e desempate `sortear <LETRA>`). Novos em `utils/lobbyUtils.js`: `STAFF2_SECTIONS` + `buildStaff2Embed`; handler `handleStaff2Command` em `legacyCommands.js`; rotas `!staff2`/slash em `index.js` (2 pontos). Parity test: `buildStaff2Embed` + `STAFF2_SECTIONS` declarados em `KNOWN_EXPORT_GAPS.caps` (lobbyUtils). Suite **309/309 (53 suites)**.
-- **Divulgação reduzida (2026-10-21, pedido do dono):** embeds automáticos **1x/dia às 10h (SP)** — `social.horas` (redes oficiais), `social.poster.horas` (torneio em `comunicados`/`geral`) e `social.torneioPreview.horas` (prévia em `🤖・comandos`), todos em `config.json` (eram 10/16/21 = 3x/dia). **Clube VIP segue 2x/dia (12h/19h)** — `CLUBE_PROMO_HOURS` em `lobbyUtils.js` intacto. Horas são lidas do `config` por tick (caching no boot → precisa `pm2 restart` p/ aplicar). Suite 309/309.
-- **Pendências/next:** enquete do grupo p/ formalizar o formato (texto WhatsApp pronto da sessão anterior — o bloco citava "sorteados UMA VEZ e mantidos até o fim" ✓ igual ao implementado); docs-texto (`TODOS OS COMANDOS - CAPS ARENA + LCL BOT.txt`) seção torneio ainda descreve repescagem — conferir na próxima sessão; testar o fluxo F1 ponta a ponta (prod ou `caps-bot-teste`).
+- **Próximo torneio:** teste da **Fase de Pontos v1**. Código atualizado nesta sessão para grupos A/B dinâmicos e final agendada; precisa ser validado antes do uso. Não afirmar teste ou restart.
+- **Formato padrão confirmado no código:** `services/torneioService.js` define `TORNEIO_FORMATO_DEFAULT = 'F1'`. Torneios novos sem formato explícito seguem F1; estados com formato legado explícito continuam no motor mata-mata. A tag `formato-mata-mata-v1` é opção de rollback, não o padrão atual.
+- **Formato dinâmico:** inscritos divididos igualmente em Grupos A e B; equipes fixas de cinco e round-robin dentro do grupo. 30 = 15 por grupo/3 times; 40 = 20/4 times; 50 = 25/5 times; 60 = 30/6 times. Aplicar a mesma regra para cada múltiplo de 10; em rodadas com número ímpar de times haverá bye. Campeões de A e B avançam.
+- **Final:** MD3 dos líderes de A/B, iniciada manualmente no dia combinado pela staff com `!torneio final start`; J1 sorteado, J2 inverte, e em 1x1 o vencedor de J1 escolhe lado do J3.
+- **Substituições na final:** o código agora escolhe entre reservas (ou reforços elegíveis se a fila estiver vazia) pela menor diferença total de MMR entre os dois times após ocupar a vaga. É o melhor equilíbrio possível dentre os candidatos disponíveis; não promete MMR idêntico.
+- **Salas de voz:** capacidade de 10 por sala. Criar lobbies suficientes para os jogos simultâneos (ex.: 40 jogadores, quatro partidas paralelas = quatro salas de 10); o lobby de aquecimento dura 5 min e depois os participantes são movidos para as salas dos confrontos.
+- **Implementação:** `services/torneioService.js`, `commands/legacyCommands.js` e `services/torneioChannelsService.js` foram atualizados para o formato dinâmico, classificação separada e final pendente/início manual. Validar antes de usar em produção.
+- **Voz atual no código:** cria `LOBBY TORNEIO`; após 5 minutos move jogadores para sala por confronto (C1, C2…). A ausência conta depois da divisão.
+- **Comandos de staff:** `!torneioon`, `!torneio start`, `!torneio sortear`, `!torneio lider <A|B> <ID_DO_TIME>` em caso de desempate decidido pela staff, `!torneio final start` na data marcada, `!torneio resultado <jogo> <1|2>` e `!torneio lado <1|2> j3` se a final ficar 1x1.
+- **Duelo:** regra “quem matar primeiro vence”; staff declara com `!duelo vitoria @vitorioso @perdedor`.
+- **Bot:** última nota da sessão de 2026-10-21 reporta `caps-bot` online após restart. Estado não reconsultado nesta atualização da memória.
 
-- **Data:** 2026-10-20
-- **Foco:** **Torneio — Etapa 1 IMPLEMENTADA** ✅ — categoria Discord dedicada `🏆・TORNEIO CAPS ARENA` (dinâmica: `regras`/`inscrições`/`bracket`/`campeões` com permissões leitura-pública), lobbies de voz por jogo com **mover automático dos 10 sorteados** + limite 10 (só participantes conectam), **fila de reservas** com substituição por desistência/ausência (**re-balance do jogo** se pré-resultado; vaga na próxima rodada se pós-resultado), **ausência automática** (aviso T+5min, substituição T+10min, tick a cada 60s, sobrevive restart via `round.ausencia`), subcomando **`!torneio desistencia @user`**, `encerrar` restrito a **pré-1º-sorteio** (`podeEncerrar`), final MD3 (times congelados + **lados: J1 sorteado, J2 inverte, J3 o vencedor do J1 escolhe**, [t.final.sides.j1]) com **Fearless honorável**, **hall de campeões** por edição (nick+avatar em `systemMeta.torneioHistorico`), cargo 🏆 idempotente (bicampeão mantém, sem remove/add) e `arquivarPosCampeao` (só bracket+campeões ficam) + embeds (`TORNEIO_INFO` novo, buildRodadaEmbed/final/inscricoes reutilizáveis).
-- **Status:** ✅ **CAPS 287/287** (49 suites; +11 testes novos em `tests/torneio.test.js`: substituições 4 modos, ausência aviso/limpar/substituir/limpar-final, sides da final, `podeEncerrar`, **nomes de time estáveis**). LCL sem alteração. `node --check` OK (6 arquivos). Plano completo: `~/.opencode/plan/etapa1-torneio-categoria.md`; deliberado p/ etapa futura: **Fearless via Riot API**.
-- **Commit:** `feat(torneio)` na branch **`feat/torneio-onoff`** — arquivos: `services/torneioService.js`, `services/torneioChannelsService.js` (NOVO), `commands/legacyCommands.js`, `services/eventoService.js`, `utils/lobbyUtils.js`, `tests/torneio.test.js`, `TODOS OS COMANDOS - CAPS ARENA + LCL BOT.txt`, `MEMORY.md`. Backups `database/backup-2026-10-18.json`/`-19.json` ficam FORA do commit (estados de runtime).
-- **Docs alinhadas:** seção TORNEIO do `TODOS OS COMANDOS...txt` (times nomeados + repescagem 5 melhores perdedores + MD3 times congelados) e seção 🏆 Torneio do `!staff` (`utils/lobbyUtils.js` — magro: campo de embed ~1000 chars, NÃO alongar, senão estoura o limite 1024 do Discord).
-- **Nomes de time (refinamento 2026-10-19, 2ª rodada de conversa):** times **nascem com nome no sorteio** — `R1 TIME A`, `R1 TIME B`, `R1 TIME C`, `R1 TIME D`... — letras em sequência por edição (`t.timeSeq`, `nomeLetraTime`/`atribuirNomesTimes` em `torneioService.js`; 26 letras, depois `A2`, `B2`...). **O nome mantém enquanto o time existe e vai até a final**; slots de R2+ são re-balanceados no formato do torneio (vencedores + repescagem dos **5 melhores perdedores individuais** re-sortados, letras continuam: R2 TIME G, H...). Em substituição de reserva os jogadores mudam, **o nome NÃO** (`substituirDesistente` re-carimba `p.timeNome` pós re-balance; 'proxima-rodada' leva o `timeNome` do slot). **Final MD3 mantém os mesmos times congelados** (`t.final.nomeTime1/2` vêm dos lados vencedores; sem re-split) — embeds e `formatTorneioGames` exibem os nomes. ⚠️ NÃO re-avancar para "times como unidade" (repescagem por time inteiro) — usuário vetou: formato é re-balance por rodada. Helpers novos exportados: `timesVencedores/timesPerdedores/pairTeamsEmJogos` (o último hoje só p/ testes).
-- **Timeout de rodada + guard do `off` (2026-10-20):** `RODADA_TIMEOUT_MIN = 90` — rodada/final em aberto (`iniciadoEm` carimbado no push/sorteio) vira aviso automático no tick (`eventoService` → `finalizarTickTorneio`, post única via `marcador.timeoutAvisadoEm`); **`!torneio prorrogar`** (staff) renova a janela. **`podeDesativar`**: `!torneiooff` bloqueado **só pós-1º-sorteio** até a coroação (pré-sorteio segue livre — `handlers.test` cobre o fluxo antigo `off` não apaga nada).
-- **Cadeia de ausência v2 (2026-10-20, exceto FINAL):** **T+5 aviso → T+10 reserva → T+10 sem reserva: REFORÇO do pool morto (perdedores NÃO-repescados de rodadas anteriores — `poolMortos`/`escolherSubstituto`, melhor elo; reinseridos não voltam pro pool) → T+20 W.O. AUTOMÁTICO do lado do ausente** (`aplicarWalkover`; ambíguo = ambos lados ausentes e FINAL jamais automático → post "staff decide"). `substituirDesistente` agora usa `pegarReservaId()` (fila vazia usa `reserva.discordId` do reforço — reforço NÃO consome fila). `!torneio desistencia` sem substituto → **W.O. imediato** do lado do desistente via `jogoAbertoDePlayer` (decisão humana já tomada). **`!torneio adiar`/`retomar`** staff (`t.adiado = {em}`): tick pausa ausência/timeout (gate no `finalizarTickTorneio` + guard em `avaliarAusencia`); retomar limpa + `prorrogarRodada` + **reinicia `ausencia.criadoEm`** (evita W.O. instantâneo na volta). Docs/!staff (2 campos agora) atualizados. Suite **291/291**. No prod + pm2 restart OK.
-- **Duplicação de mensagens automáticas — causa raiz e fix (2026-10-20):** ticks agendados faziam **load → mutate → save do systemMeta INTEIRO em janelas concorrentes** (social/pôster/prévia/torneio/sexta/lcl/clube — cada um sem lock compartilhado): o save de um reverte o slot gravado pelo outro → no minuto seguinte o slot "perdido" postava **de novo** (duplicado) e podia até reverter estado do torneio. Fix: **fila global única `evento:systemMeta`** — as chaves de `withQueueOperationLock` de `runSextaTick`/`runLclTick`/`runTorneioTick` unificadas e as janelas meta de `runSocialTick`/`runPosterTick`/`runTorneioPreviewTick` (socialService) e `runClubePromoTick` (lobbyUtils) envolvidas nela; `startSocialScheduler` roda os 3 ticks **sequenciais**. Escritores event-driven (comandos) ficaram como estão — baixa frequência, risco pré-existente. Confirmed: `caps-bot` (DB Mongo `caps-bot`) e `caps-bot-teste` (DB `caps-bot-teste`) usam **bancos separados** → sem conflito entre os dois bots.
-- **Regra de PAUSE — final (2026-10-20):** é regra **do regulamento do torneio**, efetivada **só dentro do jogo** pelo `/pause` do cliente (disponível na personalizada) — **NÃO é comando do bot** (cheguei a implementar `!pause`/`pauseService` e desfiz no mesmo dia; commit de remoção). Texto adicionado em `TORNEIO_INFO` (torneioService, `!torneio info` + embed de regras) e em `buildIntroducaoBracketEmbed` (torneioChannelsService): **cada time tem 1 pause de até 5 min por jogo; quem pausou não precisa avisar para despausar**. Prévia 3x/dia já mostra a regra (usa os mesmos embeds).
-- **Prévia agendada 3x/dia (2026-10-20):** `runTorneioPreviewTick` no `socialService` (mesmo scheduler do pôster — `startSocialScheduler`, tick 60s): 10h/16h/21h SP posta em `#🤖・comandos` **content + 2 embeds (regras com banner via `attachment://torneio-banner.png`, intro bracket com a cadeia v2) + banner anexado**. Config `social.torneioPreview` (ativo/horas/canais/banner; default canais `['🤖・comandos']`, `banner: 'assets/torneio-banner.png'`); anti-duplicação por canal em `systemMeta.torneioPreviewSlots` + `torneioPreviewUltimoSlot` (mesmo formato "AAAA-MM-DD#HH"); usa a edição real de `meta.torneio` p/ o título, senão demo `newTournament(1)`. Exportos: `runTorneioPreviewTick/getTorneioPreviewCfg/torneioPreviewSlot/PREVIEW_*`. Suite **296/296 (51 suites)**. (Pôster antigo: ver bullet da unificação abaixo.)
-- **Unificação pôster × prévia (2026-10-20):** relato de **2 embeds automáticos com regulamentos divergentes** (pôster antigo 10:01 comunicados+geral com lista desatualizada vs prévia 10:02 comandos com TORNEIO_INFO atual). Fix: payload **canônico único** `buildTorneioPayload(meta)` (content + `buildRegrasEmbed(t, true)` + `buildIntroducaoBracketEmbed`) usado por `runPosterTick` **e** `runTorneioPreviewTick` — fonte única, zero drift; ambos anexam `assets/torneio-banner.png` (`torneio-banner.png`). `buildPosterEmbed`/`posterPath`/`POSTER_ARQUIVO_DEFAULT`/`POSTER_ANEXO_NOME` removidos (criativo quadrado `IMAGENS/TORNEIO CAPS ARENA.png` fora da automação); `config.social.poster` perde `arquivo`. Testes atualizados (payload idêntico nos canais, edição real #7 no título). Suite **296/296**.
-- **Prévia + banner (2026-10-20):** banner novo **`assets/torneio-banner.png`** (1200×675 exatos — ⚠️ captura `fullPage` do navegador insiste em 713px de altura, então **recortar** para 675px com System.Drawing/.NET antes de salvar; fundo `html,body` travado `#0b0e17`). Tema escuro dourado/laranja: fluxo Inscrição→Sorteio→Batalhas/Repescagem→Final MD3 + pills de ausência/90min/cargo + CTA `!torneio entrar`. `buildRegrasEmbed(t, withBanner)` anexa o banner (`attachment://torneio-banner.png`) quando enviado; `ensureCategoriaTorneio` anexa se o arquivo existe. `buildIntroducaoBracketEmbed` reescrito com a cadeia v2. **`scripts/test-torneio-embeds.js`**: posting de PRÉVIA dos embeds **REST-only (sem gateway — não conflita com bot no pm2)**; flags `--list`, `--guild <id|nome>`, `--canal <id|nome>`, `--sem-banner`. Prévia publicada em `#🤖・comandos` (CAPS 1273653944169660427, sem faixa branca). Torneio ainda OFF no prod — prévia independe do estado do torneio.
-- **Início manual do torneio + salas (2026-10-20):** `!torneio start` (staff) é alias de `sortear`: com pelo menos 20 inscritos, fecha inscrições em múltiplos de 10, envia excedentes à reserva e sorteia/inicia a rodada. O bot cria `LOBBY TORNEIO`; após 5 min, o tick move os jogadores conectados para uma sala de voz por partida (`SALA-A`, `SALA-B`, `SALA-C`, `SALA-D`…); partidas têm ambos os times na mesma sala. Inscrição `!torneio entrar` usa `withQueueOperationLock` por guild e recarrega `systemMeta` dentro do lock para evitar duplicação concorrente (lock em memória, uma instância). `TORNEIO_INFO`/embed de regras e ajuda geral documentam `!torneio start`.
-- **Duelos por primeiro abate + resultado da staff (2026-10-20):** regra: **quem matar primeiro vence**. Após jogo, staff registra `!duelo vitoria @vitorioso @perdedor`; só conclui duelo aceito entre esses dois, transfere PDL apostados (vencedor +, perdedor -) e marca `concluido`. Ajuda/aceite do desafio mencionam a regra e comando. `handleDueloCommand` pode obter o subcomando diretamente do conteúdo da mensagem como fallback ao parser de argumentos.
+### Próximos passos
 
+1. Fazer o teste em ambiente isolado (preferencialmente `caps-bot-teste` / banco `caps-bot-teste`, conforme o mapeamento registrado no histórico), sem limpar dados nem tocar na produção.
+2. Validar em ambiente isolado os formatos de 30/40/50/60, byes, pontuação, classificação por grupo, desempate e capacidade das salas.
+3. Validar final pendente e `!torneio final start` em dia posterior, lados MD3, ausência/substituição, lobby de cinco minutos e retomada após restart.
+4. Atualizar a documentação pública identificada abaixo antes de divulgar a Fase de Pontos.
 
----
+### Divergência documental confirmada
 
-## 📍 Ponto de Parada Atual
+- `TODOS OS COMANDOS - CAPS ARENA + LCL BOT.txt`, seção do torneio (perto da linha 294 na leitura atual), ainda descreve repescagem dos cinco melhores perdedores. O formato F1 atual não usa essa repescagem. Busca feita em `docs/` e `assets/` não encontrou outra divergência textual equivalente; banner e embeds do torneio descrevem F1.
 
-### Onde paramos:
-Banco no MongoDB Atlas. Pós-`!vitoria` move todos para a Sala de Espera (normal ou Tier S separada). **Painel `!votar` com botões** ativo (`commands/handlers/resultVotePanel.js`: maioria 6/10, lembrete 2min, expira 5min, auto-registro sem staff). **Botões de queue do CAPS BOT no canal `fila`** ativos em painel fixo por sala, não no feed: `updateQueueDashboard()` cria/edita um embed para Sala A e só cria outro quando existir Sala B/C/D; IDs ficam em `systemMeta.queueDashboardMessageIds`; mensagens de feed (`postQueueFeedMessage`) voltaram a ser texto puro. Botões: **Entrar Queue CAPS** (`queue:classic:join` → `!entrar`) e **Entrar Queue ARAM** (`queue:aram:join` → `!entrar aram`); Tier S continua decidido pela call/gate existente. `index.js` atualiza o painel fixo no boot via `updateQueueDashboard()`, então após restart/deploy o botão volta sozinho. **Trava 3min no `!entrar`** pós-vitória por fila até sair a `!roleta` (`enterQueue.js: getPendingRouletteEntries`). **Espera Tier S própria** (`!esperatiers`, chave `classic:5x5:s`) + **Sala de Espera Tier S** (`getPostMatchVoiceChannelId(mode,tier)`). **`!pdl @jogador ±valor`** (Admin, ±500, `application/use-cases/adjustPdl.js`, sem tocar W/L) + slash `/pdl`. **`!toprankinfernal`** (ranking por `infernalCount`, zerado por temporada). **Setup multi-servidor:** `setup-servidor.js` fix `msg.pins()` → `msg.pin()` + `fetchPinned()` → `fetchPins()`; rodado em `CAPS TESTE (1558218740875796560)` e `CAPS BOT TESTRE (1558217291123138561)`; `config.json` atual aponta p/ TESTRE (backups `config.json.bak-*`). **Limite 5x5 corrigido:** `getVoteThreshold` 5 → 6 (maioria real dos 10). Suite em **63/63**. Commit salvo: `3687829 feat: add vote panel, pdl and server setup`. Bot `CAPS BOT LOL#6241` (`1487258474810183711`), invite com `permissions=8`. Extração do `legacyCommands.js` segue pendente.
+### Limpeza do torneio de teste — alcance não confirmado
 
-### Próximo passo imediato:
-- **Torneio Etapa 1 — teste real no Discord (2026-10-19):** commit feito na `feat/torneio-onoff`; falta `pm2 restart caps-bot --update-env` e validação real: `!torneioon` (cria categoria `🏆・TORNEIO CAPS ARENA` + 4 canais) → `!torneio entrar` ×20 → `!torneio sortear` (cria lobbies, move os 10, nomes `R1 TIME A..D`) → checar ausência T+5/T+10 → `!torneio resultado` → `!torneio sortear` de novo (cria a **FINAL MD3**, times congelados, lados/Fearless) → `!torneio resultado FINAL <1|2>` (coroação: cargo 🏆 + hall + arquivamento). Estado do torneio vive no **MongoDB** (`systemMeta.torneio`), não no JSON local.
-- **Rankings do CAPS ✅ (2026-10-18):** conjunto final = `duelo` (Top 10), `classic`, `tiers` (Esmeralda+), `infernal` e `tt` (Twisted Treeline 3x3) — ver `domain/ranking/rankingViews.js` + `domain/ranking/duelRanking.js`; `!duelo rank` = atalho do Top 10. Falta só **conferir o 1º post automático do pôster no slot das 10h (SP)** — o teste manual via API não gravou `posterSlots`, então o scheduler (`runPosterTick`) deve postar sozinho em `📢┃comunicados` e `💬・geral-leagueoflegends`.
-- **Modelo salvo:** layout oficial do CAPS ARENA em `docs/SERVER_LAYOUT_CAPS_ARENA.md` (6 categorias, 13 TXT + 9 VOZ mapeados p/ `config.json`, hierarquia de cargos) — pronto p/ replicar no TESTRE
-- **Deploy teste × prod (2026-10-10):** TESTRE = pasta `CAPS BOT TESTRE` → guild `CAPS BOT TESTE (1558217291123138561)` → banco `caps-bot-teste` (`MONGODB_DB`) → PM2 `caps-bot-teste` (online, cwd correto); PROD = pasta `BOT CAPS DISCORD` → guild `CAPS ARENA (1273653944169660427)` → banco `caps-bot` (default) → PM2 `caps-bot` (online); tokens diferentes (hashes distintos); `dataService.js` usa `process.env.MONGODB_DB || 'caps-bot'` nas duas pastas; `.gitignore` prod com `.env.bak*` + `*.bak*`; NUNCA dois processos com o mesmo token
-- **Roteiro de teste:** `!cadastrar` → botão **Entrar Queue CAPS** ou `!entrar` → `!votar` (botões) → MVP → `!roleta` → `!placar`; conferir `🎮・fila`, `⚔️・partidas`, `📋┃resultados`, `🔥┃destaques`
-- Testar em TESTRE: `!cadastrar Nick#TAG` → `!entrar` → `!votar 1` (botões) → `!roleta N A` → `!esperatiers` → `!pdl`
-- Continuar extração de lógica de negócio do `legacyCommands.js`
+- O histórico relata exclusão da categoria/canais/cargo de campeão e limpeza de `systemMeta.torneio` e `torneioHistorico`. O registro não identifica com segurança o servidor/guild nem o banco MongoDB afetado, e o script temporário foi apagado. Tratar como relato histórico não verificado; não inferir que produção ou teste esteja limpo.
+
+### Estado de validação conhecido
+
+- Última validação registrada em 2026-10-21: suíte CAPS 309/309 e restart do processo. Estes resultados são históricos, não foram repetidos nesta edição da memória.
+- Ainda falta executar o fluxo F1 ponta a ponta no ambiente de teste; não iniciar diretamente na produção.
 
 ---
 
-## ✅ O que já foi feito
+## 📚 Inventário de implementação (referência histórica)
 
 ### Modularização
 - [x] `commands/handlers/matchCommandHandlers.js` — extraído
@@ -73,7 +61,7 @@ Banco no MongoDB Atlas. Pós-`!vitoria` move todos para a Sala de Espera (normal
 - [x] `domain/ranking/playerStats.js`
 
 ### Infraestrutura
-- [x] MongoDB local via Docker (`caps-mongo`, `mongodb://localhost:27017/caps-bot`) como banco principal
+- [x] Persistência MongoDB Atlas indicada pelas sessões mais recentes do CAPS; as referências a `caps-mongo` local são históricas e devem ser confirmadas antes de reutilizar instruções antigas
 - [x] Fallback JSON local em `database/` (sincronizado com o Mongo)
 - [x] `services/dataService.js` com lock em memória
 - [x] `services/riotService.js` com cache em memória (1h)
@@ -107,6 +95,7 @@ Banco no MongoDB Atlas. Pós-`!vitoria` move todos para a Sala de Espera (normal
 
 ### Fila de espera
 - [x] `!espera` e `/espera` inscrevem jogadores na espera da próxima partida e mostram a ordem de entrada (`joinedAt`)
+- [x] Comando por mensagem aceita !esperar como alias de !espera no bot principal e no lcl-bot (roteia para o mesmo handler e preserva subcomandos como er/sair)
 - [x] `!espera ver` consulta a ordem sem se inscrever; `!espera sair` ou `!sair` removem o jogador da espera
 - [x] A espera é persistida separadamente das salas de `!entrar`, por modo e formato, com filtros como `!fila aram 2x2`
 - [x] Jogadores são removidos da espera ao entrar em uma sala normal; os resets administrativos também limpam a espera
@@ -179,37 +168,18 @@ Banco no MongoDB Atlas. Pós-`!vitoria` move todos para a Sala de Espera (normal
 
 ---
 
-## 🔲 O que ainda falta fazer
+## Backlog técnico — revalidar prioridade antes de iniciar
 
-### Alta prioridade
-- [ ] Terminar extração do `legacyCommands.js` — ainda está grande e mistura responsabilidades
-- [ ] Separar `lobbyUtils.js` em módulos menores (embed, domínio, canais, ranking, histórico)
-- [ ] Mapear quais comandos ainda vivem só no `legacyCommands.js` (ex: `!lista`, `!placar`, `!top10`, `!topstreak`, `!perfil`, `!sync`, `!onboarding`, `!resetgeral`)
+Estes itens foram registrados em sessões anteriores e não são pré-requisitos para o teste F1. Confirmar se ainda fazem sentido antes de planejar:
 
-### Médio prazo
-- [ ] Implementar lock distribuído (Redis ou Mongo-based lease) — atualmente só funciona com 1 instância
-- [ ] Mover `pendingAutoStarts` (Map em memória) para persistência durável
-- [ ] Criar worker separado para jobs lentos (auto-start, limpeza, ranking)
-
-### Riot API
-- [ ] Rate limiter real
-- [ ] Fila de requisições
-- [ ] Retry com backoff exponencial
-- [ ] Circuit breaker para indisponibilidade da Riot API
-
-### Qualidade
-- [ ] Testes automatizados para: ranking, streak, auto-start, vitória concorrente, parse de comandos
-- [ ] Logging estruturado por comando e por match
-- [ ] IDs de correlação por partida/lobby
-
-### Infraestrutura futura (médio/longo prazo)
-- [ ] `bot-gateway` separado
-- [ ] `matchmaking-api` separado
-- [ ] `riot-worker` separado
-- [ ] Redis para locks e debounce
+- Extração adicional de `legacyCommands.js` e divisão de `lobbyUtils.js`.
+- Locks distribuídos se o serviço passar a rodar em mais de uma instância; hoje os locks citados são em memória.
+- Persistência de `pendingAutoStarts` e worker separado para jobs lentos.
+- Melhorias da Riot API (rate limit, fila, retry/backoff e circuit breaker).
+- Logging estruturado e IDs de correlação.
+- Componentes futuros (`bot-gateway`, `matchmaking-api`, `riot-worker` e Redis).
 
 ---
-
 ## 🐛 Problemas Conhecidos / Débitos Técnicos
 
 | Problema | Arquivo | Impacto |
@@ -239,7 +209,7 @@ database/                    ← fallback JSON local
 
 ---
 
-## 📝 Notas de Sessão
+## 📚 Arquivo histórico — notas cronológicas
 
 ### 2026-09-24
 - Arquivo MEMORY.md criado para rastreamento de progresso
@@ -593,10 +563,10 @@ database/                    ← fallback JSON local
 
 ## 🔄 Como usar este arquivo
 
-1. **Ao início de cada sessão:** Leia este arquivo para saber onde paramos
-2. **Durante a sessão:** Marque itens concluídos e adicione notas
-3. **Ao fim de cada sessão:** Atualize "Última Sessão", "Ponto de Parada" e mova itens para ✅
+1. **Ao início de cada sessão:** Leia primeiro `Estado Operacional` e confirme fatos voláteis no código antes de agir.
+2. **Durante a sessão:** registre decisões novas e diferencie planos de ações concluídas.
+3. **Ao fim de cada sessão:** atualize data, estado do bot, pendências e validações; mantenha sessões anteriores no `Arquivo histórico`.
 
 ---
 
-*Arquivo gerado automaticamente pela IA em 2026-09-24. Manter atualizado a cada sessão.*
+*Memória revisada em 2026-10-21.*
