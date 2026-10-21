@@ -2042,7 +2042,9 @@ function buildLeaderboardEmbed(statsData, mode = QUEUE_MODES.CLASSIC, format = n
       if (duelRank) {
         const net = Number(player.duelPoints ?? player.adjustedMmr ?? 0);
         const netLabel = net >= 0 ? `+${net}` : `${net}`;
-        return `${medal}${resolve(player.discordId)} ${label}\n**⚔️ ${player.duelWins}V / ${player.duelLosses}D** • ${netLabel} PDL em duelos`;
+        const ganhos = Number(player.duelPointsWon || 0);
+        const perdidos = Number(player.duelPointsLost || 0);
+        return `${medal}${resolve(player.discordId)} ${label}\n**⚔️ ${player.duelWins}V / ${player.duelLosses}D** • +${ganhos} ganhos / -${perdidos} perdidos • líquido ${netLabel} PDL`;
       }
 
       const rankName = getRankName(player.baseMmr);
@@ -2112,7 +2114,9 @@ function buildTopTenEmbed(statsData, seasonMeta, mode, format = null, options = 
         if (duelRank) {
           const net = Number(player.duelPoints ?? player.adjustedMmr ?? 0);
           const netLabel = net >= 0 ? `+${net}` : `${net}`;
-          return `${medal}${resolve(player.discordId)} <@${player.discordId}>\n**⚔️ ${player.duelWins}V / ${player.duelLosses}D** • ${netLabel} PDL em duelos • ${player.winRate}% WR`;
+          const ganhos = Number(player.duelPointsWon || 0);
+          const perdidos = Number(player.duelPointsLost || 0);
+          return `${medal}${resolve(player.discordId)} <@${player.discordId}>\n**⚔️ ${player.duelWins}V / ${player.duelLosses}D** • +${ganhos} ganhos / -${perdidos} perdidos • líquido ${netLabel} PDL • ${player.winRate}% WR`;
         }
 
         const rankName = getRankName(player.baseMmr);
