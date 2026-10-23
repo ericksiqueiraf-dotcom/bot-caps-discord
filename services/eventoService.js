@@ -113,14 +113,15 @@ async function runSextaTick(nowMs = Date.now(), deps = {}) {
   const { minutes, key } = getSPParts(nowMs);
   const friday = isFridaySP(nowMs);
   const meta = await loadSystemMeta();
+  const announcementsEnabled = config.automation?.fridayAnnouncementsEnabled !== false;
   if (friday && minutes >= 8 * 60 && meta.sextaAbertaEm !== key) {
-    await postOpen();
+    if (announcementsEnabled) await postOpen();
     meta.sextaAbertaEm = key;
     await saveSystemMeta(meta);
   }
   if (friday && minutes >= 23 * 60 + 59 && meta.sextaEncerradaEm !== key) {
     const top = getSextaTop(meta, 3);
-    await postClose(top);
+    if (announcementsEnabled) await postClose(top);
     meta.sextaEncerradaEm = key;
     await saveSystemMeta(meta);
   }

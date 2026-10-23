@@ -187,8 +187,8 @@ const LIVE_ALLOWED_HOSTS = new Set([
   'youtube.com', 'www.youtube.com', 'youtu.be',
   'kick.com', 'www.kick.com'
 ]);
-const CLUBE_PROMO_HOURS = [12, 19];
-const CLUBE_PROMO_MIN_GAP_MS = 10 * 60 * 60 * 1000;
+const CLUBE_PROMO_HOURS = [8];
+const CLUBE_PROMO_MIN_GAP_MS = 20 * 60 * 60 * 1000;
 
 function parseLiveLink(raw) {
   const text = String(raw || '').trim();
@@ -1439,7 +1439,7 @@ function pickMvpWinner(session) {
 }
 
 async function persistPendingMvpVotes() {
-  const systemMeta = await loadSystemMeta();
+  const systemMeta = (await loadSystemMeta()) || {};
   systemMeta.pendingMvpVotes = Object.fromEntries(pendingMvpVotes.entries());
   await saveSystemMeta(systemMeta);
 }
@@ -1606,7 +1606,7 @@ async function handleMvpVoteInteraction(interaction) {
 }
 
 async function resumePendingMvpVotes() {
-  const systemMeta = await loadSystemMeta();
+  const systemMeta = (await loadSystemMeta()) || {};
   const stored = systemMeta.pendingMvpVotes || {};
 
   for (const [voteId, session] of Object.entries(stored)) {
@@ -1979,19 +1979,19 @@ function buildTeamsEmbed(teams, tierResolver = null) {
     .setColor(THEME.SUCCESS)
     .setTitle('⚔️ Times Balanceados')
     .setDescription(
-      `Os times foram montados automaticamente com base no elo do LoL dos jogadores.\nModo: **${formatQueueMode(teams.mode)}** | Formato: **${teams.teamOne.length}x${teams.teamTwo.length}**`
+      `Os times foram montados pelo MMR atual da fila, que considera o elo do LoL e o desempenho nas partidas CAPS.\nModo: **${formatQueueMode(teams.mode)}** | Formato: **${teams.teamOne.length}x${teams.teamTwo.length}**`
     )
     .addFields(
       {
-        name: `Equipe 1 | Elo total: ${teams.teamOneMmr}`,
+        name: `Equipe 1 | MMR total: ${teams.teamOneMmr}`,
         value: teamOneText || 'Sem jogadores'
       },
       {
-        name: `Equipe 2 | Elo total: ${teams.teamTwoMmr}`,
+        name: `Equipe 2 | MMR total: ${teams.teamTwoMmr}`,
         value: teamTwoText || 'Sem jogadores'
       },
       {
-        name: 'Diferenca de Elo',
+        name: 'Diferença de MMR',
         value: `${teams.difference}`
       }
     )
@@ -2411,18 +2411,63 @@ async function postDailyRankUpdates() {
     return;
   }
 
+  const systemMeta = (await loadSystemMeta()) || {};
+  const now = getSaoPauloDateParts(new Date());
+  const date = new Date(`${now.key}T12:00:00-03:00`);
+  const weekday = date.getDay();
+  if (weekday !== 1) return { posted: false, reason: 'rankings semanais apenas na segunda-feira' };
+  const weekKey = now.key;
+  if (systemMeta.weeklyRankPostKey === weekKey) return { posted: false, reason: 'rankings já publicados nesta segunda-feira' };
+
   const statsData = await loadPlayerStats();
   const seasonMeta = await loadSeasonMeta();
+  const duelos = systemMeta.duelos || [];
+  const month = `${now.year}-${String(now.month).padStart(2, '0')}`;
+  const inviteService = require('../services/convitesService');
+  const inviteStore = inviteService.ensureInvitesStore(systemMeta);
+  const inviteTop = inviteService.getMonthlyTop(inviteStore, month, 10);
+  const inviteEmbed = new EmbedBuilder()
+    .setColor(THEME.RANK).setTitle(`🔗 Top convites — ${String(now.month).padStart(2, '0')}/${now.year}`)
+    .setDescription(inviteTop.length
+      ? inviteTop.map((item) => `${item.position === 1 ? '👑 ' : ''}**${item.position}º** <@${item.userId}> — ${item.count} convite(s)`).join('\n')
+      : 'Ninguém trouxe novos membros neste mês ainda.')
+    .setFooter({ text: 'CAPS ARENA • Ranking mensal de convites' }).setTimestamp();
+
+  const voiceService = require('../services/voiceTimeService');
+  const voiceStore = voiceService.ensureVoiceStore(systemMeta);
+  const voiceTop = voiceService.getMonthlyTop(voiceStore, month, 10);
+  const voiceEmbed = new EmbedBuilder()
+    .setColor(THEME.RANK).setTitle(`🎙️ Top Voz — ${String(now.month).padStart(2, '0')}/${now.year}`)
+    .setDescription(voiceTop.length
+      ? voiceTop.map((item) => `**${item.position}º** <@${item.userId}> — ${voiceService.formatTempo(item.ms)}`).join('\n')
+      : 'Ainda não há tempo em call registrado neste mês.')
+    .setFooter({ text: 'CAPS ARENA • 5h Ativo • 15h Frequente • 30h Viciado' }).setTimestamp();
 
   await channel.send({
-    content: `Atualizacao diaria de rankings | ${getSeasonDisplayLabel(seasonMeta)}`,
+    content: `🏆 **Rankings semanais CAPS ARENA — segunda-feira, 08h** | ${getSeasonDisplayLabel(seasonMeta)}`,
     embeds: [
       buildTopTenEmbed(statsData, seasonMeta, QUEUE_MODES.CLASSIC, null, { excludeTierS: true }),
       buildTopTenEmbed(statsData, seasonMeta, QUEUE_MODES.CLASSIC, null, { tierSOnly: true }),
-      buildTopTenEmbed(statsData, seasonMeta, QUEUE_MODES.ARAM, '1x1'),
-      buildTopInfernalEmbed(statsData, seasonMeta)
+      buildTopInfernalEmbed(statsData, seasonMeta),
+      inviteEmbed,
+      buildTopTenEmbed(statsData, seasonMeta, 'duel', null, { duelos }),
+      voiceEmbed,
+      new EmbedBuilder()
+        .setColor(THEME.INFO)
+        .setTitle('📌 Consulte os rankings quando quiser')
+        .setDescription([
+          '`!top10` — Classic',
+          '`!top10 tiers` — Tier S',
+          '`!toprankinfernal` — INFERNAL',
+          '`!topconvites` — Convites',
+          '`!duelorank` — Duelo',
+          '`!topvoz` — Tempo em call'
+        ].join('\n'))
     ]
   });
+  systemMeta.weeklyRankPostKey = weekKey;
+  await saveSystemMeta(systemMeta);
+  return { posted: true, weekKey };
 }
 
 async function postMvpAnnouncement(guild, mvpData) {
@@ -2619,7 +2664,7 @@ async function postMatchHistoryLog(guild, payload) {
   await channel.send({ embeds: [summaryEmbed, detailEmbed] }).catch(() => null);
 }
 
-// Promo automática do clube 2x/dia (12h e 19h SP) no geral, sem duplicar.
+// Promo automática do clube 1x/dia às 08h SP no geral, sem duplicar.
 async function runClubePromoTick(now = new Date()) {
   const parts = getSaoPauloDateParts(now);
   if (!CLUBE_PROMO_HOURS.includes(parts.hour) || parts.minute !== 0) return { posted: 0, reason: 'fora de horário' };
@@ -2666,8 +2711,11 @@ function startDailyRankScheduler() {  setInterval(async () => {
         return;
       }
 
-      lastDailyRankPostKey = now.key;
-      await postDailyRankUpdates();
+      const weekday = new Date(`${now.key}T12:00:00-03:00`).getDay();
+      if (weekday === 1 && config.automation?.weeklyRankUpdatesEnabled !== false && lastDailyRankPostKey !== now.key) {
+        lastDailyRankPostKey = now.key;
+        await postDailyRankUpdates();
+      }
       for (const guild of global.discordClient?.guilds.cache.values() || []) {
         await expireInfernalRolesIfDue(guild);
         await reconcileInfernalRoles(guild).catch(() => null);

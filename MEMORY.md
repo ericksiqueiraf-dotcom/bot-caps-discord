@@ -5,7 +5,15 @@
 
 ---
 
-## Estado Operacional — 2026-10-21
+## Estado Operacional — 2026-10-23
+
+- **Balanceamento da fila (atualizado):** `services/balanceService.js:getBalanceWeight()` usa `player.mmr` quando disponível (MMR atual da fila, com base Riot e desempenho CAPS) e recua para `baseMmr` em torneios/chamadas sem MMR híbrido. O split testa todas as combinações e minimiza a diferença da soma; o embed agora chama os totais de MMR e explica a composição. Partidas já iniciadas não são rebalanceadas.
+- **Agenda e divulgações:** a Agenda de modos é atualizada diariamente às 08h em Comunicados e Geral. Social e Clube VIP divulgam 1x/dia às 08h. Pôster/prévia automáticos do torneio estão desativados. Rankings Classic, Tier S, INFERNAL, convites, duelo e Top Voz saem juntos às segundas às 08h, com comandos de consulta no último embed. PDL em dobro no Classic e Tier S de sexta a domingo.
+- **Boas-vindas:** texto prioriza o fluxo Classic e orienta consultar `!ajuda`/`!ajuda2` para filas, rankings e horários.
+- **Salas temporárias:** saída de voz agenda a remoção após `deleteDelaySeconds` mesmo se o cache de membros estiver atrasado; o canal é buscado e confirmado vazio ao expirar. No boot, salas temporárias já vazias também recebem timer. Configuração atual: 60 segundos.
+- **Bot:** `caps-bot` reiniciado em 2026-10-23 após os ajustes de MMR; PM2 reportou processo online. Checagens `node --check` e `git diff --check` passaram para as alterações correspondentes; a suíte de testes não foi executada nesta sessão.
+
+### Estado operacional anterior — 2026-10-21 (referência histórica)
 
 - **⚠️ INCIDENTE RESOLVIDO:** um commit não-autorizado (`5edd36d feat(torneio): adota fase de pontos por grupos`, mesmo identity git — provavelmente OUTRA sessão de IA) mudou o motor para grupos A/B e deixou a suite 306/309 vermelha. O dono não reconheceu a mudança → **revertido** em `7b46a55`. Outro commit estranho (`b5f9951 feat(queue): add esperar alias`) foi mantido (inofensivo, suíte verde) e a reescrita do MEMORY.md desta sessão foi preservada, corrigida abaixo.
 - **Próximo torneio:** teste da **Fase de Pontos v1** com o formato **todos contra todos** (confirmado em produção): 4 TIMES FIXOS de 5 (20 inscritos), round-robin 3 rodadas × 2 confrontos MD2, final automática após a 3ª rodada fechada. Precisa ser validado ponta a ponta em ambiente isolado antes do uso real.
@@ -64,7 +72,7 @@
 - [x] Fallback JSON local em `database/` (sincronizado com o Mongo)
 - [x] `services/dataService.js` com lock em memória
 - [x] `services/riotService.js` com cache em memória (1h)
-- [x] `services/balanceService.js`: balanceamento só pelo elo LoL (`getBalanceWeight` = `baseMmr`); pontos custom `1000 + W/L` só visuais
+- [x] `services/balanceService.js`: balanceamento usa MMR atual da fila (`player.mmr`, elo Riot + desempenho CAPS), com fallback para `baseMmr` em fluxos sem MMR híbrido; split exaustivo minimiza a diferença total
 - [x] `workers/` pasta criada (sem worker ativo ainda)
 - [x] `Ativar Bot.bat` com `restart --update-env` (reinicia mesmo se já ativo e recarrega o `.env`)
 - [x] Backups em `backups/` (ZIP do código + export JSON do Mongo) — ver "Backup e recuperação"
@@ -568,4 +576,4 @@ database/                    ← fallback JSON local
 
 ---
 
-*Memória revisada em 2026-10-21.*
+*Memória revisada em 2026-10-23.*

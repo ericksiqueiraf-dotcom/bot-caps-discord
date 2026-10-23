@@ -1,11 +1,13 @@
 const DEFAULT_CUSTOM_POINTS = 1000;
 const RATING_VERSION = 2;
 
-// Peso usado no balanceamento de times: apenas o elo do LoL (baseMmr).
-// A pontuacao custom (internalRating/modo) e so visual (perfil, placar, embeds)
-// e NAO influencia a montagem dos times.
+// Usa o MMR atual da fila (elo inicial da Riot ajustado pelo desempenho CAPS).
+// Torneios e chamadas antigas sem `mmr` continuam usando o elo base da Riot.
 function getBalanceWeight(player = {}) {
-  return Math.max(0, Number(player.baseMmr || 0));
+  const currentMmr = Number(player.mmr);
+  const leagueMmr = Number(player.baseMmr);
+  const weight = Number.isFinite(currentMmr) ? currentMmr : leagueMmr;
+  return Math.max(0, Number.isFinite(weight) ? weight : 0);
 }
 
 function calculateTeamMmr(team) {

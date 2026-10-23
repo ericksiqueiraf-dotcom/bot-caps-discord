@@ -324,8 +324,12 @@ function startSocialScheduler() {
       await runSocialTick(Date.now()).catch((err) => console.error('[SOCIAL] Erro na divulgação automática:', err.message));
       await runPosterTick(Date.now()).catch((err) => console.error('[SOCIAL] Erro no pôster agendado:', err.message));
       await runTorneioPreviewTick(Date.now()).catch((err) => console.error('[SOCIAL] Erro na prévia do torneio:', err.message));
+      await require('./communityScheduleService').runWeeklyScheduleTick(Date.now())
+        .catch((err) => console.error('[AGENDA] Erro na publicação semanal:', err.message));
     })();
   }, 60000).unref?.();
+  require('./communityScheduleService').runWeeklyScheduleTick(Date.now())
+    .catch((err) => console.error('[AGENDA] Erro na publicação semanal inicial:', err.message));
 }
 
 module.exports = {

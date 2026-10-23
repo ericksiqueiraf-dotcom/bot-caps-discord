@@ -1,15 +1,15 @@
 const DEFAULT_CONTENT_TEMPLATES = {
   welcome: {
-    titleTemplate: '🏟️ Bem-vindo à {{serverName}}, {{username}} — sua vaga está esperando!',
-    description: '🔥 **10 jogadores por partida • ranking com PDL • roleta, MVP e cargo INFERNAL**\nDo cadastro à primeira partida em **2 minutos**: cadastre seu Nick#TAG e digite `!entrar` no lobby.',
-    rulesTitle: 'Como funciona o acesso',
-    rulesText: 'Quem joga LoL precisa usar `!cadastrar Nick#TAG` para receber o cargo de jogador e liberar os canais privados de texto e voz.\nQuem nao joga LoL permanece apenas com as salas abertas do servidor.',
-    unlockTitle: 'Se voce joga LoL',
-    unlockText: 'Clique em **Jogo LoL** ou **⚡ Quero jogar agora** e depois envie:\n```bash\n!cadastrar Nick#TAG\n```\nApos o cadastro, o bot libera o cargo automaticamente.',
-    howToPlayTitle: 'Se voce nao joga LoL',
-    howToPlayText: 'Clique em **Nao jogo LoL** para permanecer somente com os canais abertos, sem receber cargo de jogador.',
-    commandsTitle: 'Comandos importantes',
-    commandsText: '`!cadastrar Nick#TAG` - libera o acesso completo\n`!entrar` - entra na fila rapidinho\n`!ajuda` - mostra todos os comandos',
+    titleTemplate: '🏟️ Bem-vindo à {{serverName}}, {{username}}!',
+    description: 'Partidas personalizadas de League of Legends, times balanceados e uma comunidade para jogar com frequência.\n\n**Comece pelo Classic:** faça o cadastro, entre no Lobby Classic e participe da fila.',
+    rulesTitle: '1. Faça seu cadastro',
+    rulesText: 'No canal `#comandos`, envie:\n```\n!cadastrar SeuNick#TAG\n```\nO cadastro libera o acesso completo aos canais de jogador.',
+    unlockTitle: '2. Entre na sua primeira partida',
+    unlockText: 'Conecte-se ao canal de voz **Lobby Classic** e digite:\n```\n!entrar\n```\nQuando a sala completar, o bot organiza os times e informa onde jogar.',
+    howToPlayTitle: '3. Termine a partida e acompanhe',
+    howToPlayText: 'Depois do jogo, vote com `!votar 1` ou `!votar 2` e acompanhe seu progresso no ranking.',
+    commandsTitle: 'Comandos e outras modalidades',
+    commandsText: 'Veja `!ajuda` e `!ajuda2` para consultar filas, rankings, horários e demais comandos. Depois de conhecer o Classic, experimente `!duelo`, `!torneio` e outras modalidades.',
     footerText: 'Caps Bot • CAPS Arena'
   },
   onboarding: {

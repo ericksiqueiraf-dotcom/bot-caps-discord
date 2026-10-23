@@ -24,7 +24,7 @@ const { createRiotService } = require('./services/riotService');
 const { startSextaScheduler, startLclScheduler, startTorneioScheduler } = require('./services/eventoService');
 const { startSocialScheduler } = require('./services/socialService');
 const { startBackupScheduler } = require('./services/backupService');
-const { handleTempVoiceStateUpdate } = require('./services/tempVoiceService');
+const { handleTempVoiceStateUpdate, scheduleExistingEmptyTempRooms } = require('./services/tempVoiceService');
 const {
   createBalancedTeams,
   calculateHybridMmr,
@@ -456,6 +456,7 @@ const handlers = require('./commands/legacyCommands');
 client.once('ready', async () => {
   await ensureDataFiles();
   console.log(`Bot conectado como ${client.user.tag} | ${BOT_VERSION}`);
+  scheduleExistingEmptyTempRooms(client);
   await registerSlashCommands();
   startDailyRankScheduler();
   startVipPaymentPoller({ config });
@@ -642,7 +643,7 @@ async function runVoiceTimeMonthlyTick(nowMs = Date.now()) {
         }
       }
       const news = guild.channels.cache.find((c) => c.name === '📢┃comunicados' && c.isTextBased?.());
-      if (news?.isTextBased?.()) {
+      if (config.automation?.voiceTimeMonthlyAnnouncementEnabled !== false && news?.isTextBased?.()) {
         const lines = top.slice(0, 3).map((t, i) => `**${i + 1}º** <@${t.userId}> — ${vt.formatTempo(t.ms)}`);
         await news.send(
           `🎙️ **Apuração do tempo em call — ${prevMonth.slice(5)}/${prevMonth.slice(0, 4)}**\n` +
@@ -1526,7 +1527,7 @@ client.on('guildMemberAdd', async (member) => {
   );
 
   await channel.send({
-    content: `Seja bem-vindo, ${member}! Escolha abaixo como voce vai usar o servidor:`,
+    content: `Seja bem-vindo, ${member}! Comece pelo Classic seguindo os passos do embed.`,
     embeds: [welcomeEmbed],
     components: [onboardingActions]
   }).catch((err) => console.error('[BOAS-VINDAS] Erro ao enviar mensagem:', err));

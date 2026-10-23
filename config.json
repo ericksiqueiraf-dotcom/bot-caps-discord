@@ -48,8 +48,12 @@
     "guideChannelId": "1559619768720425050"
   },
   "automation": {
+    "dailyRankUpdatesEnabled": false,
+    "weeklyRankUpdatesEnabled": true,
     "dailyRankUpdatesHour": 8,
-    "dailyRankUpdatesMinute": 0
+    "dailyRankUpdatesMinute": 0,
+    "fridayAnnouncementsEnabled": false,
+    "voiceTimeMonthlyAnnouncementEnabled": false
   },
   "cadastro": {
     "minSummonerLevel": 30
@@ -90,9 +94,7 @@
   },
   "social": {
     "divulgacaoChannelId": "",
-    "horas": [
-      10
-    ],
+    "horas": [8],
     "links": {
       "instagram": "https://www.instagram.com/capsarenatv/",
       "twitch": "https://www.twitch.tv/capsarenatv",
@@ -100,19 +102,19 @@
       "youtube": ""
     },
     "poster": {
-      "ativo": true,
+      "ativo": false,
       "canais": [
         "📢┃comunicados",
         "💬・geral-leagueoflegends"
       ],
       "horas": [
-        10
+        8
       ]
     },
     "torneioPreview": {
-      "ativo": true,
+      "ativo": false,
       "horas": [
-        10
+        8
       ],
       "canais": [
         "🤖・comandos"

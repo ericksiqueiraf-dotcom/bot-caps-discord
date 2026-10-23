@@ -216,7 +216,9 @@ function buildTempVoiceName(member) {
 }
 
 async function scheduleTempVoiceDeletion(channel) {
-  if (!isManagedTempVoiceChannel(channel) || channel.members.size > 0) return;
+  // O cache de membros pode ainda refletir o estado anterior durante o
+  // voiceStateUpdate. Agenda a checagem e confirma novamente ao expirar.
+  if (!isManagedTempVoiceChannel(channel)) return;
 
   if (deleteTimers.has(channel.id)) {
     clearTimeout(deleteTimers.get(channel.id));
@@ -224,8 +226,9 @@ async function scheduleTempVoiceDeletion(channel) {
 
   const delayMs = Math.max(1, Number(config.tempVoice?.deleteDelaySeconds || 60)) * 1000;
   const timeout = setTimeout(async () => {
-    deleteTimers.delete(channel.id);
     const freshChannel = await channel.guild.channels.fetch(channel.id).catch(() => null);
+    if (deleteTimers.get(channel.id) !== timeout) return;
+    deleteTimers.delete(channel.id);
     if (!freshChannel) {
       unregisterTempRoom(channel.id, channel.guild.id);
       return;
@@ -239,6 +242,18 @@ async function scheduleTempVoiceDeletion(channel) {
   }, delayMs);
 
   deleteTimers.set(channel.id, timeout);
+}
+
+function scheduleExistingEmptyTempRooms(client) {
+  for (const guild of client?.guilds?.cache?.values?.() || []) {
+    for (const channel of guild.channels.cache.values()) {
+      if (isManagedTempVoiceChannel(channel) && channel.members.size === 0) {
+        scheduleTempVoiceDeletion(channel).catch((error) => {
+          console.error('[TEMP VOICE] Erro ao agendar limpeza após inicialização:', error.message);
+        });
+      }
+    }
+  }
 }
 
 async function createTempVoiceForMember(member, hubChannel) {
@@ -290,7 +305,7 @@ async function handleTempVoiceStateUpdate(oldState, newState) {
     }
   }
 
-  if (leftChannel && isManagedTempVoiceChannel(leftChannel) && leftChannel.members.size === 0) {
+  if (leftChannel && isManagedTempVoiceChannel(leftChannel)) {
     await scheduleTempVoiceDeletion(leftChannel);
   }
 }
@@ -522,6 +537,7 @@ module.exports = {
   HUB_CHANNEL_NAME,
   buildHubOverwrites,
   handleTempVoiceStateUpdate,
+  scheduleExistingEmptyTempRooms,
   isHubChannel,
   isManagedTempVoiceChannel,
   canCreateTempVoice,
