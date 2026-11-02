@@ -11,9 +11,9 @@ const DAYS = [
   { offset: 1, title: 'TERÇA • LIVRE', summary: 'Sem modo fixo; partidas podem ser organizadas espontaneamente.' },
   { offset: 2, title: 'QUARTA • CLASSIC', summary: 'Partidas Classic durante o dia todo.' },
   { offset: 3, title: 'QUINTA • CLASSIC', summary: 'Partidas Classic durante o dia todo.' },
-  { offset: 4, title: 'SEXTA • DIA COMPETITIVO', summary: 'Classic, Tier S e Duelos durante o dia todo. PDL em dobro no Classic e no Tier S.' },
-  { offset: 5, title: 'SÁBADO', summary: 'Torneio se houver edição agendada; caso contrário, Classic, Tier S e Duelos. PDL em dobro no Classic e no Tier S.' },
-  { offset: 6, title: 'DOMINGO', summary: 'Torneio se houver edição agendada; caso contrário, Classic, Tier S e Duelos. PDL em dobro no Classic e no Tier S.' }
+  { offset: 4, title: 'SEXTA • DIA COMPETITIVO', summary: 'Classic, Tier S e Duelos durante o dia todo. Use !duelo para desafiar alguém. PDL em dobro no Classic e no Tier S.' },
+  { offset: 5, title: 'SÁBADO', summary: 'Torneio se houver edição agendada; caso contrário, Classic, Tier S e Duelos. Use !duelo para desafiar alguém. PDL em dobro no Classic e no Tier S.' },
+  { offset: 6, title: 'DOMINGO', summary: 'Torneio se houver edição agendada; caso contrário, Classic, Tier S e Duelos. Use !duelo para desafiar alguém. PDL em dobro no Classic e no Tier S.' }
 ];
 
 function getMondayKey(nowMs = Date.now()) {
@@ -69,7 +69,7 @@ function buildWeeklyScheduleEmbed(weekKey = getMondayKey()) {
   }
 
   return embed
-    .setFooter({ text: 'Para entrar na fila Classic, conecte-se ao Lobby Classic e use !entrar.' })
+    .setFooter({ text: 'Classic: conecte-se ao Lobby Classic e use !entrar. Duelos: use !duelo para desafiar alguém.' })
     .setTimestamp();
 }
 
@@ -126,7 +126,7 @@ async function runWeeklyScheduleTick(nowMs = Date.now(), deps = {}) {
     const payload = buildWeeklySchedulePayload(weekKey);
     const now = Number(nowMs);
     let posted = 0;
-    let changed = state.uiVersion !== 3 || meta.communitySchedule?.weekKey !== weekKey;
+    let changed = state.uiVersion !== 4 || meta.communitySchedule?.weekKey !== weekKey;
 
     for (const guild of guilds) {
       for (const channel of findCanaisPorNomes(guild, WEEKLY_SCHEDULE_CHANNELS)) {
@@ -135,7 +135,7 @@ async function runWeeklyScheduleTick(nowMs = Date.now(), deps = {}) {
         const checkedAt = Number(state.dedupeCheckedAt[channelId] || 0);
         let existing = null;
 
-        if (state.uiVersion !== 3 || now - checkedAt >= 5 * 60 * 1000) {
+        if (state.uiVersion !== 4 || now - checkedAt >= 5 * 60 * 1000) {
           try {
             existing = await findAndDedupeWeeklyMessage(
               channel,
@@ -152,7 +152,7 @@ async function runWeeklyScheduleTick(nowMs = Date.now(), deps = {}) {
 
         if (existing) {
           state.posts[channelId] = { guildId: guild.id, channelId, messageId: existing.id };
-          if (state.uiVersion !== 3 || existing.id !== priorPost?.messageId || dailyRefresh) {
+          if (state.uiVersion !== 4 || existing.id !== priorPost?.messageId || dailyRefresh) {
             await existing.edit(payload);
             changed = true;
           }
@@ -160,7 +160,7 @@ async function runWeeklyScheduleTick(nowMs = Date.now(), deps = {}) {
         }
 
         if (priorPost?.messageId) {
-          if (state.uiVersion !== 3 || dailyRefresh) {
+          if (state.uiVersion !== 4 || dailyRefresh) {
             try {
               const previousMessage = await channel.messages.fetch(priorPost.messageId);
               await previousMessage.edit(payload);
@@ -183,7 +183,7 @@ async function runWeeklyScheduleTick(nowMs = Date.now(), deps = {}) {
       }
     }
 
-    state.uiVersion = 3;
+    state.uiVersion = 4;
     if (posted || Object.keys(state.posts).length) {
       state.dailySlot = dailyKey;
       changed = true;
