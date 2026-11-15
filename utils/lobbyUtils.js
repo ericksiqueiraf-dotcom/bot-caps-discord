@@ -2376,8 +2376,7 @@ function getTopOneBadges(statsData, seasonMeta, systemMeta, discordId) {
     const duelTop = getRankedPlayersByDuel(systemMeta?.duelos || [], statsData, seasonMeta)[0];
     if (duelTop?.discordId === discordId) badges.push('⚔️ TOP 1 DUELO 1x1');
 
-    const streakTop = getRankedPlayersByStreak(statsData, QUEUE_MODES.CLASSIC, null)[0];
-    if (streakTop?.discordId === discordId) badges.push('🔥 TOP 1 STREAK');
+    // Streak e INFERNAL medem a mesma coisa (5 wins seguidas): mantemos só o INFERNAL.
 
     const infernalTop = Object.values(statsData?.players || {})
       .map((p) => ({ discordId: p.discordId, infernalCount: Number(p.infernalCount || 0) }))
