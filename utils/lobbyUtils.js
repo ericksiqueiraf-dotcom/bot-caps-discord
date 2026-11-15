@@ -2334,7 +2334,7 @@ function buildOpGgUrl(riotNickname) {
   if (!riotNickname || !riotNickname.includes('#')) return null;
   const [gameName, tagLine] = riotNickname.split('#');
   if (!gameName || !tagLine) return null;
-  return `https://www.op.gg/br/lol/summoners/br/${encodeURIComponent(gameName.trim())}-${encodeURIComponent(tagLine.trim())}`;
+  return `https://op.gg/lol/summoners/br/${encodeURIComponent(gameName.trim())}-${encodeURIComponent(tagLine.trim())}`;
 }
 
 function buildPlayerCardEmbed(playerStats, targetUser, vipTierName = null, insights = null) {
