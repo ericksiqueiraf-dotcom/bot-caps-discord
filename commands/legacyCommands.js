@@ -1,4 +1,5 @@
-const { ChannelType, EmbedBuilder, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { ChannelType, EmbedBuilder, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder } = require('discord.js');
+const { buildFramedAvatarBuffer } = require('../utils/avatarFrame');
 const config = require('../config.json');
 const { parseModeAndFormatArgs, shouldMirrorAramGroupedStats } = require('../domain/queue/selection');
 const { parseRankingView } = require('../domain/ranking/rankingViews');
@@ -37,7 +38,7 @@ const {
   buildSeasonHistoryEmbed, formatCustomRecord,
   postPlayerLogs, postMatchSummaryToSeasonLog, postSeasonSummaryToSeasonLog, postSmurfAlerts,
   getCustomPointsDelta, getCustomDisplayScore, buildTopInfernalEmbed, buildQueueFeedText, postQueueFeedMessage,
-  buildQueueJoinActionRow, getMemberVipTier, buildVipTierResolver, buildClubeEmbed,
+  buildQueueJoinActionRow, getMemberVipTier, buildVipTierResolver, buildClubeEmbed, getAvatarFrameType,
   parseLiveLink, getLiveCooldownRemainingMs, formatCooldownRemaining,
   buildLiveEmbed, findPromoChannel, ensureAoVivoRole
 } = require('../utils/lobbyUtils');
@@ -1031,7 +1032,25 @@ async function handlePlayerCardCommand(message, targetUser = null) {
   if (!playerStats) return await replyToMessage(message, 'Jogador nao registrado no sistema.');
   const targetMember = message.guild?.members?.cache?.get?.(selectedUser.id) || null;
   const insights = await fetchPlayerMatchInsights(playerStats);
-  await sendToMessageChannel(message, { embeds: [buildPlayerCardEmbed(playerStats, selectedUser, getMemberVipTier(targetMember), insights)] });
+
+  const frameAttachmentName = 'perfil-frame.png';
+  let frameBuffer = null;
+  if (targetMember?.displayAvatarURL) {
+    frameBuffer = await buildFramedAvatarBuffer(
+      targetMember.displayAvatarURL({ extension: 'png', size: 256 }),
+      getAvatarFrameType(targetMember)
+    ).catch((error) => {
+      console.warn('[PERFIL] Moldura do avatar indisponivel:', error.message);
+      return null;
+    });
+  }
+
+  const embed = buildPlayerCardEmbed(playerStats, selectedUser, getMemberVipTier(targetMember), insights, frameBuffer ? frameAttachmentName : null);
+  const payload = { embeds: [embed] };
+  if (frameBuffer) {
+    payload.files = [new AttachmentBuilder(frameBuffer, { name: frameAttachmentName })];
+  }
+  await sendToMessageChannel(message, payload);
 }
 
 async function handleClubeFixarCommand(message) {

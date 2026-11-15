@@ -167,6 +167,26 @@ function getVipSeal(tierName) {
   return tier ? ` ${tier.seal}` : '';
 }
 
+// Moldura do avatar no !perfil, por cargo (prioridade: Lendário > INFERNAL > VIP > Apoiador).
+const AVATAR_FRAME_BY_ROLE = [
+  { roleName: '👑 Lendário', frameType: 'lendario' },
+  { roleName: config.roles?.infernalRoleName || '🔥 INFERNAL', frameType: 'infernal' },
+  { roleName: '⭐ VIP', frameType: 'vip' },
+  { roleName: '💜 Apoiador', frameType: 'apoiador' }
+];
+
+function getAvatarFrameType(member) {
+  try {
+    const cache = member?.roles?.cache;
+    const roles = cache?.values ? [...cache.values()] : Array.isArray(cache) ? cache : [];
+    const roleNames = roles.map((role) => String(role?.name || ''));
+    for (const entry of AVATAR_FRAME_BY_ROLE) {
+      if (roleNames.includes(entry.roleName)) return entry.frameType;
+    }
+  } catch { /* sem cargos resolviveis */ }
+  return null;
+}
+
 // Resolve discordId -> ' ⭐' (selo) ou '' usando o cache de membros da guild.
 // Puro e barato: sem fetch, só leitura do cache.
 function buildVipTierResolver(guild) {
@@ -2343,7 +2363,7 @@ function formatMasteryPoints(points) {
   return `${points}`;
 }
 
-function buildPlayerCardEmbed(playerStats, targetUser, vipTierName = null, insights = null) {
+function buildPlayerCardEmbed(playerStats, targetUser, vipTierName = null, insights = null, frameAttachmentName = null) {
   const modes = normalizePlayerModes(playerStats);
   const classicStats = modes.classic;
   const lolMmr = Number(classicStats.baseMmr || playerStats.baseMmr || 0);
@@ -2356,7 +2376,9 @@ function buildPlayerCardEmbed(playerStats, targetUser, vipTierName = null, insig
     .setColor(THEME.INFO)
     .setTitle(`👤 ${riotNickname || playerStats.nickname || 'Ficha do Jogador'}`);
 
-  if (targetUser?.displayAvatarURL) {
+  if (frameAttachmentName) {
+    embed.setThumbnail(`attachment://${frameAttachmentName}`);
+  } else if (targetUser?.displayAvatarURL) {
     embed.setThumbnail(targetUser.displayAvatarURL({ size: 256 }));
   }
 
@@ -3565,6 +3587,7 @@ module.exports = {
   inferSeasonMetaFromArchive,
   archiveCurrentSeason,
   buildPlayerCardEmbed,
+  getAvatarFrameType,
   buildPlayerMatchLogEmbed,
   postPlayerLogs,
   postSmurfAlerts,
