@@ -138,7 +138,9 @@ function buildInsightsFromMatches(matches, puuid, championCatalog) {
 
   for (const match of matches) {
     const info = match?.info;
-    if (!info || info.gameMode !== 'MATCHED_GAME') continue;
+    // gameMode vem como CLASSIC/ARAM/CHERRY... (v5). Exclui apenas modos sem partida ranqueada normal.
+    const gameMode = String(info?.gameMode || '').toUpperCase();
+    if (!info || ['CHERRY', 'TUTORIAL', 'ULTBOOK', 'ODIN'].includes(gameMode)) continue;
 
     const participant = (info.participants || []).find((p) => p.puuid === puuid);
     if (!participant) continue;
