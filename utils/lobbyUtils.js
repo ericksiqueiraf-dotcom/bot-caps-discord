@@ -1809,7 +1809,7 @@ function splitEmbedFieldChunks(entries, maxLength = 1024) {
 const RULES_SECTIONS = [
   {
     name: '📝 1. Cadastro (uma vez só)',
-    value: '`!cadastrar Nick#TAG` vincula sua conta Riot (ex: `!cadastrar Faker#BR1`). Depois, `!nick Nick#TAG` atualiza se mudar de conta. `!perfil` mostra seu elo e seus pontos.'
+    value: '`!cadastrar Nick#TAG` vincula sua conta Riot (ex: `!cadastrar Faker#BR1`). Depois, `!nick Nick#TAG` atualiza sua conta. Administradores também podem trocar a conta de alguém com `!nick @membro Nick#TAG` ou `/nick nick:Nick#TAG perfil:@membro`. `!perfil` mostra seu elo e seus pontos.'
   },
   {
     name: '🎮 2. Como jogar',
@@ -1856,7 +1856,7 @@ const STAFF_SECTIONS = [
   },
   {
     name: '🎖️ Elos e cargos — manter atualizado',
-    value: '`!sincronizarelo @jogador` • Atualiza elo Riot + cargo de um jogador (mostra se o cargo falhou).\n`!sincronizartodos` • Atualiza TODO MUNDO (demora ~2,5s por jogador; use com calma).\n`!sync` • Reaplica cargos pelo elo já salvo (sem chamar a Riot).\n`!sync infernal` • Limpa INFERNALs travados/órfãos.'
+    value: '`!sincronizarelo @jogador` • Atualiza elo Riot + cargo de um jogador (mostra se o cargo falhou).\n`!nick @membro Nick#TAG` ou `/nick nick:Nick#TAG perfil:@membro` • Troca a conta Riot vinculada e preserva o histórico (só Admin).\n`!sincronizartodos` • Atualiza TODO MUNDO (demora ~2,5s por jogador; use com calma).\n`!sync` • Reaplica cargos pelo elo já salvo (sem chamar a Riot).\n`!sync infernal` • Limpa INFERNALs travados/órfãos.'
   },
   {
     name: '💎 Clube VIP — assinaturas',
@@ -1864,7 +1864,7 @@ const STAFF_SECTIONS = [
   },
   {
     name: '📌 Fixar guias (staff)',
-    value: '`!ajudafixar` • Posta e fixa `!ajuda` + `!ajuda2` no #infos-lol.\n`!clubefixar` • Posta e fixa os benefícios no #clube-vip.'
+    value: '`!ajudafixar` • Posta e fixa `!ajuda` + `!ajuda2` no #infos-lol.\n`!clubefixar` • Posta e fixa os benefícios no #clube-vip.\n`!nick @membro Nick#TAG` ou `/nick nick:Nick#TAG perfil:@membro` • Troca a conta Riot vinculada de um membro (só Admin).'
   },
   {
     name: '📊 Temporada — só Admin, com fila vazia',
@@ -2330,23 +2330,71 @@ function getCustomDisplayScore(modeStats) {
   return DEFAULT_CUSTOM_POINTS + getCustomPointsDelta(modeStats);
 }
 
-function buildPlayerCardEmbed(playerStats, targetUser, vipTierName = null) {
+function buildOpGgUrl(riotNickname) {
+  if (!riotNickname || !riotNickname.includes('#')) return null;
+  const [gameName, tagLine] = riotNickname.split('#');
+  if (!gameName || !tagLine) return null;
+  return `https://www.op.gg/br/lol/summoners/br/${encodeURIComponent(gameName.trim())}-${encodeURIComponent(tagLine.trim())}`;
+}
+
+function buildPlayerCardEmbed(playerStats, targetUser, vipTierName = null, insights = null) {
   const modes = normalizePlayerModes(playerStats);
   const classicStats = modes.classic;
   const lolMmr = Number(classicStats.baseMmr || playerStats.baseMmr || 0);
   const lolRankLabel = playerStats.tier
     ? formatRank(playerStats)
     : getRankName(lolMmr);
+  const riotNickname = playerStats.registeredNickname || playerStats.nickname || null;
 
   const embed = new EmbedBuilder()
     .setColor(THEME.INFO)
-    .setTitle('👤 Ficha do Jogador')
-    .setDescription(targetUser ? `${targetUser}` : `\`${playerStats.nickname}\``)
-    .addFields(
-      { name: 'Nick', value: `\`${playerStats.nickname || 'Nao identificado'}\``, inline: true },
-      { name: 'Elo LoL', value: `**${lolRankLabel}**\n\`${lolMmr} pts\``, inline: true },
-      { name: 'Pontos Custom', value: `\`${getCustomDisplayScore(classicStats)}\``, inline: true }
-    );
+    .setTitle(`👤 ${riotNickname || playerStats.nickname || 'Ficha do Jogador'}`);
+
+  if (targetUser?.displayAvatarURL) {
+    embed.setThumbnail(targetUser.displayAvatarURL({ size: 256 }));
+  }
+
+  if (insights) {
+    const bullets = [];
+
+    if (insights.mainLane) {
+      bullets.push(`- 🛣️ **Rota principal:** ${insights.mainLane}.`);
+    }
+    if (insights.totalGames > 0) {
+      bullets.push(`- 📊 **Win rate geral:** ${insights.winRate}% nas últimas ${insights.totalGames} partidas, com ${insights.wins} vitórias e ${insights.losses} derrotas.`);
+    }
+    if (insights.recentChampion) {
+      bullets.push(`- 🏆 **${insights.recentChampion.name}:** ${insights.recentChampion.winRate}% de vitórias em ${insights.recentChampion.games} partida(s) nos últimos 7 dias.`);
+    }
+    if (insights.styleText) {
+      bullets.push(`- ⚔️ **Estilo:** ${insights.styleText}.`);
+    }
+    if (insights.attentionText) {
+      bullets.push(`- ⚠️ **Ponto de atenção:** ${insights.attentionText}`);
+    }
+    const opGgUrl = buildOpGgUrl(riotNickname);
+    if (opGgUrl) {
+      bullets.push(`- 🔗 [Ver no OP.GG](${opGgUrl})`);
+    }
+
+    const baseDescription = targetUser ? `${targetUser}` : null;
+    if (bullets.length > 0) {
+      embed.setDescription([baseDescription, bullets.join('\n')].filter(Boolean).join('\n\n'));
+      if (insights.mainLane) {
+        embed.addFields({ name: '🏅 Especialista em', value: `**${insights.mainLane}**`, inline: true });
+      }
+    } else if (baseDescription) {
+      embed.setDescription(baseDescription);
+    }
+  } else if (targetUser) {
+    embed.setDescription(`${targetUser}`);
+  }
+
+  embed.addFields(
+    { name: 'Nick', value: `\`${playerStats.nickname || 'Nao identificado'}\``, inline: true },
+    { name: 'Elo LoL', value: `**${lolRankLabel}**\n\`${lolMmr} pts\``, inline: true },
+    { name: 'Pontos Custom', value: `\`${getCustomDisplayScore(classicStats)}\``, inline: true }
+  );
 
   if (vipTierName) {
     embed.addFields({ name: '💎 Clube VIP', value: `**${vipTierName}**`, inline: true });
@@ -2588,8 +2636,13 @@ async function sendMatchStartAnnouncement(guild, teams) {
   if (!channel || !channel.isTextBased()) return;
 
   const embed = buildTeamsEmbed(teams, buildVipTierResolver(guild));
+  const codeText = teams.riotTournamentCode
+    ? `\n\n🎮 **Código da sala Riot:** \`${teams.riotTournamentCode}\`\nCriem a sala usando esse código para o bot tentar buscar as estatísticas no fim da partida.`
+    : teams.mode === 'classic'
+      ? '\n\nℹ️ Código Riot indisponível nesta partida. As estatísticas automáticas não serão coletadas; a votação de vitória e MVP segue normal.'
+      : '';
   await channel.send({ 
-    content: '⚔️ **Nova partida iniciada!** Preparem-se para a batalha.',
+    content: `⚔️ **Nova partida iniciada!** Preparem-se para a batalha.${codeText}`,
     embeds: [embed] 
   }).catch(err => 
     console.error('[MATCH] Erro ao anunciar partida em andamento:', err.message)

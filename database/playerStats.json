@@ -10173,6 +10173,80 @@
       "leaguePoints": 19,
       "summonerId": null,
       "isFallbackUnranked": false
+    },
+    "HnSCv31vsOYarBsNdR6vtbI9WfIO-ndR-MLbE8CzBM5ZhgRMEr9ly3vy-Ec-REEhHxr28rXKe97fyA": {
+      "discordId": "286901182222565378",
+      "nickname": "Xxsucodefruta#BR1",
+      "puuid": "HnSCv31vsOYarBsNdR6vtbI9WfIO-ndR-MLbE8CzBM5ZhgRMEr9ly3vy-Ec-REEhHxr28rXKe97fyA",
+      "customWins": 0,
+      "customLosses": 0,
+      "baseMmr": 2712,
+      "internalRating": 3712,
+      "modes": {
+        "classic": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 2712,
+          "internalRating": 3712,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 2712,
+          "internalRating": 3712,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram1x1": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 2712,
+          "internalRating": 3712,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram2x2": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 2712,
+          "internalRating": 3712,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram3x3": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 2712,
+          "internalRating": 3712,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram4x4": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 2712,
+          "internalRating": 3712,
+          "winStreak": 0,
+          "ratingVersion": 2
+        },
+        "aram5x5": {
+          "customWins": 0,
+          "customLosses": 0,
+          "baseMmr": 2712,
+          "internalRating": 3712,
+          "winStreak": 0,
+          "ratingVersion": 2
+        }
+      },
+      "registeredNickname": "Xxsucodefruta#BR1",
+      "registeredAt": "2026-11-01T19:05:34.463Z",
+      "tier": "DIAMOND",
+      "rank": "I",
+      "leaguePoints": 12,
+      "summonerId": null,
+      "isFallbackUnranked": false
     }
   }
 }

@@ -73,7 +73,17 @@
       Acesso: publico
 
   !nick  /  /nick
-      Atualiza o nick Riot ja cadastrado: !nick Nick#TAG
+      Jogador: !nick Nick#TAG (atualiza a propria conta).
+      Administrador: !nick @membro Nick#TAG (troca a conta vinculada do membro).
+      Slash: /nick nick:Nick#TAG perfil:@membro (perfil opcional; so Admin ao alterar outro).
+      Acesso: publico para atualizar a propria conta; Admin para trocar a conta de outro membro.
+
+  !riotstats  /  /riotstats
+      Consulta/ativa/desativa o compartilhamento voluntario de estatisticas Riot:
+      !riotstats status | !riotstats ativar | !riotstats desativar
+      Dados individuais so aparecem para quem ativou. A integracao usa codigo
+      de torneio em partidas Classic; depende de chave Riot com acesso Tournament
+      API e callback HTTPS publico. O MVP continua decidido por votacao.
       Acesso: publico
 
 
@@ -156,7 +166,8 @@
       Aliases: !ficha, !p   -   Acesso: publico
 
   !palpite  /  /palpite
-      Aposta pontos no vencedor (janela de 5 min): !palpite <1|2> <10-100>
+      Aposta na partida ativa por até 5 min: !palpite <1|2> <10-100> [sala]. Ex.: !palpite 1 50 A.
+      Participantes e espectadores cadastrados podem apostar; com várias partidas, informe a sala.
       Acesso: jogador (em partida)
 
   !roleta  /  /roleta

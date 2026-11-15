@@ -166,9 +166,16 @@ async function registerVictory({
           if (String(palpites[id]?.time) !== String(winningTeam)) continue;
           const credit = Math.floor(Number(palpites[id].pontos) * pool / winPool);
           if (credit <= 0) continue;
-          const bPlayer = allMatchPlayers.find((p) => p.discordId === id) || { discordId: id };
-          const bStored = getStoredPlayerStats(statsData, bPlayer);
+          const matchPlayer = allMatchPlayers.find((p) => String(p.discordId) === String(id));
+          const bStored = getStoredPlayerStats(statsData, matchPlayer || { discordId: id });
           if (!bStored) continue;
+          // Spectators can place bets too. Resolve their saved account before
+          // upserting the payout so their PUUID key and existing history stay intact.
+          const bPlayer = matchPlayer || {
+            discordId: String(id),
+            nickname: bStored.registeredNickname || bStored.nickname || String(id),
+            puuid: bStored.puuid || null
+          };
           const bModes = getModeStats(bStored, match.mode, match.format);
           const bKey = getStatsBucketKey(match.mode, match.format);
           upsertPlayerStats(statsData, bPlayer, {

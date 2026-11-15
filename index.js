@@ -21,6 +21,7 @@ const {
 const config = require('./config.json');
 const { createVipPixPayment, getClubeTierConfig, recordPendingPayment, startVipPaymentPoller } = require('./services/clubePaymentsService');
 const { createRiotService } = require('./services/riotService');
+const { createRiotTournamentService } = require('./services/riotTournamentService');
 const { startSextaScheduler, startLclScheduler, startTorneioScheduler } = require('./services/eventoService');
 const { startSocialScheduler } = require('./services/socialService');
 const { startBackupScheduler } = require('./services/backupService');
@@ -146,10 +147,11 @@ function buildSlashCommands() {
           { name: 'Lendário', value: 'lendario' }
         ))
       .addIntegerOption((option) => option.setName('dias').setDescription('Dias (padrão do tier)').setRequired(false).setMinValue(1).setMaxValue(365)),
-    new SlashCommandBuilder().setName('palpite').setDescription('Aposte pontos no vencedor da sua partida.')
+    new SlashCommandBuilder().setName('palpite').setDescription('Aposte pontos no vencedor de uma partida ativa; também pode apostar como espectador.')
       .addIntegerOption((option) => option.setName('time').setDescription('Time vencedor').setRequired(true)
         .addChoices({ name: 'Time 1', value: 1 }, { name: 'Time 2', value: 2 }))
-      .addIntegerOption((option) => option.setName('pontos').setDescription('10 a 100').setRequired(true).setMinValue(10).setMaxValue(100)),
+      .addIntegerOption((option) => option.setName('pontos').setDescription('10 a 100').setRequired(true).setMinValue(10).setMaxValue(100))
+      .addStringOption((option) => option.setName('sala').setDescription('Sala A, B etc. (necessária se houver várias partidas)').setRequired(false)),
     new SlashCommandBuilder().setName('missoes').setDescription('Suas missões da semana.'),
     new SlashCommandBuilder().setName('duelo').setDescription('Desafie alguém para um duelo de PDL.')
       .addStringOption((option) => option.setName('acao').setDescription('O que fazer').setRequired(false)
@@ -289,9 +291,15 @@ function buildSlashCommands() {
       .setDescription('Vincula sua conta Riot ao Discord (feito uma unica vez).')
       .addStringOption((option) => option.setName('nick').setDescription('Seu Nick#TAG da Riot, ex: FakerBR#BR1').setRequired(true)),
     new SlashCommandBuilder()
+      .setName('riotstats')
+      .setDescription('Ativa, desativa ou consulta seu consentimento de estatísticas Riot.')
+      .addStringOption((option) => option.setName('acao').setDescription('Ação de compartilhamento').setRequired(false)
+        .addChoices({ name: 'Ativar', value: 'ativar' }, { name: 'Desativar', value: 'desativar' }, { name: 'Status', value: 'status' })),
+    new SlashCommandBuilder()
       .setName('nick')
-      .setDescription('Atualiza seu nick da Riot cadastrado.')
-      .addStringOption((option) => option.setName('nick').setDescription('Novo Nick#TAG, ex: FakerBR#BR2').setRequired(true)),
+      .setDescription('Atualiza sua conta Riot; administradores também podem atualizar a de um membro.')
+      .addStringOption((option) => option.setName('nick').setDescription('Novo Nick#TAG, ex: FakerBR#BR2').setRequired(true))
+      .addUserOption((option) => option.setName('perfil').setDescription('Membro cuja conta será trocada (somente administrador)').setRequired(false)),
     new SlashCommandBuilder()
       .setName('votar')
       .setDescription('Vota no time vencedor da sua partida ativa.')
@@ -360,9 +368,15 @@ async function registerSlashCommands() {
 }
 
 const riotService = createRiotService(RIOT_API_KEY, config.region);
+const riotTournamentService = createRiotTournamentService({
+  apiKey: process.env.RIOT_TOURNAMENT_API_KEY || RIOT_API_KEY,
+  region: config.region,
+  publicBaseUrl: process.env.PUBLIC_BASE_URL
+});
 
 global.discordClient = client;
 global.riotService = riotService;
+global.riotTournamentService = riotTournamentService;
 
 const {
   getSeasonDisplayLabel,
@@ -467,6 +481,13 @@ client.once('ready', async () => {
   startSocialScheduler();
   startVoiceTimeScheduler();
   startBackupScheduler();
+  if (riotTournamentService.enabled) {
+    setInterval(() => riotTournamentService.processCallbacks(client).catch((error) => {
+      console.error('[RIOT TOURNAMENT] Erro ao processar callback pendente:', error.message);
+    }), 30000);
+  } else {
+    console.log('[RIOT TOURNAMENT] Integração inativa: configure RIOT_TOURNAMENT_API_KEY e PUBLIC_BASE_URL HTTPS.');
+  }
 
   // Snapshot de convites p/ atribuir quem convidou cada novo membro.
   try {
@@ -903,6 +924,9 @@ async function processCommand(message, rawContent) {
       case 'stats':
       case 'estatisticas':
         await handlers.handleStatsCommand(message);
+        break;
+      case 'riotstats':
+        await handlers.handleRiotStatsCommand(message, args);
         break;
       case 'votar':
         await handlers.handleVoteCommand(message, args);
@@ -1372,7 +1396,8 @@ client.on('interactionCreate', async (interaction) => {
       case 'palpite': {
         const palpiteTime = interaction.options.getInteger('time');
         const palpitePontos = interaction.options.getInteger('pontos');
-        await handlers.handlePalpiteCommand(context, [String(palpiteTime), String(palpitePontos)]);
+        const palpiteSala = interaction.options.getString('sala');
+        await handlers.handlePalpiteCommand(context, [String(palpiteTime), String(palpitePontos), ...(palpiteSala ? [palpiteSala] : [])]);
         break;
       }
       case 'missoes':
@@ -1448,7 +1473,13 @@ client.on('interactionCreate', async (interaction) => {
       }
       case 'nick': {
         const updateNick = interaction.options.getString('nick');
-        await handlers.handleNickUpdateCommand(context, [updateNick]);
+        const profileUser = interaction.options.getUser('perfil');
+        await handlers.handleNickUpdateCommand(context, [updateNick], profileUser);
+        break;
+      }
+      case 'riotstats': {
+        const action = interaction.options.getString('acao') || 'status';
+        await handlers.handleRiotStatsCommand(context, [action]);
         break;
       }
       default:

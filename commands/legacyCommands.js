@@ -48,6 +48,7 @@ const {
   loadSeasonMeta, saveSeasonMeta, loadSeasonHistory, 
   saveSeasonHistory, loadSystemMeta, saveSystemMeta,
   loadContentTemplates, loadVipSubscriptions,
+  loadRiotTournamentMatches, saveRiotTournamentMatches,
   withQueueOperationLock 
 } = require('../services/dataService');
 const { getResolvedContentTemplates } = require('../services/contentTextService');
@@ -162,8 +163,33 @@ function createStartMatchDeps() {
     calculateHybridMmr,
     migrateInternalRating,
     createTeamChannelsForLobby,
-    movePlayersToTeamChannels
+    movePlayersToTeamChannels,
+    loadRiotTournamentMatches,
+    saveRiotTournamentMatches,
+    createClassicTournamentCode: global.riotTournamentService?.createTournamentCode
+      ? (payload) => global.riotTournamentService.createTournamentCode(payload)
+      : null
   };
+}
+
+async function handleRiotStatsCommand(message, args = []) {
+  const action = String(args[0] || 'status').toLowerCase();
+  const userId = message.author?.id;
+  const meta = await loadSystemMeta();
+  meta.riotStatsConsent ||= {};
+  if (action === 'ativar' || action === 'on') {
+    meta.riotStatsConsent[userId] = { enabled: true, updatedAt: new Date().toISOString() };
+    await saveSystemMeta(meta);
+    return await replyToMessage(message, '✅ Compartilhamento de estatísticas Riot ativado. Seus dados individuais de partidas Classic poderão aparecer no resumo publicado no Discord. Use `!riotstats desativar` para retirar o consentimento.');
+  }
+  if (action === 'desativar' || action === 'off') {
+    delete meta.riotStatsConsent[userId];
+    await saveSystemMeta(meta);
+    return await replyToMessage(message, '✅ Compartilhamento de estatísticas Riot desativado. Partidas futuras não publicarão seus dados individuais.');
+  }
+  const enabled = Boolean(meta.riotStatsConsent[userId]?.enabled);
+  const integration = global.riotTournamentService?.enabled;
+  return await replyToMessage(message, `Compartilhamento individual: **${enabled ? 'ativado' : 'desativado'}**. Pré-requisitos de configuração Riot: **${integration ? 'presentes; falta confirmar acesso e operação da API' : 'aguardando chave Tournament API e URL HTTPS pública'}**. Use \`!riotstats ativar\` ou \`!riotstats desativar\`. O MVP continua por votação.`);
 }
 
 function createRegisterVictoryDeps() {
@@ -498,17 +524,38 @@ async function handleRegisterCommand(message, args) {
   }
 }
 
-async function handleNickUpdateCommand(message, args) {
+async function handleNickUpdateCommand(message, args = [], targetUserOverride = null) {
   try {
-    const nickname = args.join(' ').trim();
-    if (!nickname) {
-      await replyToMessage(message, '❌ Use `!nick SeuNovoNick#TAG` para atualizar seu cadastro.');
+    const firstArg = String(args[0] || '').trim();
+    const mentionInArgs = /^<@!?\d+>$/.test(firstArg);
+    const targetUser = targetUserOverride
+      || (mentionInArgs ? message.mentions?.users?.first?.() : null)
+      || message.author;
+    const isChangingAnotherMember = String(targetUser?.id || '') !== String(message.author?.id || '');
+    if (isChangingAnotherMember && !message.member?.permissions?.has(PermissionFlagsBits.Administrator)) {
+      await replyToMessage(message, '❌ Apenas administradores podem trocar a conta Riot vinculada de outro membro.');
       return;
     }
-    await replyToMessage(message, '⏳ Verificando novo nick na Riot...');
+    if (mentionInArgs && !targetUserOverride && !message.mentions?.users?.first?.()) {
+      await replyToMessage(message, '❌ Não consegui localizar o membro mencionado. Use `!nick @membro Nick#TAG`.');
+      return;
+    }
+    const nickname = (targetUserOverride ? args : mentionInArgs ? args.slice(1) : args).join(' ').trim();
+    if (!nickname) {
+      await replyToMessage(message, '❌ Use `!nick SeuNovoNick#TAG` para sua conta ou `!nick @membro NovoNick#TAG` para trocar a conta de um membro (administrador).');
+      return;
+    }
+    if (isChangingAnotherMember) {
+      const targetMember = await message.guild?.members?.fetch?.(targetUser.id).catch(() => null);
+      if (!targetMember) {
+        await replyToMessage(message, '❌ Esse usuário não é membro deste servidor.');
+        return;
+      }
+    }
+    await replyToMessage(message, `⏳ Verificando a conta Riot de <@${targetUser.id}>...`);
     if (global.riotService.invalidateCache) {
       const playerStats = await loadPlayerStats();
-      const storedEntry = Object.values(playerStats.players || {}).find(p => p.discordId === message.author.id);
+      const storedEntry = Object.values(playerStats.players || {}).find(p => p.discordId === targetUser.id);
       if (storedEntry?.puuid) global.riotService.invalidateCache(storedEntry.puuid);
     }
     const rankProfile = await global.riotService.getPlayerRankProfile(nickname);
@@ -518,8 +565,14 @@ async function handleNickUpdateCommand(message, args) {
       return;
     }
     const playerStats = await loadPlayerStats();
-    const storedStats = getStoredPlayerStats(playerStats, { discordId: message.author.id, nickname: rankProfile.nickname, puuid: rankProfile.puuid });
-    upsertPlayerStats(playerStats, { discordId: message.author.id, nickname: rankProfile.nickname, puuid: rankProfile.puuid }, {
+    const conflictingAccount = Object.values(playerStats.players || {}).find((player) =>
+      String(player.puuid || '') === String(rankProfile.puuid) && String(player.discordId || '') !== String(targetUser.id));
+    if (conflictingAccount) {
+      await replyToMessage(message, `❌ A conta **${rankProfile.nickname}** já está vinculada a outro membro. Não alterei o cadastro.`);
+      return;
+    }
+    const storedStats = getStoredPlayerStats(playerStats, { discordId: targetUser.id, nickname: rankProfile.nickname, puuid: rankProfile.puuid });
+    upsertPlayerStats(playerStats, { discordId: targetUser.id, nickname: rankProfile.nickname, puuid: rankProfile.puuid }, {
       registeredNickname: rankProfile.nickname,
       registeredAt: new Date().toISOString(),
       tier: rankProfile.tier,
@@ -532,8 +585,8 @@ async function handleNickUpdateCommand(message, args) {
       modes: syncBaseMmrAcrossModes(storedStats, rankProfile.mmr)
     });
     await savePlayerStats(playerStats);
-    const gate = await grantRegisteredPlayerRole(message.guild, message.author.id);
-    await syncMemberRankRole(message.guild, message.author.id, rankProfile.mmr);
+    const gate = await grantRegisteredPlayerRole(message.guild, targetUser.id);
+    await syncMemberRankRole(message.guild, targetUser.id, rankProfile.mmr);
     const rankStr = rankProfile.isFallbackUnranked ? 'Unranked (base Gold IV)' : `${rankProfile.tier} ${rankProfile.rank} — ${rankProfile.leaguePoints} PDL`;
     let accessLine = '';
     if (gate.ok && !gate.alreadyHad) {
@@ -542,7 +595,7 @@ async function handleNickUpdateCommand(message, args) {
       accessLine = '\n_Nao foi possivel atribuir o cargo automaticamente. Confira config e permissoes do bot._';
     }
     await replyToMessage(message,
-      `✅ Nick atualizado!\n` +
+      `✅ Conta Riot de <@${targetUser.id}> atualizada${isChangingAnotherMember ? ` pelo administrador <@${message.author.id}>` : ''}!\n` +
       `🎮 **${rankProfile.nickname}** · ${rankStr}` +
       accessLine
     );
@@ -961,13 +1014,24 @@ async function handleTopInfernalCommand(message) {
   await sendToMessageChannel(message, { embeds: [embed] });
 }
 
+async function fetchPlayerMatchInsights(playerStats) {
+  if (!playerStats?.puuid || !global.riotService?.getMatchInsights) return null;
+  try {
+    return await global.riotService.getMatchInsights(playerStats.puuid);
+  } catch (error) {
+    console.warn('[PERFIL] Insights da Riot indisponiveis:', error.message);
+    return null;
+  }
+}
+
 async function handlePlayerCardCommand(message, targetUser = null) {
   const selectedUser = targetUser || message.mentions.users.first() || message.author;
   const statsData = await loadPlayerStats();
   const playerStats = Object.values(statsData.players || {}).find(p => p.discordId === selectedUser.id);
   if (!playerStats) return await replyToMessage(message, 'Jogador nao registrado no sistema.');
   const targetMember = message.guild?.members?.cache?.get?.(selectedUser.id) || null;
-  await sendToMessageChannel(message, { embeds: [buildPlayerCardEmbed(playerStats, selectedUser, getMemberVipTier(targetMember))] });
+  const insights = await fetchPlayerMatchInsights(playerStats);
+  await sendToMessageChannel(message, { embeds: [buildPlayerCardEmbed(playerStats, selectedUser, getMemberVipTier(targetMember), insights)] });
 }
 
 async function handleClubeFixarCommand(message) {
@@ -1880,10 +1944,10 @@ function buildAjudaEmbed(page = 1) {
       .setTitle('📚 Guia de Comandos (2/2) — Ranking e extras')
       .setDescription('Ranking, clube VIP, salas temporárias e extras. Página 1 no `!ajuda`.')
       .addFields(
-        { name: '🏆 Ranking e pós-jogo', value: '`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!palpite <1|2> <10-100>` • Aposta pontos no vencedor da sua partida\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking CLASSIC (pontos custom)\n`!placar tiers` • Só Esmeralda+\n`!placar duelo` • TOP 10 dos duelos 1v1 (vitórias em duelo)\n`!placar tt` • TWISTED TREELINE 3x3 (antigo 3x3)\n`!top10` • Top 10 (classic, tiers, duelo ou tt)\n`!topstreak` • Ranking Streak 🔥 (classic ou tt)\n`!toprankinfernal` • Quem mais pegou INFERNAL na temporada 🔥\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
+        { name: '🏆 Ranking e pós-jogo', value: '`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!palpite <1|2> <10-100> [sala]` • Aposta na partida ativa, também como espectador; indique a sala se houver várias (ex.: `!palpite 1 50 A`)\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking CLASSIC (pontos custom)\n`!placar tiers` • Só Esmeralda+\n`!placar duelo` • TOP 10 dos duelos 1v1 (vitórias em duelo)\n`!placar tt` • TWISTED TREELINE 3x3 (antigo 3x3)\n`!top10` • Top 10 (classic, tiers, duelo ou tt)\n`!topstreak` • Ranking Streak 🔥 (classic ou tt)\n`!toprankinfernal` • Quem mais pegou INFERNAL na temporada 🔥\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
         { name: '💎 Clube VIP', value: '`!clube` • Tiers, assinatura PIX e renovação -10%\n`!querolive` • Entrar/sair do ping 🔴 Ao Vivo\n`!live <link>` • Divulgar live Twitch/YouTube/Kick (Lendário 6h, VIP 12h, Apoiador 24h)' },
         { name: '🔊 Salas temporárias (dono da sala)', value: 'Entre no ➕・criar-sala para ganhar sua sala\n`!salahub` • Lista as salas ativas\n`!sala` • Mostra sua sala • `!sala <nome>` renomeia\n`!convidar @u` • Chama alguém p/ sua sala\n`!salalock` • Tranca (`!salalock abrir` destranca)\n`!salalimit <0-99>` • Limite de usuários (0 = sem limite)\n`!salaexpulsar @u` • Remove alguém da sala\n`!limparvoz` • Apaga sua sala (dentro dela)' },
-        { name: '🎁 Extras', value: '`!convite` • Seu link pessoal (traga gente e ganhe recompensas)\n`!topconvites` • Ranking de quem mais trouxe gente\n`!torneio` • Torneio CAPS ARENA — fase de pontos + final (entrar, lista, status, classificacao — staff: `!torneioon`/`!torneiooff`/`!torneio start`)\n`!tempo` • Seu tempo em call • `!topvoz` • Ranking de call\n`!palpite <1|2> <10-100>` • Bolão da partida • `!missoes` • Missões da semana\n`!duelo @u [10-200]` • Desafio de PDL — quem matar primeiro vence (`!duelo aceitar`/`recusar`; staff declara com `!duelo vitoria @vitorioso @perdedor`) • `!duelo rank` • Top 10 dos duelos\n`!social` • Instagram, Twitch, TikTok e YouTube oficiais da CAPS ARENA\n🌅 Primeira vitória do dia vale +50% PDL (automático)\n`!regras` • Regulamento completo' },
+        { name: '🎁 Extras', value: '`!convite` • Seu link pessoal (traga gente e ganhe recompensas)\n`!topconvites` • Ranking de quem mais trouxe gente\n`!torneio` • Torneio CAPS ARENA — fase de pontos + final (entrar, lista, status, classificacao — staff: `!torneioon`/`!torneiooff`/`!torneio start`)\n`!tempo` • Seu tempo em call • `!topvoz` • Ranking de call\n`!palpite <1|2> <10-100> [sala]` • Bolão de partida ativa, também para espectadores (ex.: `!palpite 1 50 A`) • `!missoes` • Missões da semana\n`!duelo @u [10-200]` • Desafio de PDL — quem matar primeiro vence (`!duelo aceitar`/`recusar`; staff declara com `!duelo vitoria @vitorioso @perdedor`) • `!duelo rank` • Top 10 dos duelos\n`!social` • Instagram, Twitch, TikTok e YouTube oficiais da CAPS ARENA\n🌅 Primeira vitória do dia vale +50% PDL (automático)\n`!regras` • Regulamento completo' },
         { name: '⬅️ Página 1', value: '`!ajuda` • Cadastro, fila e voto\n`!staff` • Guia da staff (restrito)' }
       );
     } else {
@@ -1908,20 +1972,35 @@ async function handlePalpiteCommand(message, args = []) {
     const time = String(timeArg || '');
     const pontos = Number(pontosArg);
     if (!['1', '2'].includes(time) || !Number.isInteger(pontos) || pontos < 10 || pontos > 100) {
-      return await replyToMessage(message, '❌ Use: `!palpite <1|2> <10-100>` (aposta com seus pontos custom).');
+      return await replyToMessage(message, '❌ Use: `!palpite <1|2> <10-100> [sala]` (ex.: `!palpite 1 50 A`).');
     }
     const currentMatchData = await loadCurrentMatch();
-    const entry = Object.entries(currentMatchData.matches || {}).find(([, e]) => {
-      if (!e?.active || !e?.match) return false;
-      return [...(e.match.teamOne || []), ...(e.match.teamTwo || [])].some((p) => p.discordId === message.author.id);
-    });
-    if (!entry) {
-      return await replyToMessage(message, '❌ Você não está em nenhuma partida ativa.');
+    const activeEntries = Object.entries(currentMatchData.matches || {}).filter(([, entry]) => entry?.active && entry?.match);
+    if (!activeEntries.length) {
+      return await replyToMessage(message, '❌ Não há nenhuma partida ativa para apostar.');
     }
-    const [matchId, matchEntry] = entry;
+    const roomSelector = String(args[2] || '').trim().toUpperCase().replace(/^SALA\s+/, '');
+    let selectedEntry = null;
+    if (roomSelector) {
+      selectedEntry = activeEntries.find(([matchId, entry]) =>
+        String(entry.match.letter || '').toUpperCase() === roomSelector || String(matchId).toUpperCase() === roomSelector);
+      if (!selectedEntry) {
+        return await replyToMessage(message, `❌ Não encontrei uma partida ativa na sala **${roomSelector}**.`);
+      }
+    } else {
+      selectedEntry = activeEntries.find(([, entry]) =>
+        [...(entry.match.teamOne || []), ...(entry.match.teamTwo || [])]
+          .some((player) => String(player.discordId) === String(message.author.id))
+      ) || (activeEntries.length === 1 ? activeEntries[0] : null);
+      if (!selectedEntry) {
+        const rooms = activeEntries.map(([, entry]) => `**${entry.match.letter || '?'}**`).join(', ');
+        return await replyToMessage(message, `🎯 Há mais de uma partida ativa (${rooms}). Informe a sala: \`!palpite <1|2> <10-100> <sala>\`.`);
+      }
+    }
+    const [matchId, matchEntry] = selectedEntry;
     matchEntry.palpites ||= {};
     if (matchEntry.palpites[message.author.id]) {
-      return await replyToMessage(message, '❌ Você já apostou nesta partida.');
+      return await replyToMessage(message, `❌ Você já apostou na partida da sala **${matchEntry.match.letter || '?'}**.`);
     }
     // Janela de aposta: 5 minutos após a formação dos times.
     const PALPITE_WINDOW_MS = 5 * 60 * 1000;
@@ -1930,8 +2009,16 @@ async function handlePalpiteCommand(message, args = []) {
       return await replyToMessage(message, '❌ Apostas encerradas para essa partida (vale nos primeiros 5 minutos após formar os times).');
     }
     const playerStats = await loadPlayerStats();
-    const bettor = [...(matchEntry.match.teamOne || []), ...(matchEntry.match.teamTwo || [])]
-      .find((p) => p.discordId === message.author.id) || { discordId: message.author.id };
+    const storedAccount = Object.values(playerStats.players || {}).find((player) =>
+      String(player.discordId || '') === String(message.author.id));
+    if (!storedAccount?.puuid || !(storedAccount.registeredNickname || storedAccount.nickname)) {
+      return await replyToMessage(message, '❌ Você precisa vincular sua conta Riot com `!cadastrar Nick#TAG` antes de apostar.');
+    }
+    const bettor = {
+      discordId: String(message.author.id),
+      nickname: storedAccount.registeredNickname || storedAccount.nickname,
+      puuid: storedAccount.puuid
+    };
     const stored = getStoredPlayerStats(playerStats, bettor);
     const bucketKey = getStatsBucketKey(matchEntry.match.mode, matchEntry.match.format);
     const modeStats = getModeStats(stored, matchEntry.match.mode, matchEntry.match.format);
@@ -1946,7 +2033,7 @@ async function handlePalpiteCommand(message, args = []) {
     await savePlayerStats(playerStats);
     matchEntry.palpites[message.author.id] = { time, pontos, betAt: new Date().toISOString() };
     await saveCurrentMatch(currentMatchData);
-    await replyToMessage(message, `🎯 Aposta registrada: **${pontos} pontos no time ${time}**! Boa sorte!`);
+    await replyToMessage(message, `🎯 Aposta registrada na sala **${matchEntry.match.letter || '?'}**: **${pontos} pontos no time ${time}**! Boa sorte!`);
   } catch (error) {
     console.error('[ERRO] !palpite:', error);
     await replyToMessage(message, `❌ Erro ao apostar: \`${error.message}\``);
@@ -2011,7 +2098,14 @@ async function handleDueloCommand(message, args = [], targetUserOverride = null)
 
     if (['vitoria', 'resultado'].includes(sub)) {
       if (!isStaffOnly(message.member)) return await replyToMessage(message, '❌ Só a Staff pode declarar o resultado do duelo. Use `!duelo vitoria @vencedor @perdedor`.');
-      const mentions = [...message.mentions.users.values()];
+      // Discord.js Collection order is not guaranteed to match the order in
+      // message.content. The command contract is winner first, loser second,
+      // so recover mention IDs from the raw text to preserve that order.
+      const mentionIds = [...String(message.content || '').matchAll(/<@!?([0-9]+)>/g)]
+        .map((match) => match[1]);
+      const mentions = mentionIds
+        .map((userId) => message.mentions.users.get(userId))
+        .filter(Boolean);
       if (mentions.length < 2) return await replyToMessage(message, '❌ Use: `!duelo vitoria @vencedor @perdedor`.');
       const [winner, loser] = mentions;
       const result = duelo.completeDuel(systemMeta.duelos, winner.id, loser.id);
@@ -3248,6 +3342,7 @@ module.exports = {
   handleConviteCommand, handleTopConvitesCommand, handleTorneioCommand, handleTempoCommand, handleTopVozCommand,
   handleAjudaFixarCommand, buildAjudaEmbed, buildTempoEmbed, normalizePresentearTier, handlePresentearCommand, handlePalpiteCommand,
   handleMissoesCommand, handleDueloCommand,
+  handleRiotStatsCommand,
   LIVE_COOLDOWN_BY_TIER_MS,
   handleSalaHubCommand, handleConvidarCommand, handleLimparVozCommand, handleSalaCommand,
   handleSalaLockCommand, handleSalaLimitCommand, handleSalaExpulsarCommand,

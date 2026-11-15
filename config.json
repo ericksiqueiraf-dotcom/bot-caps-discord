@@ -53,6 +53,7 @@
     "dailyRankUpdatesHour": 8,
     "dailyRankUpdatesMinute": 0,
     "fridayAnnouncementsEnabled": false,
+    "lclWeekendEnabled": false,
     "voiceTimeMonthlyAnnouncementEnabled": false
   },
   "cadastro": {

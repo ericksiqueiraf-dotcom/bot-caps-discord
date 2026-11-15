@@ -53,6 +53,155 @@ function setCachedProfile(puuid, data) {
   rankProfileCache.set(puuid, { data, expiresAt: Date.now() + CACHE_TTL_MS });
 }
 
+// ===== Insights de partidas (dados usados no !perfil) =====
+const matchInsightsCache = new Map();
+const MATCH_INSIGHTS_TTL_MS = 30 * 60 * 1000; // 30 minutos
+const MATCH_INSIGHTS_COUNT = 10; // partidas analisadas por consulta
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+const LANE_LABELS = {
+  TOP: 'Top',
+  JUNGLE: 'Selva',
+  MIDDLE: 'Meio',
+  BOTTOM: 'Bot',
+  UTILITY: 'Suporte'
+};
+
+const STYLE_BY_TAG = {
+  Fighter: 'duelo no 1x1 e pressão individual',
+  Assassin: 'jogadas agressivas e caça ao carry adversário',
+  Marksman: 'dano à distância e posicionamento cuidadoso',
+  Mage: 'controle de área e dano em lista',
+  Tank: 'linha de frente e engajamento de lutas',
+  Support: 'proteção de aliados e visão de mapa',
+  Slayer: 'caça ao alvo isolado'
+};
+
+let championCatalogCache = null;
+let championCatalogExpiresAt = 0;
+
+async function getChampionCatalog() {
+  if (championCatalogCache && Date.now() < championCatalogExpiresAt) {
+    return championCatalogCache;
+  }
+
+  const versionsResponse = await axios.get('https://ddragon.leagueoflegends.com/api/versions.json', { timeout: 10000 });
+  const latestVersion = versionsResponse.data[0];
+  const championsResponse = await axios.get(
+    `https://ddragon.leagueoflegends.com/cdn/${latestVersion}/data/pt_BR/champion.json`,
+    { timeout: 10000 }
+  );
+
+  const catalog = {};
+  for (const champion of Object.values(championsResponse.data.data || {})) {
+    catalog[String(champion.key)] = { name: champion.name, tags: champion.tags || [] };
+  }
+
+  championCatalogCache = catalog;
+  championCatalogExpiresAt = Date.now() + 24 * 60 * 60 * 1000;
+  return catalog;
+}
+
+function buildStyleText(tags) {
+  const items = (tags || []).map((tag) => STYLE_BY_TAG[tag]).filter(Boolean);
+  return items.length ? items.join(' + ') : 'estilo versátil';
+}
+
+function getCachedInsights(puuid) {
+  const entry = matchInsightsCache.get(puuid);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    matchInsightsCache.delete(puuid);
+    return null;
+  }
+  return entry.data;
+}
+
+function setCachedInsights(puuid, data) {
+  matchInsightsCache.set(puuid, { data, expiresAt: Date.now() + MATCH_INSIGHTS_TTL_MS });
+}
+
+function summarizeChampionStats(entry, games) {
+  return {
+    name: entry.name,
+    games,
+    winRate: Math.round((entry.wins / games) * 100)
+  };
+}
+
+function buildInsightsFromMatches(matches, puuid, championCatalog) {
+  let wins = 0;
+  let losses = 0;
+  const laneCounts = {};
+  const champStats = {};
+  const now = Date.now();
+
+  for (const match of matches) {
+    const info = match?.info;
+    if (!info || info.gameMode !== 'MATCHED_GAME') continue;
+
+    const participant = (info.participants || []).find((p) => p.puuid === puuid);
+    if (!participant) continue;
+
+    if (participant.win) wins += 1; else losses += 1;
+
+    if (LANE_LABELS[participant.individualPosition]) {
+      laneCounts[participant.individualPosition] = (laneCounts[participant.individualPosition] || 0) + 1;
+    }
+
+    const champId = String(participant.championId);
+    const champMeta = championCatalog[champId] || { name: `Campeão ${champId}`, tags: [] };
+    if (!champStats[champId]) {
+      champStats[champId] = { name: champMeta.name, tags: champMeta.tags, wins: 0, games: 0, lastPlayedAt: 0 };
+    }
+    champStats[champId].games += 1;
+    if (participant.win) champStats[champId].wins += 1;
+    const playedAt = Number(info.gameEndTimestamp || 0);
+    if (playedAt > champStats[champId].lastPlayedAt) champStats[champId].lastPlayedAt = playedAt;
+  }
+
+  const totalGames = wins + losses;
+  if (totalGames === 0) return null;
+
+  const mainLaneKey = Object.entries(laneCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+  const mainLane = mainLaneKey ? LANE_LABELS[mainLaneKey] : null;
+
+  const championsAllTime = Object.values(champStats)
+    .map((entry) => ({ entry, games: entry.games }))
+    .sort((a, b) => b.games - a.games);
+
+  const topChampAllTime = championsAllTime[0]
+    ? summarizeChampionStats(championsAllTime[0].entry, championsAllTime[0].games)
+    : null;
+
+  const recentChampionEntry = championsAllTime.find((item) => item.entry.lastPlayedAt >= now - SEVEN_DAYS_MS);
+  const recentChampion = recentChampionEntry
+    ? summarizeChampionStats(recentChampionEntry.entry, recentChampionEntry.games)
+    : null;
+
+  const styleSource = championsAllTime[0]?.entry || null;
+  const styleText = styleSource ? buildStyleText(styleSource.tags) : null;
+
+  let attentionText = null;
+  const focusChampion = recentChampion || topChampAllTime;
+  if (focusChampion && ((focusChampion.games >= 3 && focusChampion.winRate >= 60) || focusChampion.games >= 6)) {
+    attentionText = `é um jogador muito identificado com ${focusChampion.name}; vale considerar banimento ou roubo do campeão.`;
+  }
+
+  return {
+    totalGames,
+    wins,
+    losses,
+    winRate: Math.round((wins / totalGames) * 100),
+    mainLane,
+    topChampion: topChampAllTime,
+    recentChampion,
+    styleText,
+    attentionText,
+    generatedAt: new Date().toISOString()
+  };
+}
+
 function createRiotService(apiKey, region = DEFAULT_REGION) {
   if (!apiKey) {
     throw new Error('RIOT_API_KEY nao foi configurada no arquivo .env.');
@@ -226,12 +375,45 @@ function createRiotService(apiKey, region = DEFAULT_REGION) {
     return profile;
   }
 
+  async function getMatchInsights(puuid) {
+    if (!puuid) return null;
+
+    const cached = getCachedInsights(puuid);
+    if (cached) return cached;
+
+    const championCatalog = await getChampionCatalog();
+
+    const matchIdsResponse = await request(() =>
+      regionalClient.get(`/lol/match/v5/matches/by-puuid/${encodeURIComponent(puuid)}/ids`, {
+        params: { start: 0, count: MATCH_INSIGHTS_COUNT }
+      }),
+      'Historico de partidas'
+    );
+
+    const matchIds = Array.isArray(matchIdsResponse.data) ? matchIdsResponse.data : [];
+    const matchResponses = await Promise.all(
+      matchIds.map((matchId) =>
+        request(() => regionalClient.get(`/lol/match/v5/matches/${matchId}`), `Partida ${matchId}`)
+          .then((response) => response.data)
+          .catch(() => null)
+      )
+    );
+
+    const insights = buildInsightsFromMatches(matchResponses, puuid, championCatalog);
+    if (!insights) return null;
+
+    setCachedInsights(puuid, insights);
+    return insights;
+  }
+
   function invalidateCache(puuid) {
     rankProfileCache.delete(puuid);
+    matchInsightsCache.delete(puuid);
   }
 
   return {
     getPlayerRankProfile,
+    getMatchInsights,
     convertRankToMmr,
     invalidateCache
   };

@@ -23,6 +23,8 @@ const LOCAL_FILES = {
   },
   seasonHistory: { file: 'seasonHistory.json', fallback: { seasons: [] } },
   systemMeta: { file: 'systemMeta.json', fallback: { lastQueueMessageId: null, queueDashboardMessageIds: {} } },
+  riotTournamentCallbacks: { file: 'riotTournamentCallbacks.json', fallback: { callbacks: [] } },
+  riotTournamentMatches: { file: 'riotTournamentMatches.json', fallback: { matches: [] } },
   contentTemplates: { file: 'contentTemplates.json', fallback: { onboarding: {}, welcome: {} } }
 };
 
@@ -115,6 +117,8 @@ async function ensureDataFiles() {
     },
     { _id: 'seasonHistory', data: { seasons: [] } },
     { _id: 'systemMeta', data: { lastQueueMessageId: null, queueDashboardMessageIds: {} } },
+    { _id: 'riotTournamentCallbacks', data: { callbacks: [] } },
+    { _id: 'riotTournamentMatches', data: { matches: [] } },
     { _id: 'vipSubscriptions', data: { subscriptions: [] } },
     { _id: 'contentTemplates', data: { onboarding: {}, welcome: {} } }
   ];
@@ -250,6 +254,24 @@ async function saveSystemMeta(data) {
   await writeDoc('systemMeta', data);
 }
 
+async function loadRiotTournamentCallbacks() {
+  const parsed = await readDoc('riotTournamentCallbacks', { callbacks: [] });
+  return { callbacks: Array.isArray(parsed?.callbacks) ? parsed.callbacks : [] };
+}
+
+async function saveRiotTournamentCallbacks(data) {
+  await writeDoc('riotTournamentCallbacks', { callbacks: Array.isArray(data?.callbacks) ? data.callbacks : [] });
+}
+
+async function loadRiotTournamentMatches() {
+  const parsed = await readDoc('riotTournamentMatches', { matches: [] });
+  return { matches: Array.isArray(parsed?.matches) ? parsed.matches : [] };
+}
+
+async function saveRiotTournamentMatches(data) {
+  await writeDoc('riotTournamentMatches', { matches: Array.isArray(data?.matches) ? data.matches : [] });
+}
+
 async function loadContentTemplates() {
   const parsed = await readDoc('contentTemplates', { onboarding: {}, welcome: {} });
   return {
@@ -289,6 +311,10 @@ module.exports = {
   saveSeasonHistory,
   loadSystemMeta,
   saveSystemMeta,
+  loadRiotTournamentCallbacks,
+  saveRiotTournamentCallbacks,
+  loadRiotTournamentMatches,
+  saveRiotTournamentMatches,
   loadContentTemplates,
   saveContentTemplates,
   loadVipSubscriptions,

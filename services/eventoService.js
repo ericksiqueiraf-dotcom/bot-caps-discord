@@ -291,6 +291,10 @@ async function runLclTick(nowMs = Date.now(), deps = {}) {
 }
 
 function startLclScheduler() {
+  if (config.automation?.lclWeekendEnabled === false) {
+    console.log('[LCL] Automação de fim de semana desativada em config.');
+    return null;
+  }
   setInterval(() => {
     runLclTick(Date.now()).catch((err) => console.error('[LCL] Erro no tick:', err.message));
   }, 60000).unref?.();

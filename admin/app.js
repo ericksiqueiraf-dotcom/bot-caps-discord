@@ -152,6 +152,23 @@ app.post('/webhooks/mercadopago', async (req, res) => {
   }
 });
 
+// Callback da Riot para partidas iniciadas com Tournament Code.
+app.post('/webhooks/riot-tournament', async (req, res) => {
+  try {
+    const { createRiotTournamentService } = require('../services/riotTournamentService');
+    const service = createRiotTournamentService({
+      apiKey: process.env.RIOT_TOURNAMENT_API_KEY || process.env.RIOT_API_KEY,
+      region: require('../config.json').region,
+      publicBaseUrl: process.env.PUBLIC_BASE_URL
+    });
+    const result = await service.acceptCallback(req.body);
+    return res.status(result.status).send(result.accepted ? 'OK' : 'Invalid callback');
+  } catch (error) {
+    console.error('[WEBHOOK RIOT] Erro:', error.message);
+    return res.status(500).send('Callback processing error');
+  }
+});
+
 app.use((error, req, res, next) => {
   console.error('[ADMIN DASHBOARD]', error);
   res.status(500).send(`Erro interno no dashboard: ${error.message}`);
