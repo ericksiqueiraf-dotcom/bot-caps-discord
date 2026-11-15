@@ -2382,7 +2382,7 @@ function getTopOneBadges(statsData, seasonMeta, systemMeta, discordId) {
       .map((p) => ({ discordId: p.discordId, infernalCount: Number(p.infernalCount || 0) }))
       .filter((p) => p.discordId && p.infernalCount > 0)
       .sort((a, b) => b.infernalCount - a.infernalCount)[0];
-    if (infernalTop?.discordId === discordId) badges.push('🌋 TOP 1 INFERNAL');
+    if (infernalTop?.discordId === discordId) badges.push('🔥 TOP 1 INFERNAL');
   } catch { /* badges sao cosméticas: nunca quebrar o perfil */ }
   return badges;
 }
