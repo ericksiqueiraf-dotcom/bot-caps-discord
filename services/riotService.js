@@ -132,6 +132,9 @@ function summarizeChampionStats(entry, games) {
 function buildInsightsFromMatches(matches, puuid, championCatalog) {
   let wins = 0;
   let losses = 0;
+  let totalKills = 0;
+  let totalDeaths = 0;
+  let totalAssists = 0;
   const laneCounts = {};
   const champStats = {};
   const now = Date.now();
@@ -146,6 +149,9 @@ function buildInsightsFromMatches(matches, puuid, championCatalog) {
     if (!participant) continue;
 
     if (participant.win) wins += 1; else losses += 1;
+    totalKills += Number(participant.kills || 0);
+    totalDeaths += Number(participant.deaths || 0);
+    totalAssists += Number(participant.assists || 0);
 
     if (LANE_LABELS[participant.individualPosition]) {
       laneCounts[participant.individualPosition] = (laneCounts[participant.individualPosition] || 0) + 1;
@@ -164,6 +170,13 @@ function buildInsightsFromMatches(matches, puuid, championCatalog) {
 
   const totalGames = wins + losses;
   if (totalGames === 0) return null;
+
+  const avgKills = (totalKills / totalGames).toFixed(1);
+  const avgDeaths = (totalDeaths / totalGames).toFixed(1);
+  const avgAssists = (totalAssists / totalGames).toFixed(1);
+  const kdaRatio = totalDeaths > 0
+    ? ((totalKills + totalAssists) / totalDeaths).toFixed(1)
+    : 'Perfeito';
 
   const mainLaneKey = Object.entries(laneCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
   const mainLane = mainLaneKey ? LANE_LABELS[mainLaneKey] : null;
@@ -200,6 +213,7 @@ function buildInsightsFromMatches(matches, puuid, championCatalog) {
     recentChampion,
     styleText,
     attentionText,
+    kda: { avgKills, avgDeaths, avgAssists, ratio: kdaRatio },
     generatedAt: new Date().toISOString()
   };
 }
@@ -377,6 +391,40 @@ function createRiotService(apiKey, region = DEFAULT_REGION) {
     return profile;
   }
 
+  async function getChampionMasteries(puuid, championCatalog) {
+    try {
+      const response = await request(() =>
+        platformClient.get(`/lol/champion-mastery/v4/champion-masteries/by-puuid/${encodeURIComponent(puuid)}`),
+        'Maestria de campeoes'
+      );
+      return (response.data || [])
+        .sort((a, b) => Number(b.championPoints) - Number(a.championPoints))
+        .slice(0, 3)
+        .map((entry) => {
+          const meta = championCatalog[String(entry.championId)] || { name: `Campeao ${entry.championId}`, tags: [] };
+          return { name: meta.name, level: Number(entry.championLevel), points: Number(entry.championPoints) };
+        });
+    } catch {
+      return null;
+    }
+  }
+
+  async function getSoloQueueRecord({ puuid }) {
+    try {
+      const soloQueue = await getSoloQueueRank({ puuid });
+      if (soloQueue.isFallbackUnranked) return null;
+      return {
+        tier: soloQueue.tier,
+        rank: soloQueue.rank,
+        leaguePoints: soloQueue.leaguePoints,
+        wins: Number(soloQueue.wins || 0),
+        losses: Number(soloQueue.losses || 0)
+      };
+    } catch {
+      return null;
+    }
+  }
+
   async function getMatchInsights(puuid) {
     if (!puuid) return null;
 
@@ -385,14 +433,18 @@ function createRiotService(apiKey, region = DEFAULT_REGION) {
 
     const championCatalog = await getChampionCatalog();
 
-    const matchIdsResponse = await request(() =>
-      regionalClient.get(`/lol/match/v5/matches/by-puuid/${encodeURIComponent(puuid)}/ids`, {
-        params: { start: 0, count: MATCH_INSIGHTS_COUNT }
-      }),
-      'Historico de partidas'
-    );
+    const [matchIdsResponse, masteries, soloRecord] = await Promise.all([
+      request(() =>
+        regionalClient.get(`/lol/match/v5/matches/by-puuid/${encodeURIComponent(puuid)}/ids`, {
+          params: { start: 0, count: MATCH_INSIGHTS_COUNT }
+        }),
+        'Historico de partidas'
+      ).then((response) => response.data).catch(() => []),
+      getChampionMasteries(puuid, championCatalog),
+      getSoloQueueRecord({ puuid })
+    ]);
 
-    const matchIds = Array.isArray(matchIdsResponse.data) ? matchIdsResponse.data : [];
+    const matchIds = Array.isArray(matchIdsResponse) ? matchIdsResponse : [];
     const matchResponses = await Promise.all(
       matchIds.map((matchId) =>
         request(() => regionalClient.get(`/lol/match/v5/matches/${matchId}`), `Partida ${matchId}`)
@@ -402,8 +454,29 @@ function createRiotService(apiKey, region = DEFAULT_REGION) {
     );
 
     const insights = buildInsightsFromMatches(matchResponses, puuid, championCatalog);
-    if (!insights) return null;
 
+    if (!insights) {
+      if (masteries?.length) {
+        return {
+          totalGames: 0,
+          wins: 0,
+          losses: 0,
+          winRate: 0,
+          mainLane: null,
+          topChampion: null,
+          recentChampion: null,
+          styleText: null,
+          attentionText: null,
+          topMasteries: masteries,
+          rankedSolo: soloRecord,
+          generatedAt: new Date().toISOString()
+        };
+      }
+      return null;
+    }
+
+    insights.topMasteries = masteries;
+    insights.rankedSolo = soloRecord;
     setCachedInsights(puuid, insights);
     return insights;
   }

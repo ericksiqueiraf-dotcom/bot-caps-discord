@@ -2337,6 +2337,12 @@ function buildOpGgUrl(riotNickname) {
   return `https://op.gg/lol/summoners/br/${encodeURIComponent(gameName.trim())}-${encodeURIComponent(tagLine.trim())}`;
 }
 
+function formatMasteryPoints(points) {
+  if (points >= 1000000) return `${(points / 1000000).toFixed(1).replace('.', ',')}M`;
+  if (points >= 1000) return `${Math.round(points / 1000)}k`;
+  return `${points}`;
+}
+
 function buildPlayerCardEmbed(playerStats, targetUser, vipTierName = null, insights = null) {
   const modes = normalizePlayerModes(playerStats);
   const classicStats = modes.classic;
@@ -2360,18 +2366,49 @@ function buildPlayerCardEmbed(playerStats, targetUser, vipTierName = null, insig
     if (insights.mainLane) {
       bullets.push(`- 🛣️ **Rota principal:** ${insights.mainLane}.`);
     }
-    if (insights.totalGames > 0) {
+
+    const ranked = insights.rankedSolo;
+    if (ranked && ranked.wins + ranked.losses > 0) {
+      const rankedTotal = ranked.wins + ranked.losses;
+      const rankedWr = Math.round((ranked.wins / rankedTotal) * 100);
+      bullets.push(`- 📊 **Win rate ranqueado:** ${rankedWr}% da temporada, com ${ranked.wins} vitórias e ${ranked.losses} derrotas.`);
+      if (insights.totalGames > 0) {
+        bullets.push(`- 📊 **Últimas ${insights.totalGames} partidas:** ${insights.winRate}% (${insights.wins}V/${insights.losses}D).`);
+      }
+    } else if (insights.totalGames > 0) {
       bullets.push(`- 📊 **Win rate geral:** ${insights.winRate}% nas últimas ${insights.totalGames} partidas, com ${insights.wins} vitórias e ${insights.losses} derrotas.`);
     }
+
     if (insights.recentChampion) {
       bullets.push(`- 🏆 **${insights.recentChampion.name}:** ${insights.recentChampion.winRate}% de vitórias em ${insights.recentChampion.games} partida(s) nos últimos 7 dias.`);
     }
+
+    if (insights.topMasteries?.length) {
+      const masteryList = insights.topMasteries
+        .map((m) => `${m.name} (Nv ${m.level} · ${formatMasteryPoints(m.points)} pts)`)
+        .join(', ');
+      bullets.push(`- 🎖️ **Principais campeões:** ${masteryList}.`);
+    }
+
+    if (insights.kda && insights.totalGames > 0) {
+      bullets.push(`- 📈 **KDA médio:** ${insights.kda.ratio} (${insights.kda.avgKills}/${insights.kda.avgDeaths}/${insights.kda.avgAssists} por jogo).`);
+    }
+
     if (insights.styleText) {
       bullets.push(`- ⚔️ **Estilo:** ${insights.styleText}.`);
     }
+
     if (insights.attentionText) {
       bullets.push(`- ⚠️ **Ponto de atenção:** ${insights.attentionText}`);
     }
+
+    const capsGames = Number(classicStats.customWins || 0) + Number(classicStats.customLosses || 0);
+    if (capsGames > 0) {
+      const capsWr = Math.round((Number(classicStats.customWins || 0) / capsGames) * 100);
+      const streak = Number(classicStats.winStreak || 0);
+      bullets.push(`- 🏟️ **Histórico CAPS:** ${capsGames} partidas (${classicStats.customWins}V/${classicStats.customLosses}D · ${capsWr}%) · Streak atual: ${streak} 🔥`);
+    }
+
     const opGgUrl = buildOpGgUrl(riotNickname);
     if (opGgUrl) {
       bullets.push(`- 🔗 [Ver no OP.GG](${opGgUrl})`);
