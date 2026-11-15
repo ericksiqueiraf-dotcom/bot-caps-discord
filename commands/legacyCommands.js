@@ -38,7 +38,7 @@ const {
   buildSeasonHistoryEmbed, formatCustomRecord,
   postPlayerLogs, postMatchSummaryToSeasonLog, postSeasonSummaryToSeasonLog, postSmurfAlerts,
   getCustomPointsDelta, getCustomDisplayScore, buildTopInfernalEmbed, buildQueueFeedText, postQueueFeedMessage,
-  buildQueueJoinActionRow, getMemberVipTier, buildVipTierResolver, buildClubeEmbed, getAvatarFrameType,
+  buildQueueJoinActionRow, getMemberVipTier, buildVipTierResolver, buildClubeEmbed, getAvatarFrameType, getTopOneBadges,
   parseLiveLink, getLiveCooldownRemainingMs, formatCooldownRemaining,
   buildLiveEmbed, findPromoChannel, ensureAoVivoRole
 } = require('../utils/lobbyUtils');
@@ -1031,7 +1031,12 @@ async function handlePlayerCardCommand(message, targetUser = null) {
   const playerStats = Object.values(statsData.players || {}).find(p => p.discordId === selectedUser.id);
   if (!playerStats) return await replyToMessage(message, 'Jogador nao registrado no sistema.');
   const targetMember = message.guild?.members?.cache?.get?.(selectedUser.id) || null;
-  const insights = await fetchPlayerMatchInsights(playerStats);
+  const [insights, seasonMeta, systemMeta] = await Promise.all([
+    fetchPlayerMatchInsights(playerStats),
+    loadSeasonMeta(),
+    loadSystemMeta()
+  ]);
+  const topOneBadges = getTopOneBadges(statsData, seasonMeta, systemMeta, selectedUser.id);
 
   const frameAttachmentName = 'perfil-frame.png';
   let frameBuffer = null;
@@ -1045,7 +1050,7 @@ async function handlePlayerCardCommand(message, targetUser = null) {
     });
   }
 
-  const embed = buildPlayerCardEmbed(playerStats, selectedUser, getMemberVipTier(targetMember), insights, frameBuffer ? frameAttachmentName : null);
+  const embed = buildPlayerCardEmbed(playerStats, selectedUser, getMemberVipTier(targetMember), insights, frameBuffer ? frameAttachmentName : null, topOneBadges);
   const payload = { embeds: [embed] };
   if (frameBuffer) {
     payload.files = [new AttachmentBuilder(frameBuffer, { name: frameAttachmentName })];

@@ -2363,7 +2363,32 @@ function formatMasteryPoints(points) {
   return `${points}`;
 }
 
-function buildPlayerCardEmbed(playerStats, targetUser, vipTierName = null, insights = null, frameAttachmentName = null) {
+// ─── Badges TOP 1 do perfil (mesmos rankings dos comandos !placar/!topstreak/!toprankinfernal) ──
+function getTopOneBadges(statsData, seasonMeta, systemMeta, discordId) {
+  const badges = [];
+  try {
+    const classicTop = getRankedPlayersByMode(statsData, QUEUE_MODES.CLASSIC, null, seasonMeta)[0];
+    if (classicTop?.discordId === discordId) badges.push('🏆 TOP 1 CLASSIC');
+
+    const ttTop = getRankedPlayersByMode(statsData, QUEUE_MODES.ARAM, '3x3', seasonMeta)[0];
+    if (ttTop?.discordId === discordId) badges.push('🌳 TOP 1 TT 3x3');
+
+    const duelTop = getRankedPlayersByDuel(systemMeta?.duelos || [], statsData, seasonMeta)[0];
+    if (duelTop?.discordId === discordId) badges.push('⚔️ TOP 1 DUELO 1x1');
+
+    const streakTop = getRankedPlayersByStreak(statsData, QUEUE_MODES.CLASSIC, null)[0];
+    if (streakTop?.discordId === discordId) badges.push('🔥 TOP 1 STREAK');
+
+    const infernalTop = Object.values(statsData?.players || {})
+      .map((p) => ({ discordId: p.discordId, infernalCount: Number(p.infernalCount || 0) }))
+      .filter((p) => p.discordId && p.infernalCount > 0)
+      .sort((a, b) => b.infernalCount - a.infernalCount)[0];
+    if (infernalTop?.discordId === discordId) badges.push('🌋 TOP 1 INFERNAL');
+  } catch { /* badges sao cosméticas: nunca quebrar o perfil */ }
+  return badges;
+}
+
+function buildPlayerCardEmbed(playerStats, targetUser, vipTierName = null, insights = null, frameAttachmentName = null, topOneBadges = null) {
   const modes = normalizePlayerModes(playerStats);
   const classicStats = modes.classic;
   const lolMmr = Number(classicStats.baseMmr || playerStats.baseMmr || 0);
@@ -2380,6 +2405,10 @@ function buildPlayerCardEmbed(playerStats, targetUser, vipTierName = null, insig
     embed.setThumbnail(`attachment://${frameAttachmentName}`);
   } else if (targetUser?.displayAvatarURL) {
     embed.setThumbnail(targetUser.displayAvatarURL({ size: 256 }));
+  }
+
+  if (topOneBadges?.length) {
+    embed.addFields({ name: '🏅 Conquistas da temporada', value: topOneBadges.join(' • ') });
   }
 
   if (insights) {
@@ -3588,6 +3617,7 @@ module.exports = {
   archiveCurrentSeason,
   buildPlayerCardEmbed,
   getAvatarFrameType,
+  getTopOneBadges,
   buildPlayerMatchLogEmbed,
   postPlayerLogs,
   postSmurfAlerts,
