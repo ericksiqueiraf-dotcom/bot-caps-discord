@@ -9,7 +9,11 @@
     "rankRoleIds": {
       "Prata": "1552537451388608602"
     },
-    "visitanteRoleId": "1559671650864205924"
+    "visitanteRoleId": "1559671650864205924",
+    "topClassicRoleName": "🏆 TOP 1 CLASSIC",
+    "topTtRoleName": "🌳 TOP 1 TT 3x3",
+    "topDueloRoleName": "⚔️ TOP 1 DUELO 1x1",
+    "topInfernalRoleName": "🔥 TOP 1 INFERNAL"
   },
   "voiceChannels": {
     "classicQueueChannelId": "1489240283051856023",
@@ -39,6 +43,7 @@
     "rankUpdatesChannelId": "1489247981155651645",
     "matchHistoryChannelId": "1489248090526449684",
     "mvpAnnouncementsChannelId": "1489238507313696838",
+    "achievementsChannelId": "",
     "queueStatusChannelId": "1489237001013297182",
     "matchOngoingChannelId": "1489236955479937114",
     "welcomeChannelId": "1559622687113085039",
@@ -52,6 +57,8 @@
     "weeklyRankUpdatesEnabled": true,
     "dailyRankUpdatesHour": 8,
     "dailyRankUpdatesMinute": 0,
+    "weeklySummaryHour": 21,
+    "weeklySummaryMinute": 0,
     "fridayAnnouncementsEnabled": false,
     "lclWeekendEnabled": false,
     "voiceTimeMonthlyAnnouncementEnabled": false

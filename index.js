@@ -440,6 +440,7 @@ const {
   expireInfernalRolesIfDue,
   parseQueueJoinButtonId,
   startDailyRankScheduler,
+  startWeeklySummaryScheduler,
   startClubePromoScheduler,
   movePlayersToTeamChannels,
   movePlayersToVoiceChannel,
@@ -473,6 +474,7 @@ client.once('ready', async () => {
   scheduleExistingEmptyTempRooms(client);
   await registerSlashCommands();
   startDailyRankScheduler();
+  startWeeklySummaryScheduler();
   startVipPaymentPoller({ config });
   startClubePromoScheduler();
   startSextaScheduler();
@@ -1094,6 +1096,24 @@ client.on('interactionCreate', async (interaction) => {
       // Painel de votação de resultado: votewin:<matchId>:<time>
       if (String(interaction.customId || '').startsWith('votewin:')) {
         await handlers.handleResultVoteButton(interaction);
+        return;
+      }
+
+      // Botão de desafio do perfil: duelo-desafiar:<discordId>
+      if (String(interaction.customId || '').startsWith('duelo-desafiar:')) {
+        const targetId = String(interaction.customId).split(':')[1];
+        if (!targetId || targetId === interaction.user.id) {
+          await interaction.reply({ content: 'Voce nao pode desafiar a si mesmo. 😄', ephemeral: true }).catch(() => null);
+          return;
+        }
+        await interaction.deferReply({ ephemeral: true }).catch(() => null);
+        const targetUser = await client.users.fetch(targetId).catch(() => null);
+        if (!targetUser) {
+          await interaction.followUp({ content: 'Nao encontrei esse jogador.', ephemeral: true }).catch(() => null);
+          return;
+        }
+        const context = createInteractionContext(interaction, { content: '!duelo' });
+        await handlers.handleDueloCommand(context, [], targetUser);
         return;
       }
     } catch (error) {

@@ -1,4 +1,8 @@
 const config = require('../../config.json');
+const {
+  announceTopOneChanges,
+  recordWeeklyActivity
+} = require('../../utils/lobbyUtils');
 
 async function handleVictoryCommandFlow({
   message,
@@ -118,6 +122,15 @@ async function handleVictoryCommandFlow({
   // MVP: votacao de 2 min entre os jogadores da partida + cargo MVP player ao mais votado.
   // Se ninguem votar, o encerramento usa fallback automatico (maior ganho de rating).
   await startMvpVote(message.guild, match, winners, losers);
+
+  // Resumo semanal: conta partida + vitorias de cada vencedor.
+  await recordWeeklyActivity(message.guild.id, { type: 'match' });
+  for (const winner of winners || []) {
+    await recordWeeklyActivity(message.guild.id, { type: 'playerWin', playerId: winner.discordId });
+  }
+
+  // Conquistas: anuncia novo TOP 1 (classic/tt/duelo/infernal) e troca os cargos.
+  await announceTopOneChanges(message.guild);
 
   // Pos-partida: todos voltam para a Sala de Espera (Tier S tem sala propria)
   const postMatchChannelId = getPostMatchVoiceChannelId(match.mode, match);

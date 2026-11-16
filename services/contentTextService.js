@@ -9,7 +9,7 @@ const DEFAULT_CONTENT_TEMPLATES = {
     howToPlayTitle: '3. Termine a partida e acompanhe',
     howToPlayText: 'Depois do jogo, vote com `!votar 1` ou `!votar 2` e acompanhe seu progresso no ranking.',
     commandsTitle: 'Comandos e outras modalidades',
-    commandsText: 'Veja `!ajuda` e `!ajuda2` para consultar filas, rankings, horários e demais comandos. Depois de conhecer o Classic, experimente `!duelo`, `!torneio` e outras modalidades.',
+    commandsText: 'Dia a dia: `!entrar` entra na fila • `!perfil` mostra seu card com moldura e conquistas • `!placar` rankings • `!duelo @alguem` desafia 1x1 • `!ajuda` lista tudo. Depois de dominar o Classic, experimente `!torneio` e as outras modalidades.',
     footerText: 'Caps Bot • CAPS Arena'
   },
   onboarding: {

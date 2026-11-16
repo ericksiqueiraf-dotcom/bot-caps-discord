@@ -1055,6 +1055,15 @@ async function handlePlayerCardCommand(message, targetUser = null) {
   if (frameBuffer) {
     payload.files = [new AttachmentBuilder(frameBuffer, { name: frameAttachmentName })];
   }
+  // Botão de desafio para duelo 1x1 (não aparece para o próprio perfil).
+  if (selectedUser.id !== message.author?.id) {
+    payload.components = [new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`duelo-desafiar:${selectedUser.id}`)
+        .setLabel('⚔️ Desafiar para duelo 1x1')
+        .setStyle(ButtonStyle.Primary)
+    )];
+  }
   await sendToMessageChannel(message, payload);
 }
 
@@ -2153,6 +2162,9 @@ async function handleDueloCommand(message, args = [], targetUserOverride = null)
         return await replyToMessage(message, `❌ Não consegui atualizar o PDL: ${err.message}`);
       }
       await save();
+      const { recordWeeklyActivity, announceTopOneChanges } = require('../utils/lobbyUtils');
+      await recordWeeklyActivity(message.guild.id, { type: 'duelo' });
+      await announceTopOneChanges(message.guild);
       return await replyToMessage(message, `🏆 Resultado registrado: ${winner} matou primeiro e venceu o duelo contra ${loser}. **+${result.duel.pontos} PDL** para o vencedor e **-${result.duel.pontos} PDL** para o perdedor.`);
     }
 

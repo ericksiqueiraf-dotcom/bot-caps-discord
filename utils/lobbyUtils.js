@@ -1497,6 +1497,8 @@ async function finalizeMvpVote(voteId) {
     await clearMvpRoles(guild);
     if (winner) {
       await syncMvpRole(guild, winner.discordId);
+      await recordMvpCount(winner.discordId);
+      await recordWeeklyActivity(session.guildId, { type: 'mvp', playerId: winner.discordId, nickname: winner.nickname });
       await postMvpAnnouncement(guild, {
         discordId: winner.discordId,
         nickname: winner.nickname,
@@ -2387,6 +2389,313 @@ function getTopOneBadges(statsData, seasonMeta, systemMeta, discordId) {
   return badges;
 }
 
+// ─── Canal de conquistas + cargos dinâmicos de TOP 1 ─────────────────────────
+const TOP_ONE_ROLE_NAMES = {
+  classic: config.roles?.topClassicRoleName || '🏆 TOP 1 CLASSIC',
+  tt3x3: config.roles?.topTtRoleName || '🌳 TOP 1 TT 3x3',
+  duelo: config.roles?.topDueloRoleName || '⚔️ TOP 1 DUELO 1x1',
+  infernal: config.roles?.topInfernalRoleName || '🔥 TOP 1 INFERNAL'
+};
+
+const TOP_ONE_LABELS = {
+  classic: '🏆 TOP 1 CLASSIC',
+  tt3x3: '🌳 TOP 1 TT 3x3',
+  duelo: '⚔️ TOP 1 DUELO 1x1',
+  infernal: '🔥 TOP 1 INFERNAL'
+};
+
+function getAchievementsChannelId() {
+  return config.textChannels?.achievementsChannelId
+    || config.textChannels?.mvpAnnouncementsChannelId
+    || config.textChannels?.matchHistoryChannelId
+    || null;
+}
+
+async function postAchievementEmbed(guild, embed) {
+  try {
+    const channelId = getAchievementsChannelId();
+    if (!channelId) return null;
+    const channel = await guild?.channels?.fetch(channelId).catch(() => null);
+    if (!channel?.isTextBased()) return null;
+    return await channel.send({ embeds: [embed] }).catch((error) => {
+      console.warn('[CONQUISTAS] Falha ao enviar anuncio:', error.message);
+      return null;
+    });
+  } catch (error) {
+    console.warn('[CONQUISTAS] Falha no canal de conquistas:', error.message);
+    return null;
+  }
+}
+
+function getTopOneLeaderboards(statsData, seasonMeta, systemMeta) {
+  const infernalTop = Object.values(statsData?.players || {})
+    .map((p) => ({
+      discordId: p.discordId,
+      nickname: p.registeredNickname || p.nickname || p.discordId,
+      infernalCount: Number(p.infernalCount || 0)
+    }))
+    .filter((p) => p.discordId && p.infernalCount > 0)
+    .sort((a, b) => b.infernalCount - a.infernalCount)[0] || null;
+
+  return {
+    classic: getRankedPlayersByMode(statsData, QUEUE_MODES.CLASSIC, null, seasonMeta)[0] || null,
+    tt3x3: getRankedPlayersByMode(statsData, QUEUE_MODES.ARAM, '3x3', seasonMeta)[0] || null,
+    duelo: getRankedPlayersByDuel(systemMeta?.duelos || [], statsData, seasonMeta)[0] || null,
+    infernal: infernalTop
+  };
+}
+
+function getLeaderStatsLabel(key, leader) {
+  if (!leader) return '';
+  if (key === 'infernal') return `— ${leader.infernalCount}x INFERNAL na temporada`;
+  if (key === 'duelo') return `— ${leader.duelWins}V / ${leader.duelLosses}D em duelos`;
+  return `— ${leader.customWins ?? '0'}V / ${leader.customLosses ?? '0'}D`;
+}
+
+/**
+ * Detecta mudança de liderança nos 4 rankings, anuncia no canal de conquistas
+ * e troca o cargo dinâmico de TOP 1. Idempotente (dedupe em systemMeta).
+ */
+async function announceTopOneChanges(guild) {
+  if (!guild) return;
+  try {
+    const [statsData, seasonMeta, systemMeta] = await Promise.all([
+      loadPlayerStats(),
+      loadSeasonMeta(),
+      loadSystemMeta()
+    ]);
+
+    const tops = getTopOneLeaderboards(statsData, seasonMeta, systemMeta);
+    systemMeta.topOneAnnouncements ||= {};
+    let changed = false;
+
+    for (const key of Object.keys(TOP_ONE_LABELS)) {
+      const leader = tops[key];
+      if (!leader?.discordId) continue;
+      if (systemMeta.topOneAnnouncements[key] === leader.discordId) continue;
+      systemMeta.topOneAnnouncements[key] = leader.discordId;
+      changed = true;
+
+      const label = TOP_ONE_LABELS[key];
+      const embed = new EmbedBuilder()
+        .setColor(THEME.RANK)
+        .setTitle(`${label} — novo líder!`)
+        .setDescription(
+          `**${leader.nickname || leader.discordId}** assumiu o ${label} ${getLeaderStatsLabel(key, leader)}.\n` +
+          `<@${leader.discordId}> leva o cargo ${TOP_ONE_ROLE_NAMES[key]} ate ser destronado!`
+        )
+        .setFooter({ text: `${FOOTER_PREFIX} • Conquistas` })
+        .setTimestamp();
+      await postAchievementEmbed(guild, embed);
+
+      const role = await ensureNamedRole(guild, TOP_ONE_ROLE_NAMES[key]);
+      if (role) {
+        for (const member of [...role.members.values()]) {
+          if (member.id !== leader.discordId) {
+            await member.roles.remove(role, 'Perdeu a lideranca do TOP 1').catch(() => null);
+          }
+        }
+        const leaderMember = guild.members.cache.get(leader.discordId)
+          || await guild.members.fetch(leader.discordId).catch(() => null);
+        if (leaderMember) {
+          await leaderMember.roles.add(role, 'Novo lider do TOP 1').catch((error) => {
+            console.warn('[CONQUISTAS] Falha ao dar cargo de TOP 1:', error.message);
+          });
+        }
+      }
+    }
+
+    if (changed) {
+      await saveSystemMeta(systemMeta);
+    }
+  } catch (error) {
+    console.warn('[CONQUISTAS] Falha ao atualizar TOP 1:', error.message);
+  }
+}
+
+// ─── Mural de MVPs (contagem persistida em playerStats.mvpCount) ─────────────
+async function recordMvpCount(discordId) {
+  if (!discordId) return;
+  try {
+    const statsData = await loadPlayerStats();
+    const current = Object.values(statsData.players || {}).find((p) => p.discordId === discordId);
+    upsertPlayerStats(statsData, { discordId }, { mvpCount: Number(current?.mvpCount || 0) + 1 });
+    await savePlayerStats(statsData);
+  } catch (error) {
+    console.warn('[MVP] Falha ao registrar contagem de MVP:', error.message);
+  }
+}
+
+function buildMvpMuralEmbed(statsData, seasonMeta) {
+  const ranked = Object.values(statsData?.players || {})
+    .map((p) => ({
+      discordId: p.discordId,
+      nickname: p.registeredNickname || p.nickname || p.discordId,
+      mvpCount: Number(p.mvpCount || 0),
+      wins: Number(p.modes?.classic?.customWins || p.customWins || 0),
+      losses: Number(p.modes?.classic?.customLosses || p.customLosses || 0)
+    }))
+    .filter((p) => p.discordId && p.mvpCount > 0)
+    .sort((a, b) => b.mvpCount - a.mvpCount || b.wins - a.wins)
+    .slice(0, 10);
+
+  const embed = new EmbedBuilder()
+    .setColor(THEME.RANK)
+    .setTitle('⭐ Mural de MVPs da Temporada')
+    .setDescription(`Jogadores que mais levaram o MVP por votação em ${getSeasonDisplayLabel(seasonMeta)}.`)
+    .setFooter({ text: `${FOOTER_PREFIX} • Mural de MVPs` })
+    .setTimestamp();
+
+  if (ranked.length === 0) {
+    embed.addFields({ name: 'Ninguem no mural ainda', value: 'Vote no MVP no final das partidas para popular o mural!' });
+    return embed;
+  }
+
+  const medals = ['🥇', '🥈', '🥉'];
+  const lines = ranked.map((player, index) => {
+    const medal = medals[index] || `**${index + 1}.**`;
+    return `${medal} <@${player.discordId}> | \`${player.nickname}\` — **${player.mvpCount}x MVP** (${player.wins}V/${player.losses}D)`;
+  });
+
+  splitEmbedFieldChunks(lines).forEach((chunk, index) => {
+    embed.addFields({
+      name: index === 0 ? 'Mural' : `Mural (${index + 1})`,
+      value: chunk
+    });
+  });
+
+  return embed;
+}
+
+// ─── Resumo semanal (contadores em systemMeta.weeklySummary) ────────────────
+function getIsoWeekKey(date = new Date()) {
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const week = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+}
+
+async function recordWeeklyActivity(guildId, { type, playerId = null, nickname = null }) {
+  try {
+    const systemMeta = await loadSystemMeta();
+    const weekKey = getIsoWeekKey();
+    systemMeta.weeklySummary ||= {};
+    let summary = systemMeta.weeklySummary.current;
+    if (!summary || summary.weekKey !== weekKey) {
+      summary = systemMeta.weeklySummary.current = {
+        weekKey,
+        startedAt: new Date().toISOString(),
+        guildId: guildId || null,
+        matches: 0,
+        duelos: 0,
+        mvps: [],
+        playerWins: {}
+      };
+    }
+
+    if (type === 'match') {
+      summary.matches += 1;
+    } else if (type === 'playerWin') {
+      if (playerId) {
+        summary.playerWins[playerId] = (summary.playerWins[playerId] || 0) + 1;
+      }
+    } else if (type === 'duelo') {
+      summary.duelos += 1;
+    } else if (type === 'mvp') {
+      if (playerId && !summary.mvps.some((m) => m.discordId === playerId)) {
+        summary.mvps.push({ discordId: playerId, nickname });
+      }
+    }
+
+    await saveSystemMeta(systemMeta);
+  } catch (error) {
+    console.warn('[RESUMO] Falha ao registrar atividade semanal:', error.message);
+  }
+}
+
+function buildWeeklySummaryEmbed(summary, seasonMeta) {
+  const embed = new EmbedBuilder()
+    .setColor(THEME.INFO)
+    .setTitle('📅 Resumo da Semana na CAPS Arena')
+    .setDescription(`Balanço da semana **${summary.weekKey}** em ${getSeasonDisplayLabel(seasonMeta)}.`)
+    .setFooter({ text: `${FOOTER_PREFIX} • Resumo Semanal` })
+    .setTimestamp();
+
+  embed.addFields({ name: '🎮 Partidas realizadas', value: `**${summary.matches}** partida(s) registrada(s)`, inline: true });
+  embed.addFields({ name: '⚔️ Duelos 1x1', value: `**${summary.duelos}** duelo(s) concluido(s)`, inline: true });
+
+  const winsEntries = Object.entries(summary.playerWins || {})
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+  if (winsEntries.length > 0) {
+    embed.addFields({
+      name: '🔥 Quem mais venceu',
+      value: winsEntries.map(([id, wins], index) => `${index === 0 ? '🥇' : `${index + 1}.`} <@${id}> — **${wins}** vitória(s)`).join('\n')
+    });
+  } else {
+    embed.addFields({ name: '🔥 Quem mais venceu', value: 'Nenhuma vitória registrada esta semana.' });
+  }
+
+  if (summary.mvps?.length > 0) {
+    embed.addFields({
+      name: '⭐ MVPs da semana',
+      value: summary.mvps.slice(0, 10).map((m) => `<@${m.discordId}>`).join(', ')
+    });
+  }
+
+  return embed;
+}
+
+let lastWeeklySummaryPostKey = null;
+
+async function postWeeklySummaryIfDue() {
+  const now = getSaoPauloDateParts(new Date());
+  const weekday = new Date().getDay();
+  if (weekday !== 0) return; // apenas domingo
+
+  const targetHour = Number(config.automation?.weeklySummaryHour ?? 21);
+  const targetMinute = Number(config.automation?.weeklySummaryMinute ?? 0);
+  if (now.hour !== targetHour || now.minute !== targetMinute) return;
+
+  const dedupeKey = `${now.key}-${targetHour}`;
+  if (lastWeeklySummaryPostKey === dedupeKey) return;
+  lastWeeklySummaryPostKey = dedupeKey;
+
+  try {
+    const [systemMeta, seasonMeta] = await Promise.all([loadSystemMeta(), loadSeasonMeta()]);
+    const summary = systemMeta.weeklySummary?.current;
+    if (!summary) return;
+
+    const guild = global.discordClient?.guilds?.cache?.first?.();
+    if (!guild) return;
+
+    const embed = buildWeeklySummaryEmbed(summary, seasonMeta);
+    const posted = await postAchievementEmbed(guild, embed);
+    if (posted) {
+      systemMeta.weeklySummary.current = {
+        weekKey: getIsoWeekKey(),
+        startedAt: new Date().toISOString(),
+        guildId: guild.id,
+        matches: 0,
+        duelos: 0,
+        mvps: [],
+        playerWins: {}
+      };
+      await saveSystemMeta(systemMeta);
+    }
+  } catch (error) {
+    console.warn('[RESUMO] Falha ao postar resumo semanal:', error.message);
+  }
+}
+
+function startWeeklySummaryScheduler() {
+  setInterval(() => {
+    postWeeklySummaryIfDue();
+  }, 30000).unref?.();
+}
+
 function buildPlayerCardEmbed(playerStats, targetUser, vipTierName = null, insights = null, frameAttachmentName = null, topOneBadges = null) {
   const modes = normalizePlayerModes(playerStats);
   const classicStats = modes.classic;
@@ -2584,6 +2893,7 @@ async function postDailyRankUpdates() {
       buildTopTenEmbed(statsData, seasonMeta, QUEUE_MODES.CLASSIC, null, { excludeTierS: true }),
       buildTopTenEmbed(statsData, seasonMeta, QUEUE_MODES.CLASSIC, null, { tierSOnly: true }),
       buildTopInfernalEmbed(statsData, seasonMeta),
+      buildMvpMuralEmbed(statsData, seasonMeta),
       inviteEmbed,
       buildTopTenEmbed(statsData, seasonMeta, 'duel', null, { duelos }),
       voiceEmbed,
@@ -3617,6 +3927,10 @@ module.exports = {
   buildPlayerCardEmbed,
   getAvatarFrameType,
   getTopOneBadges,
+  announceTopOneChanges,
+  buildMvpMuralEmbed,
+  recordWeeklyActivity,
+  startWeeklySummaryScheduler,
   buildPlayerMatchLogEmbed,
   postPlayerLogs,
   postSmurfAlerts,
