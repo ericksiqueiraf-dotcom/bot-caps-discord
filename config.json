@@ -57,7 +57,7 @@
     "weeklyRankUpdatesEnabled": true,
     "dailyRankUpdatesHour": 8,
     "dailyRankUpdatesMinute": 0,
-    "weeklySummaryHour": 21,
+    "weeklySummaryHour": 8,
     "weeklySummaryMinute": 0,
     "fridayAnnouncementsEnabled": false,
     "lclWeekendEnabled": false,

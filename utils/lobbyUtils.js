@@ -2653,9 +2653,9 @@ let lastWeeklySummaryPostKey = null;
 async function postWeeklySummaryIfDue() {
   const now = getSaoPauloDateParts(new Date());
   const weekday = new Date().getDay();
-  if (weekday !== 0) return; // apenas domingo
+  if (weekday !== 1) return; // apenas segunda-feira (junto com as rankings semanais)
 
-  const targetHour = Number(config.automation?.weeklySummaryHour ?? 21);
+  const targetHour = Number(config.automation?.weeklySummaryHour ?? 8);
   const targetMinute = Number(config.automation?.weeklySummaryMinute ?? 0);
   if (now.hour !== targetHour || now.minute !== targetMinute) return;
 
