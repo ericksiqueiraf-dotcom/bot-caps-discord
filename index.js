@@ -1582,6 +1582,17 @@ client.on('guildMemberAdd', async (member) => {
     embeds: [welcomeEmbed],
     components: [onboardingActions]
   }).catch((err) => console.error('[BOAS-VINDAS] Erro ao enviar mensagem:', err));
+
+  // Tour de boas-vindas por DM: guia completo de início rápido.
+  try {
+    const guideEmbed = await handlers.buildOnboardingGuideEmbed(member.guild);
+    await member.send({
+      content: `👋 Olha o guia da CAPS Arena, ${member.user.username}! Da uma lida com calma — em 2 minutos voce ja esta jogando. 🎮`,
+      embeds: [guideEmbed]
+    });
+  } catch (err) {
+    // DMs podem estar fechadas para o servidor — sem problema.
+  }
 });
 
 // ─── Convites com recompensa: snapshot de usos p/ atribuir quem convidou ─────

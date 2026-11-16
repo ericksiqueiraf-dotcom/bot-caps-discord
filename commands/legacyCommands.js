@@ -2759,6 +2759,13 @@ async function handleOnboardingCommand(message) {
     return await replyToMessage(message, '❌ Voce nao tem permissao para usar o onboarding.');
   }
 
+  const embedGuia = await buildOnboardingGuideEmbed(message.guild);
+  await sendToMessageChannel(message, { embeds: [embedGuia] });
+  if (message.deletable) await message.delete().catch(() => null);
+}
+
+/** Guia de início rápido (usado no comando de onboarding e na DM de boas-vindas). */
+async function buildOnboardingGuideEmbed(guild) {
   const storedTemplates = await loadContentTemplates();
   const onboardingContent = getResolvedContentTemplates(storedTemplates).onboarding;
   const importantChannels = [
@@ -2830,12 +2837,11 @@ async function handleOnboardingCommand(message) {
           '*Bom jogo e que vença o melhor! 🛡️*'
       }
     )
-    .setThumbnail(message.guild.iconURL({ dynamic: true }))
+    .setThumbnail(guild?.iconURL?.({ dynamic: true }) || null)
     .setFooter({ text: `${FOOTER_PREFIX} • Guia Atualizado` })
     .setTimestamp();
 
-  await sendToMessageChannel(message, { embeds: [embedGuia] });
-  if (message.deletable) await message.delete().catch(() => null);
+  return embedGuia;
 }
 
 async function handleClearCommand(message, args) {
@@ -3371,6 +3377,7 @@ module.exports = {
   handleResetCommand, handleCleanupRoomsCommand, handleSeasonResetCommand, handleOfficialSeasonStartCommand,
   handleUndoSeasonResetCommand, handleRestoreArchivedPeriodCommand, handleCancelStartCommand, handleStartCommand,
   handleSyncAllRolesCommand, handleSyncAllPlayersEloCommand, handleVictoryCommand, handleOnboardingCommand, handleClearCommand,
+  buildOnboardingGuideEmbed,
   handleRegisterCommand, handleNickUpdateCommand, handleSyncPlayerRankCommand, handleVoteCommand, pendingAutoStarts, triggerAutoStart,
   handleRematchCommand, handleRouletteCommand, handleRoletaSairCommand, handleRulesCommand, handleStaffCommand, handleStaff2Command, handlePdlCommand,
   handleResultVoteButton, handleClubeCommand, handleClubeAdminCommand, handleClubeFixarCommand, handleQueroLiveCommand, handleLiveCommand,
