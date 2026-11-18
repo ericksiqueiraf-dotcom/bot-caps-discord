@@ -31,6 +31,8 @@ const LOCAL_FILES = {
 let client = null;
 let db = null;
 let storageMode = null;
+let lastMongoFailureAt = 0;
+const MONGO_RETRY_INTERVAL_MS = 30 * 1000;
 
 function ensureLocalDataFiles() {
   if (!fs.existsSync(DATA_DIR)) {
@@ -69,7 +71,7 @@ function writeLocalDoc(id, data) {
 
 async function getDb() {
   if (db) return db;
-  if (storageMode === 'local') return null;
+  if (storageMode === 'local' && Date.now() - lastMongoFailureAt < MONGO_RETRY_INTERVAL_MS) return null;
 
   if (!MONGODB_URI) {
     storageMode = 'local';
@@ -81,15 +83,42 @@ async function getDb() {
     client = new MongoClient(MONGODB_URI, { serverSelectionTimeoutMS: 10000 });
     await client.connect();
     db = client.db(DB_NAME);
+    const recoveredFromOutage = storageMode === 'local';
     storageMode = 'mongo';
-    console.log('[DB] Conectado ao MongoDB Atlas.');
+    lastMongoFailureAt = 0;
+    console.log('[DB] Conectado ao MongoDB.');
+
+    // Volta de uma queda (ex: energia): o MongoDB e a fonte da verdade. Reespelha os
+    // dados atuais nos arquivos locais para descartar escritas feitas no fallback.
+    if (recoveredFromOutage) {
+      await syncLocalMirrorFromMongo();
+      console.warn('[DB] Reconectado apos queda — espelho local reescrito com os dados do MongoDB.');
+    }
+
     return db;
   } catch (error) {
     storageMode = 'local';
+    lastMongoFailureAt = Date.now();
     db = null;
     client = null;
-    console.warn(`[DB] Falha ao conectar no MongoDB (${error.code || error.name}: ${error.message}). Usando arquivos locais em database/.`);
+    console.warn(`[DB] Falha ao conectar no MongoDB (${error.code || error.name}: ${error.message}). Usando arquivos locais em database/. Nova tentativa em ${Math.round(MONGO_RETRY_INTERVAL_MS / 1000)}s.`);
     return null;
+  }
+}
+
+// Copia os docs do MongoDB para os arquivos locais (fallback sempre fresco).
+async function syncLocalMirrorFromMongo() {
+  if (!db) return;
+  const col = db.collection('data');
+  for (const [id, localConfig] of Object.entries(LOCAL_FILES)) {
+    try {
+      const doc = await col.findOne({ _id: id });
+      if (doc && doc.data) {
+        writeLocalDoc(id, doc.data);
+      }
+    } catch (error) {
+      console.warn(`[DB] Falha ao reespelhar ${id} localmente: ${error.message}`);
+    }
   }
 }
 
@@ -150,6 +179,14 @@ async function writeDoc(id, data) {
     { $set: { data } },
     { upsert: true }
   );
+
+  // Mantem o espelho local em sincronia: se o Mongo cair depois,
+  // o fallback comeca do ultimo estado real, nunca de dados velhos.
+  try {
+    writeLocalDoc(id, data);
+  } catch (error) {
+    console.warn(`[DB] Falha ao atualizar espelho local de ${id}: ${error.message}`);
+  }
 }
 
 const queueOperationLocks = new Map();
