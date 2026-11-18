@@ -70,6 +70,25 @@ async function startMatch({
     teams.format = lobby.format;
     await movePlayersToTeamChannels(guild, teams, channels);
 
+    // Protecao contra sala obsoleta: se ja existir partida ativa com a mesma
+    // letra/modo/formato (ex: staff recriou o lobby e a antiga ficou "ativa"),
+    // encerra a antiga para que !vitoria nao credite os times errados.
+    const staleMatchIds = Object.entries(currentMatchData.matches || {})
+      .filter(([existingId, entry]) =>
+        entry.active &&
+        entry.match &&
+        existingId !== lobby.id &&
+        entry.match.letter === lobby.letter &&
+        entry.match.mode === lobby.mode &&
+        entry.match.format === lobby.format
+      )
+      .map(([existingId]) => existingId);
+
+    for (const staleId of staleMatchIds) {
+      console.warn(`[START MATCH] Encerrando partida obsoleta ${staleId} (mesma letra ${lobby.letter}) para abrir ${lobby.id}.`);
+      delete currentMatchData.matches[staleId];
+    }
+
     currentMatchData.matches[lobby.id] = {
       active: true,
       votes: {},

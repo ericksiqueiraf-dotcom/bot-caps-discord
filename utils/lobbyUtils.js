@@ -870,27 +870,47 @@ function findActiveMatchBySelector(currentMatchData, args = []) {
     return null;
   }
 
-  const activeEntries = Object.entries(currentMatchData.matches || {}).filter(([, entry]) => entry.active && entry.match);
+  const activeEntries = Object.entries(currentMatchData.matches || {}).filter(([, entry]) => {
+    if (!entry.active || !entry.match) {
+      return false;
+    }
 
-  return (
-    activeEntries.find(([, entry]) => {
-      const match = entry.match;
+    const match = entry.match;
 
-      if (selector.letter && match.letter !== selector.letter) {
-        return false;
-      }
+    if (selector.letter && match.letter !== selector.letter) {
+      return false;
+    }
 
-      if (selector.mode && match.mode !== selector.mode) {
-        return false;
-      }
+    if (selector.mode && match.mode !== selector.mode) {
+      return false;
+    }
 
-      if (selector.format && match.format !== selector.format) {
-        return false;
-      }
+    if (selector.format && match.format !== selector.format) {
+      return false;
+    }
 
-      return true;
-    }) || null
-  );
+    return true;
+  });
+
+  if (activeEntries.length === 0) {
+    return null;
+  }
+
+  if (activeEntries.length > 1) {
+    console.warn(`[VITORIA SELETOR] ${activeEntries.length} partidas ativas com o mesmo seletor — usando a mais recente.`);
+  }
+
+  // Preferir sempre a partida mais recente: evita creditar vitória em sala obsoleta
+  // que ficou ativa por engano com a mesma letra/modo (bug de 17/11).
+  const startedAtOf = (entry) => {
+    const raw = entry[1]?.match?.startedAt || entry[1]?.match?.createdAt;
+    const parsed = raw ? Date.parse(raw) : Number.NaN;
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  activeEntries.sort((a, b) => startedAtOf(b) - startedAtOf(a));
+
+  return activeEntries[0];
 }
 
 async function createLobbyChannels(guild, mode, format, letter, tier = null) {
