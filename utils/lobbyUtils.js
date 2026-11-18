@@ -1124,13 +1124,23 @@ async function syncInfernalRolesAfterMatch(guild, winners = [], losers = []) {
 
     const statsData = await loadPlayerStats();
     const stored = getStoredPlayerStats(statsData, winner);
+    const streak = Number(winner.winStreak || 0);
     const stillValid = stored.infernalExpiresAt && new Date(stored.infernalExpiresAt).getTime() > Date.now();
-    const infernalExpiresAt = stillValid ? stored.infernalExpiresAt : getNextEightAmSaoPauloIso();
-    // Contador da temporada: so incrementa em NOVA conquista (cargo anterior vencido).
-    // Vitorias em sequencia com o cargo ainda valido nao contam de novo.
-    const infernalCount = Number(stored.infernalCount || 0) + (stillValid ? 0 : 1);
+    // Regra: 1 conquista INFERNAL a cada 5 vitorias consecutivas (marcos 5, 10, 15...).
+    // Streak 6 = 1x INFERNAL; streak 10 = 2x. O mesmo marco da mesma streak nao conta de novo;
+    // nova streak apos derrota conta normalmente (marco 5 de novo).
+    const isMilestone = streak % INFERNAL_STREAK === 0;
+    const isNewMilestone = isMilestone && streak !== Number(stored.infernalLastMilestone || 0);
+
+    if (!isNewMilestone) {
+      // Selo em curso valido ou streak sem marco novo (ex: 6a vitoria) — nada a conceder.
+      continue;
+    }
+
+    const infernalExpiresAt = getNextEightAmSaoPauloIso();
+    const infernalCount = Number(stored.infernalCount || 0) + 1;
     try {
-      upsertPlayerStats(statsData, winner, { infernalExpiresAt, infernalCount });
+      upsertPlayerStats(statsData, winner, { infernalExpiresAt, infernalCount, infernalLastMilestone: streak });
       await savePlayerStats(statsData);
     } catch (err) {
       failed.push({ discordId: winner.discordId, action: 'save_db', error: err.message });
