@@ -131,34 +131,13 @@ function getWinRateValue(player) {
   return Number(player.customWins || 0) / total;
 }
 
-const TIER_S_MIN_MMR_RANK = 2000;
-
-function isTierSRankedEntry(entry) {
-  const classicBase = Number(entry?.modes?.classic?.baseMmr ?? entry?.baseMmr ?? 0);
-  if (Number.isFinite(classicBase) && classicBase >= TIER_S_MIN_MMR_RANK) return true;
-  return false;
-}
-
 function getRankedPlayersByMode(statsData, mode, format = null, seasonMeta = null, options = {}) {
   const players = Object.values(statsData.players || {});
   const minGames = seasonMeta?.phase === 'official' ? 10 : 5;
 
   const ranked = players
     .map((player) => mapPlayerRankingEntry(player, getModeStats(player, mode, format)))
-    .filter((player) => player.totalGames >= minGames)
-    .filter((player) => {
-      const raw = (options?.tierSOnly || options?.excludeTierS) && mode === QUEUE_MODES.CLASSIC
-        ? Object.values(statsData.players || {}).find((entry) =>
-          (entry.discordId && entry.discordId === player.discordId) || entry.nickname === player.nickname)
-        : null;
-      if (options?.tierSOnly && mode === QUEUE_MODES.CLASSIC) {
-        return isTierSRankedEntry(raw || player);
-      }
-      if (options?.excludeTierS && mode === QUEUE_MODES.CLASSIC) {
-        return !isTierSRankedEntry(raw || player);
-      }
-      return true;
-    });
+    .filter((player) => player.totalGames >= minGames);
 
   // CLASSIC: ordena por pontos custom puros (base 1000, sem elo LoL),
   // desempatando por winrate e depois por total de jogos.
@@ -234,7 +213,5 @@ module.exports = {
   getTopStreakModeStats,
   getPureCustomScore,
   getRankedPlayersByMode,
-  getRankedPlayersByStreak,
-  TIER_S_MIN_MMR_RANK,
-  isTierSRankedEntry
+  getRankedPlayersByStreak
 };

@@ -1,10 +1,12 @@
 // ─── Views de ranking da CAPS ARENA ──────────────────────────────────────────
-// O menu de ranking tem apenas estas 5 views:
+// O menu de ranking tem apenas estas 4 views:
 //   duelo    -> Top 10 do !duelo (1v1 de PDL)
-//   classic  -> CLASSIC (Summoner's Rift 5x5)
-//   tiers    -> CLASSIC filtrado para Tier S (Esmeralda+)
+//   classic  -> CLASSIC (Summoner's Rift 5x5) — rank GERAL, inclui todo mundo
 //   infernal -> Top INFERNAL da temporada
 //   tt3x3    -> TWISTED TREELINE 3X3 (formato 3x3)
+//
+// O antigo ranking TIER S (CLASSIC filtrado para Esmeralda+) foi UNIFICADO no
+// ranking CLASSIC geral. Os aliases (`!placar tiers` etc.) respondem com aviso.
 //
 // Os formatos ARAM 1x1 / 2x2 / 4x4 / 5x5 saíram do MENU DE RANKING:
 //   - 1x1  -> virou o rank do !duelo (o alias `1x1` continua aceito e cai em duelo)
@@ -12,12 +14,11 @@
 // Importante: as FILAS desses formatos seguem intactas (!entrar aram 2x2 etc.).
 // Aqui só se decide o que aparece/clareia no ranking.
 
-const RANKING_VIEWS = Object.freeze(['duelo', 'classic', 'tiers', 'infernal', 'tt3x3']);
+const RANKING_VIEWS = Object.freeze(['duelo', 'classic', 'infernal', 'tt3x3']);
 
 const VIEW_LABELS = Object.freeze({
   duelo: 'DUELO',
   classic: 'CLASSIC',
-  tiers: 'CLASSIC TIER S',
   infernal: 'INFERNAL',
   tt3x3: 'TWISTED TREELINE 3X3'
 });
@@ -30,12 +31,6 @@ const VIEW_ALIASES = new Map([
   ['classic', 'classic'],
   ['classico', 'classic'],
   ['clássico', 'classic'],
-  ['tiers', 'tiers'],
-  ['tier', 'tiers'],
-  ['tier-s', 'tiers'],
-  ['tierss', 'tiers'],
-  ['tier s', 'tiers'],
-  ['s', 'tiers'],
   ['infernal', 'infernal'],
   ['infernais', 'infernal'],
   ['inf', 'infernal'],
@@ -47,6 +42,9 @@ const VIEW_ALIASES = new Map([
   ['twistedtreeline', 'tt3x3'],
   ['twisted treeline', 'tt3x3']
 ]);
+
+// Antigos aliases do ranking TIER S: agora unificados no CLASSIC geral.
+const UNIFIED_TIER_S_ALIASES = new Set(['tiers', 'tier', 'tier-s', 'tierss', 'tier s', 's']);
 
 // Modos que existiam no ranking e foram retirados (para dar uma resposta clara).
 const RETIRED_VIEWS = new Map([
@@ -90,6 +88,15 @@ function parseRankingView(args = [], options = {}) {
   }
 
   for (const token of tokens) {
+    if (UNIFIED_TIER_S_ALIASES.has(token)) {
+      return {
+        ok: false,
+        view: null,
+        label: 'CLASSIC TIER S',
+        message: '🚫 O ranking **TIER S** foi unificado no ranking **CLASSIC** geral — todos os jogadores aparecem juntos agora.\nUse `!placar` ou `!top10`.'
+      };
+    }
+
     const view = VIEW_ALIASES.get(token);
     if (!view) continue;
 
@@ -119,5 +126,6 @@ module.exports = {
   VIEW_LABELS,
   VIEW_ALIASES,
   RETIRED_VIEWS,
+  UNIFIED_TIER_S_ALIASES,
   parseRankingView
 };

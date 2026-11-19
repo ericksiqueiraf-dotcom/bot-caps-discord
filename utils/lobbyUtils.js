@@ -1873,7 +1873,7 @@ const RULES_SECTIONS = [
   },
   {
     name: '🏆 4. Pontos e rankings',
-    value: 'Todo mundo começa com **1000 pontos custom + elo**. Ganhar de time mais forte vale mais PDL; ganhar de time mais fraco vale menos. `!top10` e `!placar` = geral; `!top10 tiers` e `!placar tiers` = só Esmeralda+. Desempate por winrate. Na temporada oficial, precisa de **10 jogos** para aparecer no ranking.'
+    value: 'Todo mundo começa com **1000 pontos custom + elo**. Ganhar de time mais forte vale mais PDL; ganhar de time mais fraco vale menos. `!top10` e `!placar` = ranking geral, com todos os elos juntos (o antigo filtro TIER S foi unificado). Desempate por winrate. Na temporada oficial, precisa de **10 jogos** para aparecer no ranking.'
   },
   {
     name: '🔥 5. Cargo INFERNAL (5 vitórias seguidas)',
@@ -2057,7 +2057,7 @@ function buildLeaderboardEmbed(statsData, mode = QUEUE_MODES.CLASSIC, format = n
     ? getRankedPlayersByDuel(options?.duelos || [], statsData, options?.seasonMeta || null)
     : getRankedPlayersByMode(statsData, mode, format, null, options);
   const modeLabel = getStatsBucketLabel(mode, format);
-  const titleLabel = options?.tierSOnly && mode === QUEUE_MODES.CLASSIC ? 'CLASSIC TIER S (Esmeralda+)' : modeLabel;
+  const titleLabel = modeLabel;
   const medals = ['🥇', '🥈', '🥉'];
 
   const embed = new EmbedBuilder()
@@ -2066,9 +2066,7 @@ function buildLeaderboardEmbed(statsData, mode = QUEUE_MODES.CLASSIC, format = n
     .setDescription(
       duelRank
         ? 'Ranking do **DUELO** (1v1 de PDL): vitórias em duelos realizados nas partidas. Desempate pelo PDL líquido dos duelos.'
-        : options?.tierSOnly
-          ? 'Mesmo PDL do Classic, filtrado para **Esmeralda IV ou superior**.'
-          : `Ranking interno de **${modeLabel}** baseado no histórico.`
+        : `Ranking interno de **${modeLabel}** baseado no histórico.`
     )
     .setFooter({ text: `${FOOTER_PREFIX} • Ranking ${titleLabel}` })
     .setTimestamp();
@@ -2127,7 +2125,7 @@ function buildTopTenEmbed(statsData, seasonMeta, mode, format = null, options = 
     ? getRankedPlayersByDuel(options?.duelos || [], statsData, seasonMeta).slice(0, 10)
     : getRankedPlayersByMode(statsData, mode, format, seasonMeta, options).slice(0, 10);
   const modeLabel = getStatsBucketLabel(mode, format);
-  const titleLabel = options?.tierSOnly && mode === QUEUE_MODES.CLASSIC ? 'CLASSIC TIER S (Esmeralda+)' : modeLabel;
+  const titleLabel = modeLabel;
   const medals = ['🥇', '🥈', '🥉'];
 
   const embed = new EmbedBuilder()
@@ -2136,9 +2134,7 @@ function buildTopTenEmbed(statsData, seasonMeta, mode, format = null, options = 
     .setDescription(
       duelRank
         ? `Duelos 1v1 de PDL concluídos nas partidas. Período: **${getSeasonDisplayLabel(seasonMeta)}**`
-        : options?.tierSOnly
-          ? `Mesmo PDL do Classic, filtrado para **Esmeralda IV ou superior**. Período: **${getSeasonDisplayLabel(seasonMeta)}**`
-          : `Período atual: **${getSeasonDisplayLabel(seasonMeta)}**`
+        : `Período atual: **${getSeasonDisplayLabel(seasonMeta)}**`
     )
     .setFooter({ text: `${FOOTER_PREFIX} • Top 10 ${titleLabel}` })
     .setTimestamp();
@@ -2920,8 +2916,7 @@ async function postDailyRankUpdates() {
   await channel.send({
     content: `🏆 **Rankings semanais CAPS ARENA — segunda-feira, 08h** | ${getSeasonDisplayLabel(seasonMeta)}`,
     embeds: [
-      buildTopTenEmbed(statsData, seasonMeta, QUEUE_MODES.CLASSIC, null, { excludeTierS: true }),
-      buildTopTenEmbed(statsData, seasonMeta, QUEUE_MODES.CLASSIC, null, { tierSOnly: true }),
+      buildTopTenEmbed(statsData, seasonMeta, QUEUE_MODES.CLASSIC, null, {}),
       buildTopInfernalEmbed(statsData, seasonMeta),
       buildMvpMuralEmbed(statsData, seasonMeta),
       inviteEmbed,
@@ -2932,7 +2927,6 @@ async function postDailyRankUpdates() {
         .setTitle('📌 Consulte os rankings quando quiser')
         .setDescription([
           '`!top10` — Classic',
-          '`!top10 tiers` — Tier S',
           '`!toprankinfernal` — INFERNAL',
           '`!topconvites` — Convites',
           '`!duelorank` — Duelo',

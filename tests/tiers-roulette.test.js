@@ -4,6 +4,7 @@ const L = require('../utils/lobbyUtils');
 const { drawRoulette } = require('../application/use-cases/drawRoulette');
 const { getRankedPlayersByMode } = require('../domain/ranking/playerStats');
 const { parseModeAndFormatArgs } = require('../domain/queue/selection');
+const { parseRankingView } = require('../domain/ranking/rankingViews');
 const { parseRouletteArgs } = require('../commands/handlers/rouletteCommandHandlers');
 
 describe('gate TIER S (Esmeralda IV+)', () => {
@@ -39,37 +40,33 @@ describe('gate TIER S (Esmeralda IV+)', () => {
   });
 });
 
-describe('top10 tiers (mesmo PDL, filtro)', () => {
-  it('tierSOnly filtra base < 2000', () => {
-    const statsData = {
-      players: {
-        k1: { discordId: 'd1', nickname: 'low#br1', baseMmr: 1200, modes: { classic: { customWins: 20, customLosses: 0, baseMmr: 1200, internalRating: 2400, winStreak: 0, ratingVersion: 2 } } },
-        k2: { discordId: 'd2', nickname: 'high#br1', baseMmr: 2400, modes: { classic: { customWins: 6, customLosses: 0, baseMmr: 2400, internalRating: 3500, winStreak: 0, ratingVersion: 2 } } }
-      }
-    };
+describe('ranking unificado (TIER S dentro do Classic geral)', () => {
+  const statsData = {
+    players: {
+      k1: { discordId: 'd1', nickname: 'low#br1', baseMmr: 1200, modes: { classic: { customWins: 20, customLosses: 0, baseMmr: 1200, internalRating: 2400, winStreak: 0, ratingVersion: 2 } } },
+      k2: { discordId: 'd2', nickname: 'high#br1', baseMmr: 2400, modes: { classic: { customWins: 6, customLosses: 0, baseMmr: 2400, internalRating: 3500, winStreak: 0, ratingVersion: 2 } } }
+    }
+  };
+
+  it('ranking geral inclui todos os elos (sem filtro Tier S)', () => {
     const all = getRankedPlayersByMode(statsData, 'classic', null, { phase: 'testing' });
     assert.equal(all.length, 2);
-    const tiers = getRankedPlayersByMode(statsData, 'classic', null, { phase: 'testing' }, { tierSOnly: true });
-    assert.equal(tiers.length, 1);
-    assert.equal(tiers[0].nickname, 'high#br1');
+    assert.deepEqual(all.map((p) => p.nickname).sort(), ['high#br1', 'low#br1']);
   });
 
-  it('excludeTierS tira Tier S do Classic (fica só no próprio ranking)', () => {
-    const statsData = {
-      players: {
-        k1: { discordId: 'd1', nickname: 'low#br1', baseMmr: 1200, modes: { classic: { customWins: 20, customLosses: 0, baseMmr: 1200, internalRating: 2400, winStreak: 0, ratingVersion: 2 } } },
-        k2: { discordId: 'd2', nickname: 'high#br1', baseMmr: 2400, modes: { classic: { customWins: 6, customLosses: 0, baseMmr: 2400, internalRating: 3500, winStreak: 0, ratingVersion: 2 } } }
-      }
-    };
-    const semTiers = getRankedPlayersByMode(statsData, 'classic', null, { phase: 'testing' }, { excludeTierS: true });
-    assert.equal(semTiers.length, 1);
-    assert.equal(semTiers[0].nickname, 'low#br1');
-    const tiers = getRankedPlayersByMode(statsData, 'classic', null, { phase: 'testing' }, { tierSOnly: true });
-    assert.equal(tiers.length, 1);
-    assert.equal(tiers[0].nickname, 'high#br1');
+  it('!placar tiers avisa que o ranking foi unificado', () => {
+    const view = parseRankingView(['tiers']);
+    assert.equal(view.ok, false);
+    assert.match(view.message, /unificado/i);
   });
 
-  it('parse aceita tiers', () => {
+  it('!placar sem args cai no Classic geral', () => {
+    const view = parseRankingView([]);
+    assert.equal(view.ok, true);
+    assert.equal(view.view, 'classic');
+  });
+
+  it('parse da fila continua aceitando tiers (lobby TIER S segue ativo)', () => {
     assert.equal(parseModeAndFormatArgs(['tiers']).tierSOnly, true);
     assert.equal(parseModeAndFormatArgs(['top10']).tierSOnly, false);
   });

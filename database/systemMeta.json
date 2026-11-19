@@ -1,7 +1,7 @@
 {
-  "lastQueueMessageId": "1560264298654343339",
+  "lastQueueMessageId": "1573027107888697477",
   "queueDashboardMessageIds": {
-    "idle": "1560264298654343339"
+    "idle": "1573027107888697477"
   },
   "recentVictory": {
     "guildId": "1273653944169660427",
@@ -10,246 +10,4744 @@
     "mode": "classic",
     "format": "5x5",
     "letter": "A",
-    "finishedAt": "2026-09-29T23:56:24.171Z"
+    "finishedAt": "2026-11-19T17:20:45.696Z",
+    "teamOne": [
+      {
+        "discordId": "1534234349723979876",
+        "nickname": "coringahelp#br1"
+      },
+      {
+        "discordId": "1539359564976095232",
+        "nickname": "PAYASUO ASSASINO#SHACO"
+      },
+      {
+        "discordId": "1437921963870916619",
+        "nickname": "MarshLol007#br1"
+      },
+      {
+        "discordId": "1029295398336077894",
+        "nickname": "ＮＥＲＯツ#exe"
+      },
+      {
+        "discordId": "751067226399965184",
+        "nickname": "BelaFortune#br1"
+      }
+    ],
+    "teamTwo": [
+      {
+        "discordId": "507973331442597899",
+        "nickname": "Allie#mator"
+      },
+      {
+        "discordId": "1537126110079356948",
+        "nickname": "FON coutinho#Fon"
+      },
+      {
+        "discordId": "846768902347685899",
+        "nickname": "Zuki#L0VE"
+      },
+      {
+        "discordId": "252603157014642689",
+        "nickname": "zPsaro#Br1"
+      },
+      {
+        "discordId": "684516265330606343",
+        "nickname": "david90#BR90"
+      }
+    ]
   },
-  "liveCooldowns": {
-    "860875184831332352": 1792066190318
-  },
-  "voiceTime": {
-    "users": {
-      "1520987441299718214": {
-        "totalMs": 20816913,
-        "week": {
-          "key": "2026-W45",
-          "ms": 4331197
+  "pendingMvpVotes": {},
+  "recentVictories": [
+    {
+      "guildId": "1273653944169660427",
+      "matchId": "classic-5x5-a",
+      "winnerTeam": "1",
+      "mode": "classic",
+      "format": "5x5",
+      "letter": "A",
+      "finishedAt": "2026-11-19T17:20:45.696Z",
+      "teamOne": [
+        {
+          "discordId": "1534234349723979876",
+          "nickname": "coringahelp#br1"
         },
-        "month": {
-          "key": "2026-11",
-          "ms": 16891361
+        {
+          "discordId": "1539359564976095232",
+          "nickname": "PAYASUO ASSASINO#SHACO"
+        },
+        {
+          "discordId": "1437921963870916619",
+          "nickname": "MarshLol007#br1"
+        },
+        {
+          "discordId": "1029295398336077894",
+          "nickname": "ＮＥＲＯツ#exe"
+        },
+        {
+          "discordId": "751067226399965184",
+          "nickname": "BelaFortune#br1"
         }
+      ],
+      "teamTwo": [
+        {
+          "discordId": "507973331442597899",
+          "nickname": "Allie#mator"
+        },
+        {
+          "discordId": "1537126110079356948",
+          "nickname": "FON coutinho#Fon"
+        },
+        {
+          "discordId": "846768902347685899",
+          "nickname": "Zuki#L0VE"
+        },
+        {
+          "discordId": "252603157014642689",
+          "nickname": "zPsaro#Br1"
+        },
+        {
+          "discordId": "684516265330606343",
+          "nickname": "david90#BR90"
+        }
+      ]
+    },
+    {
+      "guildId": "1273653944169660427",
+      "matchId": "classic-5x5-b",
+      "winnerTeam": "2",
+      "mode": "classic",
+      "format": "5x5",
+      "letter": "B",
+      "finishedAt": "2026-10-27T19:51:40.405Z",
+      "teamOne": [
+        {
+          "discordId": "692408001713143841",
+          "nickname": "Theqin2#br1"
+        },
+        {
+          "discordId": "533122006770778133",
+          "nickname": "newor#br1"
+        },
+        {
+          "discordId": "208931305792995328",
+          "nickname": "N0TURNO#br1"
+        },
+        {
+          "discordId": "860875184831332352",
+          "nickname": "BuGoN#BuGaO"
+        },
+        {
+          "discordId": "1562294378351825017",
+          "nickname": "felipecatico#BR1"
+        }
+      ],
+      "teamTwo": [
+        {
+          "discordId": "1465601754229112832",
+          "nickname": "Batt0usaii#br1"
+        },
+        {
+          "discordId": "1091489624452505621",
+          "nickname": "Jotaka#d1ana"
+        },
+        {
+          "discordId": "814518895347499079",
+          "nickname": "PRIME GOZIN#GOZO"
+        },
+        {
+          "discordId": "1344462797878198347",
+          "nickname": "relações#2204"
+        },
+        {
+          "discordId": "846768902347685899",
+          "nickname": "Zuki#L0VE"
+        }
+      ]
+    },
+    {
+      "guildId": "1273653944169660427",
+      "matchId": "aram-1x1-a",
+      "winnerTeam": "1",
+      "mode": "aram",
+      "format": "1x1",
+      "letter": "A",
+      "finishedAt": "2026-10-02T11:46:42.562Z",
+      "teamOne": [
+        {
+          "discordId": "1537126110079356948",
+          "nickname": "FON coutinho#Fon"
+        }
+      ],
+      "teamTwo": [
+        {
+          "discordId": "860875184831332352",
+          "nickname": "BuGoN#BuGaO"
+        }
+      ]
+    },
+    {
+      "guildId": "1273653944169660427",
+      "matchId": "aram-4x4-a",
+      "winnerTeam": "2",
+      "mode": "aram",
+      "format": "4x4",
+      "letter": "A",
+      "finishedAt": "2026-10-01T13:42:56.895Z",
+      "teamOne": [
+        {
+          "discordId": "509551895392813066",
+          "nickname": "JINX AGRESSIVA X#br1"
+        },
+        {
+          "discordId": "389127709248454656",
+          "nickname": "Maggot#Noxus"
+        },
+        {
+          "discordId": "860875184831332352",
+          "nickname": "BuGoN#BuGaO"
+        },
+        {
+          "discordId": "1324835968024576144",
+          "nickname": "VoliHiperativo#voli"
+        }
+      ],
+      "teamTwo": [
+        {
+          "discordId": "1243896407392518196",
+          "nickname": "GING FREECSS#Minng"
+        },
+        {
+          "discordId": "1154582352052371566",
+          "nickname": "ÐΩЯκ  亞#못爻父"
+        },
+        {
+          "discordId": "1157884288696602634",
+          "nickname": "Arcanjo#bjj"
+        },
+        {
+          "discordId": "708811482493878346",
+          "nickname": "Felipecatico#BR1"
+        }
+      ]
+    }
+  ],
+  "roletaHistory": [
+    {
+      "guildId": "1273653944169660427",
+      "letter": "A",
+      "at": "2026-10-04T21:04:22.027Z",
+      "leaving": [
+        "389127709248454656"
+      ],
+      "staying": []
+    }
+  ],
+  "liveCooldowns": {
+    "860875184831332352": 1794502097533,
+    "254417470641668107": 1792183639365
+  },
+  "clubePromoLastAt": "2026-11-19T11:00:27.548Z",
+  "invites": {
+    "links": {
+      "860875184831332352": {
+        "code": "7faAWXNtxS",
+        "channelId": "1489247981155651645",
+        "createdAt": "2026-10-30T15:48:19.959Z"
+      },
+      "1091489624452505621": {
+        "code": "aA5GBBcnvc",
+        "channelId": "1559622687113085039",
+        "createdAt": "2026-10-16T13:29:30.729Z"
       },
       "1537126110079356948": {
-        "totalMs": 47291463,
-        "week": {
-          "key": "2026-W45",
-          "ms": 7284155
-        },
-        "month": {
-          "key": "2026-11",
-          "ms": 42707694
-        }
-      },
-      "1211059609465262223": {
-        "totalMs": 1158768,
-        "week": {
-          "key": "2026-W44",
-          "ms": 1158768
-        },
-        "month": {
-          "key": "2026-10",
-          "ms": 1158768
-        }
-      },
-      "1324835968024576144": {
-        "totalMs": 371351,
-        "week": {
-          "key": "2026-W44",
-          "ms": 371351
-        },
-        "month": {
-          "key": "2026-10",
-          "ms": 371351
-        }
-      },
-      "208931305792995328": {
-        "totalMs": 20778424,
-        "week": {
-          "key": "2026-W44",
-          "ms": 20778424
-        },
-        "month": {
-          "key": "2026-11",
-          "ms": 15899649
-        }
-      },
-      "347517396954644480": {
-        "totalMs": 24449,
-        "week": {
-          "key": "2026-W44",
-          "ms": 24449
-        },
-        "month": {
-          "key": "2026-10",
-          "ms": 24449
-        }
-      },
-      "389127709248454656": {
-        "totalMs": 36216098,
-        "week": {
-          "key": "2026-W44",
-          "ms": 36216098
-        },
-        "month": {
-          "key": "2026-11",
-          "ms": 36214191
-        }
-      },
-      "274234617383616512": {
-        "totalMs": 170629,
-        "week": {
-          "key": "2026-W44",
-          "ms": 170629
-        },
-        "month": {
-          "key": "2026-11",
-          "ms": 170629
-        }
-      },
-      "788605638854705162": {
-        "totalMs": 12213373,
-        "week": {
-          "key": "2026-W44",
-          "ms": 12213373
-        },
-        "month": {
-          "key": "2026-11",
-          "ms": 12213373
-        }
-      },
-      "215526487841964033": {
-        "totalMs": 1974212,
-        "week": {
-          "key": "2026-W44",
-          "ms": 1974212
-        },
-        "month": {
-          "key": "2026-11",
-          "ms": 1974212
-        }
-      },
-      "254417470641668107": {
-        "totalMs": 19270940,
-        "week": {
-          "key": "2026-W45",
-          "ms": 6743382
-        },
-        "month": {
-          "key": "2026-11",
-          "ms": 19270940
-        }
-      },
-      "286901182222565378": {
-        "totalMs": 7401236,
-        "week": {
-          "key": "2026-W44",
-          "ms": 7401236
-        },
-        "month": {
-          "key": "2026-11",
-          "ms": 7401236
-        }
-      },
-      "1553863600156971030": {
-        "totalMs": 1050847,
-        "week": {
-          "key": "2026-W44",
-          "ms": 1050847
-        },
-        "month": {
-          "key": "2026-11",
-          "ms": 1050847
-        }
-      },
-      "348677413753847820": {
-        "totalMs": 908606,
-        "week": {
-          "key": "2026-W44",
-          "ms": 908606
-        },
-        "month": {
-          "key": "2026-11",
-          "ms": 908606
-        }
+        "code": "aA5GBBcnvc",
+        "channelId": "1559622687113085039",
+        "createdAt": "2026-10-16T13:29:34.126Z"
       },
       "297751389227188226": {
-        "totalMs": 3284003,
-        "week": {
-          "key": "2026-W45",
-          "ms": 3284003
-        },
-        "month": {
-          "key": "2026-11",
-          "ms": 3284003
-        }
+        "code": "aA5GBBcnvc",
+        "channelId": "1559622687113085039",
+        "createdAt": "2026-10-16T13:29:35.135Z"
       },
-      "302136346506690562": {
-        "totalMs": 18613,
-        "week": {
-          "key": "2026-W45",
-          "ms": 18613
-        },
-        "month": {
-          "key": "2026-11",
-          "ms": 18613
-        }
+      "1211059609465262223": {
+        "code": "53zUWFsneq",
+        "channelId": "1563649121053581543",
+        "createdAt": "2026-11-13T16:52:26.058Z"
+      },
+      "1539359564976095232": {
+        "code": "aA5GBBcnvc",
+        "channelId": "1559622687113085039",
+        "createdAt": "2026-10-24T16:21:17.591Z"
       }
     },
-    "sessions": {},
-    "loungeAccess": {},
-    "lastRewardMonth": "2026-11"
-  },
-  "lclAbertoEm": "2026-10-30",
-  "clubePromoLastAt": "2026-11-05T11:00:13.895Z",
-  "socialUltimoSlot": "2026-11-05#8",
-  "communitySchedule": {
-    "weekKey": "2026-11-02",
-    "posts": {
-      "1487953358407860235": {
-        "guildId": "1273653944169660427",
-        "channelId": "1487953358407860235",
-        "messageId": "1566769029979578407"
-      },
-      "1544297359918506004": {
-        "guildId": "1273653944169660427",
-        "channelId": "1544297359918506004",
-        "messageId": "1566769037202038805"
-      }
-    },
-    "dedupeCheckedAt": {
-      "1487953358407860235": 1793878603850,
-      "1544297359918506004": 1793878603850
-    },
-    "uiVersion": 4,
-    "dailySlot": "2026-11-05"
-  },
-  "invites": {
-    "links": {},
     "uses": [
       {
-        "code": "z8MdVF7Bx",
+        "code": "YnBQFshgk",
+        "inviterId": "860875184831332352",
+        "newMemberId": "482278881743863848",
+        "joinedAt": "2026-10-16T13:24:15.119Z",
+        "counted": true
+      },
+      {
+        "code": "YnBQFshgk",
+        "inviterId": "860875184831332352",
+        "newMemberId": "759616288720551947",
+        "joinedAt": "2026-10-16T13:30:46.469Z",
+        "counted": true
+      },
+      {
+        "code": "r2BSXV3V6",
+        "inviterId": "1539359564976095232",
+        "newMemberId": "1520207716046344334",
+        "joinedAt": "2026-10-16T16:36:01.448Z",
+        "counted": true
+      },
+      {
+        "code": "DN4BMgR8SR",
+        "inviterId": "1211059609465262223",
+        "newMemberId": "1109565387823136910",
+        "joinedAt": "2026-10-16T22:39:40.286Z",
+        "counted": true
+      },
+      {
+        "code": "KkBmVyJDJ",
+        "inviterId": "1243896407392518196",
+        "newMemberId": "1390617600358092945",
+        "joinedAt": "2026-10-16T23:05:34.300Z",
+        "counted": true
+      },
+      {
+        "code": "KkBmVyJDJ",
+        "inviterId": "1243896407392518196",
+        "newMemberId": "1390617975777660990",
+        "joinedAt": "2026-10-16T23:18:57.544Z",
+        "counted": true
+      },
+      {
+        "code": "WSKY6NuqX",
+        "inviterId": "347517396954644480",
+        "newMemberId": "375025072911417365",
+        "joinedAt": "2026-10-17T00:32:09.912Z",
+        "counted": true
+      },
+      {
+        "code": "KkBmVyJDJ",
+        "inviterId": "1243896407392518196",
+        "newMemberId": "1390617947273166908",
+        "joinedAt": "2026-10-17T01:30:47.262Z",
+        "counted": true
+      },
+      {
+        "code": "KkBmVyJDJ",
+        "inviterId": "1243896407392518196",
+        "newMemberId": "1390617701206065175",
+        "joinedAt": "2026-10-17T01:51:29.872Z",
+        "counted": true
+      },
+      {
+        "code": "KkBmVyJDJ",
+        "inviterId": "1243896407392518196",
+        "newMemberId": "871074079719981127",
+        "joinedAt": "2026-10-17T15:17:08.632Z",
+        "counted": true
+      },
+      {
+        "code": "SBqhtvAuq",
+        "inviterId": "1146255967860838562",
+        "newMemberId": "457228677051056139",
+        "joinedAt": "2026-10-17T15:42:51.830Z",
+        "counted": false
+      },
+      {
+        "code": "KkBmVyJDJ",
+        "inviterId": "1243896407392518196",
+        "newMemberId": "414079141323735040",
+        "joinedAt": "2026-10-17T18:10:11.956Z",
+        "counted": true
+      },
+      {
+        "code": "KkBmVyJDJ",
+        "inviterId": "1243896407392518196",
+        "newMemberId": "1453836802426404959",
+        "joinedAt": "2026-10-17T18:12:34.369Z",
+        "counted": true
+      },
+      {
+        "code": "DN4BMgR8SR",
+        "inviterId": "1211059609465262223",
+        "newMemberId": "1203451680130076784",
+        "joinedAt": "2026-10-17T23:25:42.339Z",
+        "counted": true
+      },
+      {
+        "code": "KkBmVyJDJ",
+        "inviterId": "1243896407392518196",
+        "newMemberId": "1390617682344411208",
+        "joinedAt": "2026-10-18T01:40:56.725Z",
+        "counted": true
+      },
+      {
+        "code": "TsQzJNaDVv",
+        "inviterId": "860875184831332352",
+        "newMemberId": "294752164058759169",
+        "joinedAt": "2026-10-18T15:29:30.422Z",
+        "counted": true
+      },
+      {
+        "code": "KkBmVyJDJ",
+        "inviterId": "1243896407392518196",
+        "newMemberId": "1390617976390156401",
+        "joinedAt": "2026-10-18T18:07:22.561Z",
+        "counted": true
+      },
+      {
+        "code": "TsQzJNaDVv",
+        "inviterId": "860875184831332352",
+        "newMemberId": "471465051434385415",
+        "joinedAt": "2026-10-18T18:19:42.849Z",
+        "counted": true
+      },
+      {
+        "code": "KkBmVyJDJ",
+        "inviterId": "1243896407392518196",
+        "newMemberId": "1390618015267295373",
+        "joinedAt": "2026-10-18T19:05:34.125Z",
+        "counted": true
+      },
+      {
+        "code": "TsQzJNaDVv",
+        "inviterId": "860875184831332352",
+        "newMemberId": "1167605199813218354",
+        "joinedAt": "2026-10-18T19:09:09.204Z",
+        "counted": true
+      },
+      {
+        "code": "TsQzJNaDVv",
+        "inviterId": "860875184831332352",
+        "newMemberId": "545036385749303306",
+        "joinedAt": "2026-10-18T21:39:18.047Z",
+        "counted": false
+      },
+      {
+        "code": "DN4BMgR8SR",
+        "inviterId": "1211059609465262223",
+        "newMemberId": "1548128585825652746",
+        "joinedAt": "2026-10-19T01:26:20.470Z",
+        "counted": true
+      },
+      {
+        "code": "g763869Yr",
+        "inviterId": "1154582352052371566",
+        "newMemberId": "819286030728429649",
+        "joinedAt": "2026-10-19T16:38:16.289Z",
+        "counted": true
+      },
+      {
+        "code": "cdG7WvrWy",
+        "inviterId": "905328826496729088",
+        "newMemberId": "903684301491691601",
+        "joinedAt": "2026-10-19T21:48:17.905Z",
+        "counted": true
+      },
+      {
+        "code": "DN4BMgR8SR",
+        "inviterId": "1211059609465262223",
+        "newMemberId": "806695597876445204",
+        "joinedAt": "2026-10-20T11:05:58.736Z",
+        "counted": false
+      },
+      {
+        "code": "qmneT7r77",
+        "inviterId": "297751389227188226",
+        "newMemberId": "244182116026417152",
+        "joinedAt": "2026-10-20T12:31:27.715Z",
+        "counted": true
+      },
+      {
+        "code": "UJG5ftC7v",
+        "inviterId": "860875184831332352",
+        "newMemberId": "325707396406181899",
+        "joinedAt": "2026-10-20T16:18:05.101Z",
+        "counted": true
+      },
+      {
+        "code": "YwTutVwPN",
+        "inviterId": "440153488480010259",
+        "newMemberId": "357603651419897869",
+        "joinedAt": "2026-10-20T16:42:08.797Z",
+        "counted": true
+      },
+      {
+        "code": "KjBj68vZH",
+        "inviterId": "357603651419897869",
+        "newMemberId": "426821754569228310",
+        "joinedAt": "2026-10-20T16:44:05.515Z",
+        "counted": true
+      },
+      {
+        "code": "AK3jkGPnF",
+        "inviterId": "509551895392813066",
+        "newMemberId": "1416490487917056115",
+        "joinedAt": "2026-10-20T21:12:36.353Z",
+        "counted": true
+      },
+      {
+        "code": "97W9nmAqN",
+        "inviterId": "860875184831332352",
+        "newMemberId": "1534234349723979876",
+        "joinedAt": "2026-10-21T14:35:50.981Z",
+        "counted": true
+      },
+      {
+        "code": "3R9GurhGC",
+        "inviterId": "1534234349723979876",
+        "newMemberId": "337816150979248129",
+        "joinedAt": "2026-10-21T14:39:27.311Z",
+        "counted": true
+      },
+      {
+        "code": "BDQbc8AQE",
+        "inviterId": "1344462797878198347",
+        "newMemberId": "1465601754229112832",
+        "joinedAt": "2026-10-21T17:50:11.035Z",
+        "counted": true
+      },
+      {
+        "code": "GqRsT8tGj",
         "inviterId": "389127709248454656",
-        "newMemberId": "286901182222565378",
-        "joinedAt": "2026-11-01T19:02:08.310Z",
+        "newMemberId": "788605638854705162",
+        "joinedAt": "2026-10-21T21:08:17.180Z",
+        "counted": true
+      },
+      {
+        "code": "yAaYrMt9m",
+        "inviterId": "688869373124804654",
+        "newMemberId": "136135615094849537",
+        "joinedAt": "2026-10-22T04:59:15.145Z",
+        "counted": true
+      },
+      {
+        "code": "NJAeQtm4d",
+        "inviterId": "860875184831332352",
+        "newMemberId": "303373932197707777",
+        "joinedAt": "2026-10-23T00:11:57.574Z",
         "counted": true
       },
       {
         "code": "RA95xU2Etx",
         "inviterId": "1344462797878198347",
-        "newMemberId": "322052324472258560",
-        "joinedAt": "2026-11-01T20:18:46.004Z",
+        "newMemberId": "779920618865819739",
+        "joinedAt": "2026-10-23T18:02:01.074Z",
+        "counted": false
+      },
+      {
+        "code": "KQPnxFxqM",
+        "inviterId": "1465601754229112832",
+        "newMemberId": "1501729224929710200",
+        "joinedAt": "2026-10-23T18:17:45.401Z",
+        "counted": true
+      },
+      {
+        "code": "RA95xU2Etx",
+        "inviterId": "1344462797878198347",
+        "newMemberId": "414911532850479105",
+        "joinedAt": "2026-10-23T18:40:39.257Z",
+        "counted": true
+      },
+      {
+        "code": "RA95xU2Etx",
+        "inviterId": "1344462797878198347",
+        "newMemberId": "1559928847237914749",
+        "joinedAt": "2026-10-23T18:54:02.248Z",
+        "counted": true
+      },
+      {
+        "code": "KQPnxFxqM",
+        "inviterId": "1465601754229112832",
+        "newMemberId": "1139626389054693458",
+        "joinedAt": "2026-10-23T18:55:11.524Z",
+        "counted": false
+      },
+      {
+        "code": "KQPnxFxqM",
+        "inviterId": "1465601754229112832",
+        "newMemberId": "265572369945460736",
+        "joinedAt": "2026-10-23T19:02:30.220Z",
+        "counted": true
+      },
+      {
+        "code": "KQPnxFxqM",
+        "inviterId": "1465601754229112832",
+        "newMemberId": "606649807997501460",
+        "joinedAt": "2026-10-23T19:20:47.156Z",
+        "counted": false
+      },
+      {
+        "code": "RA95xU2Etx",
+        "inviterId": "1344462797878198347",
+        "newMemberId": "350835058959056907",
+        "joinedAt": "2026-10-23T19:31:05.691Z",
+        "counted": false
+      },
+      {
+        "code": "j7cS854Tr",
+        "inviterId": "714929976104976391",
+        "newMemberId": "471823746370502657",
+        "joinedAt": "2026-10-23T19:49:10.898Z",
+        "counted": true
+      },
+      {
+        "code": "KQPnxFxqM",
+        "inviterId": "1465601754229112832",
+        "newMemberId": "606649807997501460",
+        "joinedAt": "2026-10-23T20:00:19.693Z",
+        "counted": false
+      },
+      {
+        "code": "faSwF4CE9",
+        "inviterId": "1465601754229112832",
+        "newMemberId": "500449462540566537",
+        "joinedAt": "2026-10-23T20:01:53.845Z",
+        "counted": true
+      },
+      {
+        "code": "eQ2pxB7rk",
+        "inviterId": "1465601754229112832",
+        "newMemberId": "1336432577157795871",
+        "joinedAt": "2026-10-23T21:03:24.813Z",
+        "counted": true
+      },
+      {
+        "code": "eQ2pxB7rk",
+        "inviterId": "1465601754229112832",
+        "newMemberId": "726111620907925624",
+        "joinedAt": "2026-10-23T21:05:19.435Z",
+        "counted": false
+      },
+      {
+        "code": "eQ2pxB7rk",
+        "inviterId": "1465601754229112832",
+        "newMemberId": "688848063317409971",
+        "joinedAt": "2026-10-23T21:10:14.715Z",
+        "counted": false
+      },
+      {
+        "code": "eQ2pxB7rk",
+        "inviterId": "1465601754229112832",
+        "newMemberId": "312267166630281218",
+        "joinedAt": "2026-10-23T21:10:16.727Z",
+        "counted": false
+      },
+      {
+        "code": "RA95xU2Etx",
+        "inviterId": "1344462797878198347",
+        "newMemberId": "1355482968230989875",
+        "joinedAt": "2026-10-23T21:10:36.376Z",
+        "counted": true
+      },
+      {
+        "code": "Uu4Up9jNC",
+        "inviterId": "312267166630281218",
+        "newMemberId": "338780604130656292",
+        "joinedAt": "2026-10-23T21:11:35.700Z",
+        "counted": false
+      },
+      {
+        "code": "eQ2pxB7rk",
+        "inviterId": "1465601754229112832",
+        "newMemberId": "123237737930293250",
+        "joinedAt": "2026-10-23T21:11:39.112Z",
+        "counted": true
+      },
+      {
+        "code": "eQ2pxB7rk",
+        "inviterId": "1465601754229112832",
+        "newMemberId": "726111620907925624",
+        "joinedAt": "2026-10-23T21:19:16.654Z",
+        "counted": false
+      },
+      {
+        "code": "2YeNC3m3b",
+        "inviterId": "350835058959056907",
+        "newMemberId": "1537400393213022278",
+        "joinedAt": "2026-10-23T21:22:22.737Z",
+        "counted": false
+      },
+      {
+        "code": "RA95xU2Etx",
+        "inviterId": "1344462797878198347",
+        "newMemberId": "1193755454426324993",
+        "joinedAt": "2026-10-23T21:29:35.997Z",
+        "counted": true
+      },
+      {
+        "code": "m8WJmpgxxn",
+        "inviterId": "860875184831332352",
+        "newMemberId": "407882734837563392",
+        "joinedAt": "2026-10-25T07:25:42.836Z",
+        "counted": false
+      },
+      {
+        "code": "Y3YYPRYnw",
+        "inviterId": "1539359564976095232",
+        "newMemberId": "622812238322860033",
+        "joinedAt": "2026-10-25T14:33:53.537Z",
+        "counted": true
+      },
+      {
+        "code": "SNP2uDnJq",
+        "inviterId": "711339895460986950",
+        "newMemberId": "1240319224073687105",
+        "joinedAt": "2026-10-25T21:43:46.905Z",
+        "counted": true
+      },
+      {
+        "code": "m8WJmpgxxn",
+        "inviterId": "860875184831332352",
+        "newMemberId": "407882734837563392",
+        "joinedAt": "2026-10-25T23:05:35.883Z",
+        "counted": false
+      },
+      {
+        "code": "7V7BmcZu5",
+        "inviterId": "860875184831332352",
+        "newMemberId": "309409816013570049",
+        "joinedAt": "2026-10-26T11:09:22.844Z",
+        "counted": true
+      },
+      {
+        "code": "DN4BMgR8SR",
+        "inviterId": "1211059609465262223",
+        "newMemberId": "1440462510867087481",
+        "joinedAt": "2026-10-26T16:48:47.459Z",
+        "counted": true
+      },
+      {
+        "code": "T5rSR3kyT",
+        "inviterId": "267172397533233154",
+        "newMemberId": "516434917622546434",
+        "joinedAt": "2026-10-27T15:21:46.387Z",
+        "counted": true
+      },
+      {
+        "code": "T5rSR3kyT",
+        "inviterId": "267172397533233154",
+        "newMemberId": "1296554864603566111",
+        "joinedAt": "2026-10-27T17:33:04.262Z",
+        "counted": true
+      },
+      {
+        "code": "C4MekGBmc",
+        "inviterId": "332695948352421889",
+        "newMemberId": "320760302641610773",
+        "joinedAt": "2026-10-27T18:02:34.353Z",
+        "counted": true
+      },
+      {
+        "code": "C4MekGBmc",
+        "inviterId": "332695948352421889",
+        "newMemberId": "304360730147160064",
+        "joinedAt": "2026-10-27T18:07:47.593Z",
+        "counted": false
+      },
+      {
+        "code": "RA95xU2Etx",
+        "inviterId": "1344462797878198347",
+        "newMemberId": "1036512847288602645",
+        "joinedAt": "2026-10-28T02:57:39.577Z",
+        "counted": true
+      },
+      {
+        "code": "rbsSK7w328",
+        "inviterId": "860875184831332352",
+        "newMemberId": "211944295215661057",
+        "joinedAt": "2026-10-28T11:14:00.706Z",
+        "counted": true
+      },
+      {
+        "code": "8bDfCje3Y",
+        "inviterId": "267172397533233154",
+        "newMemberId": "141226926797881344",
+        "joinedAt": "2026-10-28T15:42:08.520Z",
+        "counted": true
+      },
+      {
+        "code": "xYq5HSfyd",
+        "inviterId": "699115121171234876",
+        "newMemberId": "207335237628329984",
+        "joinedAt": "2026-10-29T03:47:36.050Z",
+        "counted": true
+      },
+      {
+        "code": "6cDHCJqpf",
+        "inviterId": "533122006770778133",
+        "newMemberId": "1299823987387273268",
+        "joinedAt": "2026-10-30T16:24:35.989Z",
+        "counted": true
+      },
+      {
+        "code": "RA95xU2Etx",
+        "inviterId": "1344462797878198347",
+        "newMemberId": "1117864637627637852",
+        "joinedAt": "2026-10-31T03:42:40.673Z",
+        "counted": true
+      },
+      {
+        "code": "RA95xU2Etx",
+        "inviterId": "1344462797878198347",
+        "newMemberId": "1475927933439967445",
+        "joinedAt": "2026-10-31T08:17:02.407Z",
+        "counted": false
+      },
+      {
+        "code": "RA95xU2Etx",
+        "inviterId": "1344462797878198347",
+        "newMemberId": "1156962206588608584",
+        "joinedAt": "2026-11-03T14:15:01.038Z",
+        "counted": true
+      },
+      {
+        "code": "KkBmVyJDJ",
+        "inviterId": "1243896407392518196",
+        "newMemberId": "238089105873829889",
+        "joinedAt": "2026-11-03T19:30:35.518Z",
+        "counted": true
+      },
+      {
+        "code": "KkBmVyJDJ",
+        "inviterId": "1243896407392518196",
+        "newMemberId": "425851128861687828",
+        "joinedAt": "2026-11-03T20:53:32.033Z",
+        "counted": true
+      },
+      {
+        "code": "6cDHCJqpf",
+        "inviterId": "533122006770778133",
+        "newMemberId": "611292443362721792",
+        "joinedAt": "2026-11-04T17:07:59.276Z",
+        "counted": true
+      },
+      {
+        "code": "XAXtxqZNy",
+        "inviterId": "1534234349723979876",
+        "newMemberId": "1265057083993096202",
+        "joinedAt": "2026-11-04T17:09:54.188Z",
+        "counted": true
+      },
+      {
+        "code": "m8WJmpgxxn",
+        "inviterId": "860875184831332352",
+        "newMemberId": "1030957176459628615",
+        "joinedAt": "2026-11-04T17:36:46.854Z",
+        "counted": true
+      },
+      {
+        "code": "kUBzSZ9Uy",
+        "inviterId": "860875184831332352",
+        "newMemberId": "452536884665516042",
+        "joinedAt": "2026-11-04T19:07:35.576Z",
+        "counted": true
+      },
+      {
+        "code": "7V7BmcZu5",
+        "inviterId": "860875184831332352",
+        "newMemberId": "1559275489967739031",
+        "joinedAt": "2026-11-04T20:24:17.815Z",
+        "counted": true
+      },
+      {
+        "code": "7V7BmcZu5",
+        "inviterId": "860875184831332352",
+        "newMemberId": "490574695532462081",
+        "joinedAt": "2026-11-04T20:25:25.726Z",
+        "counted": true
+      },
+      {
+        "code": "DN4BMgR8SR",
+        "inviterId": "1211059609465262223",
+        "newMemberId": "1064351485896446053",
+        "joinedAt": "2026-11-04T20:31:53.361Z",
+        "counted": true
+      },
+      {
+        "code": "JF7ZAMjjH",
+        "inviterId": "452536884665516042",
+        "newMemberId": "527632399199371265",
+        "joinedAt": "2026-11-04T21:43:17.650Z",
+        "counted": false
+      },
+      {
+        "code": "mAJy6guEz",
+        "inviterId": "389127709248454656",
+        "newMemberId": "361988305006624768",
+        "joinedAt": "2026-11-04T23:37:43.274Z",
+        "counted": false
+      },
+      {
+        "code": "mAJy6guEz",
+        "inviterId": "389127709248454656",
+        "newMemberId": "335292093733797893",
+        "joinedAt": "2026-11-04T23:38:24.486Z",
+        "counted": true
+      },
+      {
+        "code": "mAJy6guEz",
+        "inviterId": "389127709248454656",
+        "newMemberId": "1507905166383251587",
+        "joinedAt": "2026-11-05T02:25:43.819Z",
+        "counted": true
+      },
+      {
+        "code": "mAJy6guEz",
+        "inviterId": "389127709248454656",
+        "newMemberId": "569254034062442535",
+        "joinedAt": "2026-11-05T02:49:25.558Z",
+        "counted": true
+      },
+      {
+        "code": "RA95xU2Etx",
+        "inviterId": "1344462797878198347",
+        "newMemberId": "1454519193042161718",
+        "joinedAt": "2026-11-05T03:19:12.510Z",
+        "counted": true
+      },
+      {
+        "code": "RA95xU2Etx",
+        "inviterId": "1344462797878198347",
+        "newMemberId": "302138597153177600",
+        "joinedAt": "2026-11-05T03:54:16.937Z",
+        "counted": true
+      },
+      {
+        "code": "RA95xU2Etx",
+        "inviterId": "1344462797878198347",
+        "newMemberId": "1547724469705908276",
+        "joinedAt": "2026-11-05T03:54:39.693Z",
+        "counted": false
+      },
+      {
+        "code": "RA95xU2Etx",
+        "inviterId": "1344462797878198347",
+        "newMemberId": "1537941492717322452",
+        "joinedAt": "2026-11-05T17:08:34.296Z",
+        "counted": true
+      },
+      {
+        "code": "YnBQFshgk",
+        "inviterId": "860875184831332352",
+        "newMemberId": "1449063941157290091",
+        "joinedAt": "2026-11-06T12:05:33.433Z",
+        "counted": true
+      },
+      {
+        "code": "YnBQFshgk",
+        "inviterId": "860875184831332352",
+        "newMemberId": "773544490605740032",
+        "joinedAt": "2026-11-06T12:06:22.162Z",
+        "counted": false
+      },
+      {
+        "code": "9N6nkrdNh",
+        "inviterId": "1539359564976095232",
+        "newMemberId": "351141740381470730",
+        "joinedAt": "2026-11-06T18:09:02.554Z",
+        "counted": true
+      },
+      {
+        "code": "7V7BmcZu5",
+        "inviterId": "860875184831332352",
+        "newMemberId": "405901010931023872",
+        "joinedAt": "2026-11-06T18:12:37.116Z",
+        "counted": true
+      },
+      {
+        "code": "WQp7BhbRM",
+        "inviterId": "1539359564976095232",
+        "newMemberId": "1565553229788614726",
+        "joinedAt": "2026-11-06T18:14:10.053Z",
+        "counted": true
+      },
+      {
+        "code": "rDS4k3Fsg",
+        "inviterId": "414079141323735040",
+        "newMemberId": "290586625111490560",
+        "joinedAt": "2026-11-06T19:20:51.095Z",
+        "counted": true
+      },
+      {
+        "code": "7V7BmcZu5",
+        "inviterId": "860875184831332352",
+        "newMemberId": "1520219239087214693",
+        "joinedAt": "2026-11-09T17:44:30.850Z",
+        "counted": true
+      },
+      {
+        "code": "7V7BmcZu5",
+        "inviterId": "860875184831332352",
+        "newMemberId": "1300267624978055200",
+        "joinedAt": "2026-11-09T17:55:55.418Z",
+        "counted": true
+      },
+      {
+        "code": "NJAeQtm4d",
+        "inviterId": "860875184831332352",
+        "newMemberId": "1561549548113887239",
+        "joinedAt": "2026-11-10T11:11:45.351Z",
+        "counted": true
+      },
+      {
+        "code": "TsQzJNaDVv",
+        "inviterId": "860875184831332352",
+        "newMemberId": "1310194000799731732",
+        "joinedAt": "2026-11-10T11:14:24.531Z",
+        "counted": false
+      },
+      {
+        "code": "TTvpxXnKj",
+        "inviterId": "860875184831332352",
+        "newMemberId": "371311941190156310",
+        "joinedAt": "2026-11-10T14:00:22.603Z",
+        "counted": true
+      },
+      {
+        "code": "d8t6qajK3",
+        "inviterId": "533122006770778133",
+        "newMemberId": "250059060227997697",
+        "joinedAt": "2026-11-10T16:23:48.728Z",
+        "counted": true
+      },
+      {
+        "code": "7V7BmcZu5",
+        "inviterId": "860875184831332352",
+        "newMemberId": "326150362627309568",
+        "joinedAt": "2026-11-10T17:17:52.917Z",
+        "counted": false
+      },
+      {
+        "code": "TTvpxXnKj",
+        "inviterId": "860875184831332352",
+        "newMemberId": "219089253118771200",
+        "joinedAt": "2026-11-10T20:51:08.536Z",
+        "counted": true
+      },
+      {
+        "code": "7u7CfP6MB",
+        "inviterId": "1154582352052371566",
+        "newMemberId": "296778621899767809",
+        "joinedAt": "2026-11-10T20:54:06.292Z",
+        "counted": false
+      },
+      {
+        "code": "Q6rAZcKHA",
+        "inviterId": "1154582352052371566",
+        "newMemberId": "284799381935226890",
+        "joinedAt": "2026-11-10T20:56:19.448Z",
+        "counted": true
+      },
+      {
+        "code": "5AdnrUUct",
+        "inviterId": "1534234349723979876",
+        "newMemberId": "1036722272263741553",
+        "joinedAt": "2026-11-10T21:08:34.954Z",
+        "counted": true
+      },
+      {
+        "code": "jGRGFCcY5",
+        "inviterId": "294603098599456769",
+        "newMemberId": "1029295398336077894",
+        "joinedAt": "2026-11-12T16:29:50.683Z",
+        "counted": true
+      },
+      {
+        "code": "9kM3DmyeY",
+        "inviterId": "1380566076152221726",
+        "newMemberId": "350804211400704011",
+        "joinedAt": "2026-11-12T21:47:12.445Z",
+        "counted": true
+      },
+      {
+        "code": "EypAVg9gQ",
+        "inviterId": "236357825683521536",
+        "newMemberId": "408033694700404736",
+        "joinedAt": "2026-11-12T22:19:59.403Z",
+        "counted": true
+      },
+      {
+        "code": "F22zSqJZs",
+        "inviterId": "1539359564976095232",
+        "newMemberId": "375376539149271070",
+        "joinedAt": "2026-11-12T22:25:58.326Z",
+        "counted": true
+      },
+      {
+        "code": "9kM3DmyeY",
+        "inviterId": "1380566076152221726",
+        "newMemberId": "647903105693908992",
+        "joinedAt": "2026-11-13T00:37:53.508Z",
+        "counted": true
+      },
+      {
+        "code": "NjVpRP5wR",
+        "inviterId": "236357825683521536",
+        "newMemberId": "469638457661194249",
+        "joinedAt": "2026-11-13T16:47:52.252Z",
+        "counted": true
+      },
+      {
+        "code": "2a2TbTTQ7",
+        "inviterId": "1539359564976095232",
+        "newMemberId": "1217155209248116807",
+        "joinedAt": "2026-11-13T18:25:09.282Z",
+        "counted": false
+      },
+      {
+        "code": "vSHtQ6rCH",
+        "inviterId": "1539359564976095232",
+        "newMemberId": "1217155209248116807",
+        "joinedAt": "2026-11-13T19:02:01.999Z",
+        "counted": true
+      },
+      {
+        "code": "JcTVajAVs",
+        "inviterId": "1539359564976095232",
+        "newMemberId": "1219808603863650334",
+        "joinedAt": "2026-11-14T16:23:55.456Z",
+        "counted": true
+      },
+      {
+        "code": "JcTVajAVs",
+        "inviterId": "1539359564976095232",
+        "newMemberId": "470052842078601226",
+        "joinedAt": "2026-11-14T16:25:40.781Z",
+        "counted": true
+      },
+      {
+        "code": "JcTVajAVs",
+        "inviterId": "1539359564976095232",
+        "newMemberId": "1549746176276828260",
+        "joinedAt": "2026-11-14T16:29:27.603Z",
+        "counted": true
+      },
+      {
+        "code": "JcTVajAVs",
+        "inviterId": "1539359564976095232",
+        "newMemberId": "863633549810597888",
+        "joinedAt": "2026-11-14T16:34:59.031Z",
+        "counted": true
+      },
+      {
+        "code": "uemP5JX9y",
+        "inviterId": "208931305792995328",
+        "newMemberId": "765995073019183105",
+        "joinedAt": "2026-11-14T17:22:12.394Z",
+        "counted": true
+      },
+      {
+        "code": "x5uMJHukj",
+        "inviterId": "1534234349723979876",
+        "newMemberId": "378585173924511754",
+        "joinedAt": "2026-11-14T19:07:59.178Z",
+        "counted": true
+      },
+      {
+        "code": "Eg6JakXVg",
+        "inviterId": "692408001713143841",
+        "newMemberId": "468556915643908127",
+        "joinedAt": "2026-11-14T20:25:31.710Z",
+        "counted": true
+      },
+      {
+        "code": "m8WJmpgxxn",
+        "inviterId": "860875184831332352",
+        "newMemberId": "1299467330157543577",
+        "joinedAt": "2026-11-14T22:28:40.026Z",
+        "counted": true
+      },
+      {
+        "code": "m8WJmpgxxn",
+        "inviterId": "860875184831332352",
+        "newMemberId": "331574667347361793",
+        "joinedAt": "2026-11-15T13:28:08.989Z",
+        "counted": true
+      },
+      {
+        "code": "VXqtK53274",
+        "inviterId": "1550732875434037328",
+        "newMemberId": "1538008385314750585",
+        "joinedAt": "2026-11-15T23:18:07.270Z",
+        "counted": true
+      },
+      {
+        "code": "pgws7dpAN",
+        "inviterId": "1539359564976095232",
+        "newMemberId": "723982480075391106",
+        "joinedAt": "2026-11-16T17:37:07.091Z",
+        "counted": false
+      },
+      {
+        "code": "2ku8WpdEq",
+        "inviterId": "1534234349723979876",
+        "newMemberId": "422247204393189376",
+        "joinedAt": "2026-11-16T18:29:10.432Z",
+        "counted": false
+      },
+      {
+        "code": "7V7BmcZu5",
+        "inviterId": "860875184831332352",
+        "newMemberId": "939406269868040203",
+        "joinedAt": "2026-11-16T19:24:21.658Z",
+        "counted": true
+      },
+      {
+        "code": "7V7BmcZu5",
+        "inviterId": "860875184831332352",
+        "newMemberId": "561544185300123656",
+        "joinedAt": "2026-11-16T19:25:56.255Z",
+        "counted": true
+      },
+      {
+        "code": "y8qkMaVWS",
+        "inviterId": "1029295398336077894",
+        "newMemberId": "295283758435926016",
+        "joinedAt": "2026-11-16T20:31:50.687Z",
+        "counted": true
+      },
+      {
+        "code": "Q4S5rYAgS",
+        "inviterId": "1154582352052371566",
+        "newMemberId": "1073203336507035658",
+        "joinedAt": "2026-11-16T22:35:30.327Z",
+        "counted": false
+      },
+      {
+        "code": "Q4S5rYAgS",
+        "inviterId": "1154582352052371566",
+        "newMemberId": "1274094123443294290",
+        "joinedAt": "2026-11-16T22:35:53.601Z",
+        "counted": true
+      },
+      {
+        "code": "y8qkMaVWS",
+        "inviterId": "1029295398336077894",
+        "newMemberId": "1492710699749736479",
+        "joinedAt": "2026-11-16T23:56:16.016Z",
+        "counted": true
+      },
+      {
+        "code": "7V7BmcZu5",
+        "inviterId": "860875184831332352",
+        "newMemberId": "556256600227053570",
+        "joinedAt": "2026-11-17T18:17:23.649Z",
+        "counted": true
+      },
+      {
+        "code": "y8qkMaVWS",
+        "inviterId": "1029295398336077894",
+        "newMemberId": "176891840870612993",
+        "joinedAt": "2026-11-17T18:18:56.351Z",
+        "counted": true
+      },
+      {
+        "code": "ZxSqAsDMY",
+        "inviterId": "443081195325095938",
+        "newMemberId": "293444475479392266",
+        "joinedAt": "2026-11-17T18:54:26.254Z",
+        "counted": true
+      },
+      {
+        "code": "QsrCVyFFp",
+        "inviterId": "507973331442597899",
+        "newMemberId": "783479887410233394",
+        "joinedAt": "2026-11-17T20:18:22.967Z",
+        "counted": true
+      },
+      {
+        "code": "QsrCVyFFp",
+        "inviterId": "507973331442597899",
+        "newMemberId": "1210315096081834037",
+        "joinedAt": "2026-11-17T20:19:07.166Z",
+        "counted": true
+      },
+      {
+        "code": "sq4ryg32K",
+        "inviterId": "860875184831332352",
+        "newMemberId": "272079836829188097",
+        "joinedAt": "2026-11-18T16:11:18.810Z",
+        "counted": true
+      },
+      {
+        "code": "QsrCVyFFp",
+        "inviterId": "507973331442597899",
+        "newMemberId": "684516265330606343",
+        "joinedAt": "2026-11-19T16:26:51.716Z",
         "counted": true
       }
     ],
     "monthly": {
-      "2026-11": {
+      "2026-10": {
+        "860875184831332352": 10,
+        "1539359564976095232": 2,
+        "1211059609465262223": 4,
+        "1243896407392518196": 10,
+        "347517396954644480": 1,
+        "1146255967860838562": 0,
+        "1154582352052371566": 1,
+        "905328826496729088": 1,
+        "297751389227188226": 1,
+        "440153488480010259": 1,
+        "357603651419897869": 1,
+        "509551895392813066": 1,
+        "1534234349723979876": 1,
+        "1344462797878198347": 7,
         "389127709248454656": 1,
-        "1344462797878198347": 1
+        "688869373124804654": 1,
+        "1465601754229112832": 5,
+        "714929976104976391": 1,
+        "312267166630281218": 0,
+        "350835058959056907": 0,
+        "711339895460986950": 1,
+        "267172397533233154": 3,
+        "332695948352421889": 1,
+        "699115121171234876": 1,
+        "533122006770778133": 1
+      },
+      "2026-11": {
+        "1344462797878198347": 4,
+        "1243896407392518196": 2,
+        "533122006770778133": 2,
+        "1534234349723979876": 3,
+        "860875184831332352": 17,
+        "1211059609465262223": 1,
+        "452536884665516042": 0,
+        "389127709248454656": 3,
+        "1539359564976095232": 8,
+        "414079141323735040": 1,
+        "1154582352052371566": 2,
+        "294603098599456769": 1,
+        "1380566076152221726": 2,
+        "236357825683521536": 2,
+        "208931305792995328": 1,
+        "692408001713143841": 1,
+        "1550732875434037328": 1,
+        "1029295398336077894": 3,
+        "443081195325095938": 1,
+        "507973331442597899": 3
       }
     },
     "rewarded": {
-      "389127709248454656": {},
-      "1344462797878198347": {}
+      "860875184831332352": {
+        "3": true,
+        "5": true,
+        "10": true
+      },
+      "1539359564976095232": {
+        "3": true,
+        "5": true,
+        "10": true
+      },
+      "1211059609465262223": {
+        "3": true,
+        "5": true
+      },
+      "1243896407392518196": {
+        "3": true,
+        "5": true,
+        "10": true
+      },
+      "347517396954644480": {},
+      "1146255967860838562": {},
+      "1154582352052371566": {
+        "3": true
+      },
+      "905328826496729088": {},
+      "297751389227188226": {},
+      "440153488480010259": {},
+      "357603651419897869": {},
+      "509551895392813066": {},
+      "1534234349723979876": {
+        "3": true,
+        "5": true
+      },
+      "1344462797878198347": {
+        "3": true,
+        "5": true,
+        "10": true
+      },
+      "389127709248454656": {
+        "3": true
+      },
+      "688869373124804654": {},
+      "1465601754229112832": {
+        "3": true,
+        "5": true
+      },
+      "714929976104976391": {},
+      "312267166630281218": {},
+      "350835058959056907": {},
+      "711339895460986950": {},
+      "267172397533233154": {
+        "3": true
+      },
+      "332695948352421889": {},
+      "699115121171234876": {},
+      "533122006770778133": {
+        "3": true
+      },
+      "452536884665516042": {},
+      "414079141323735040": {},
+      "294603098599456769": {},
+      "1380566076152221726": {},
+      "236357825683521536": {},
+      "208931305792995328": {},
+      "692408001713143841": {},
+      "1550732875434037328": {},
+      "1029295398336077894": {
+        "3": true
+      },
+      "443081195325095938": {},
+      "507973331442597899": {
+        "3": true
+      }
     }
   },
-  "lclEncerradoEm": "2026-10-30"
+  "voiceTime": {
+    "users": {
+      "254417470641668107": {
+        "totalMs": 249647933,
+        "week": {
+          "key": "2026-W47",
+          "ms": 13566902
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 65215750
+        }
+      },
+      "1539359564976095232": {
+        "totalMs": 354659807,
+        "week": {
+          "key": "2026-W47",
+          "ms": 177518220
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 274687217
+        }
+      },
+      "1243896407392518196": {
+        "totalMs": 135825478,
+        "week": {
+          "key": "2026-W47",
+          "ms": 8627870
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 44202842
+        }
+      },
+      "905328826496729088": {
+        "totalMs": 7643359,
+        "week": {
+          "key": "2026-W43",
+          "ms": 813389
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 7643359
+        }
+      },
+      "669348089546407939": {
+        "totalMs": 6986529,
+        "week": {
+          "key": "2026-W43",
+          "ms": 3204456
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 6986529
+        }
+      },
+      "1211059609465262223": {
+        "totalMs": 127672288,
+        "week": {
+          "key": "2026-W47",
+          "ms": 9837366
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 62719303
+        }
+      },
+      "347517396954644480": {
+        "totalMs": 248304739,
+        "week": {
+          "key": "2026-W47",
+          "ms": 10688333
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 36718903
+        }
+      },
+      "846768902347685899": {
+        "totalMs": 586109030,
+        "week": {
+          "key": "2026-W47",
+          "ms": 507328661
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 532623660
+        }
+      },
+      "351176747955519498": {
+        "totalMs": 450934077,
+        "week": {
+          "key": "2026-W47",
+          "ms": 161976
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 6927899
+        }
+      },
+      "751067226399965184": {
+        "totalMs": 96023181,
+        "week": {
+          "key": "2026-W47",
+          "ms": 12352778
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 49044261
+        }
+      },
+      "860875184831332352": {
+        "totalMs": 485553646,
+        "week": {
+          "key": "2026-W47",
+          "ms": 22517309
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 269427347
+        }
+      },
+      "691743838326226975": {
+        "totalMs": 3407968,
+        "week": {
+          "key": "2026-W43",
+          "ms": 1073742
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 3407968
+        }
+      },
+      "1520987441299718214": {
+        "totalMs": 464502244,
+        "week": {
+          "key": "2026-W46",
+          "ms": 10028605
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 223680915
+        }
+      },
+      "1154582352052371566": {
+        "totalMs": 578063676,
+        "week": {
+          "key": "2026-W47",
+          "ms": 8250325
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 551193991
+        }
+      },
+      "714929976104976391": {
+        "totalMs": 22910421,
+        "week": {
+          "key": "2026-W44",
+          "ms": 5892986
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 22910421
+        }
+      },
+      "1537126110079356948": {
+        "totalMs": 883485531,
+        "week": {
+          "key": "2026-W47",
+          "ms": 23607504
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 463467703
+        }
+      },
+      "297751389227188226": {
+        "totalMs": 44628635,
+        "week": {
+          "key": "2026-W47",
+          "ms": 6668704
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 11309519
+        }
+      },
+      "1091489624452505621": {
+        "totalMs": 81064468,
+        "week": {
+          "key": "2026-W47",
+          "ms": 14102679
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 24712378
+        }
+      },
+      "482278881743863848": {
+        "totalMs": 4594570,
+        "week": {
+          "key": "2026-W42",
+          "ms": 4594570
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 4594570
+        }
+      },
+      "806705722720911401": {
+        "totalMs": 4464659,
+        "week": {
+          "key": "2026-W42",
+          "ms": 4464659
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 4464659
+        }
+      },
+      "213076279006724097": {
+        "totalMs": 15195797,
+        "week": {
+          "key": "2026-W43",
+          "ms": 4487323
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 15195797
+        }
+      },
+      "699115121171234876": {
+        "totalMs": 9061269,
+        "week": {
+          "key": "2026-W45",
+          "ms": 4123564
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 4123564
+        }
+      },
+      "294603098599456769": {
+        "totalMs": 62326683,
+        "week": {
+          "key": "2026-W46",
+          "ms": 30122255
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 30122255
+        }
+      },
+      "1553863600156971030": {
+        "totalMs": 56347910,
+        "week": {
+          "key": "2026-W47",
+          "ms": 912402
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 13799532
+        }
+      },
+      "348677413753847820": {
+        "totalMs": 79195788,
+        "week": {
+          "key": "2026-W47",
+          "ms": 1128140
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 10427257
+        }
+      },
+      "389127709248454656": {
+        "totalMs": 592464651,
+        "week": {
+          "key": "2026-W47",
+          "ms": 33274984
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 225074759
+        }
+      },
+      "418901804244402178": {
+        "totalMs": 12981066,
+        "week": {
+          "key": "2026-W45",
+          "ms": 3676946
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 3676946
+        }
+      },
+      "208931305792995328": {
+        "totalMs": 571786322,
+        "week": {
+          "key": "2026-W47",
+          "ms": 18039660
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 366397771
+        }
+      },
+      "890587805896548352": {
+        "totalMs": 20475288,
+        "week": {
+          "key": "2026-W42",
+          "ms": 20475288
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 20475288
+        }
+      },
+      "359017864943894529": {
+        "totalMs": 11906283,
+        "week": {
+          "key": "2026-W45",
+          "ms": 7290398
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 7290398
+        }
+      },
+      "302136346506690562": {
+        "totalMs": 13944356,
+        "week": {
+          "key": "2026-W44",
+          "ms": 2647863
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 13944356
+        }
+      },
+      "1157884288696602634": {
+        "totalMs": 154169,
+        "week": {
+          "key": "2026-W46",
+          "ms": 150687
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 150687
+        }
+      },
+      "692408001713143841": {
+        "totalMs": 40364274,
+        "week": {
+          "key": "2026-W46",
+          "ms": 15691775
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 21175479
+        }
+      },
+      "391982251916656650": {
+        "totalMs": 16520965,
+        "week": {
+          "key": "2026-W43",
+          "ms": 10307520
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 16520965
+        }
+      },
+      "829043493556715570": {
+        "totalMs": 6986793,
+        "week": {
+          "key": "2026-W43",
+          "ms": 444717
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 6986793
+        }
+      },
+      "379624094204690432": {
+        "totalMs": 211768287,
+        "week": {
+          "key": "2026-W46",
+          "ms": 19185285
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 38532357
+        }
+      },
+      "1520207716046344334": {
+        "totalMs": 5120412,
+        "week": {
+          "key": "2026-W47",
+          "ms": 10623
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 10623
+        }
+      },
+      "399689478110838784": {
+        "totalMs": 2435405,
+        "week": {
+          "key": "2026-W42",
+          "ms": 2435405
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 2435405
+        }
+      },
+      "509551895392813066": {
+        "totalMs": 99736547,
+        "week": {
+          "key": "2026-W44",
+          "ms": 10528877
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 99736547
+        }
+      },
+      "730457772080103445": {
+        "totalMs": 1559047,
+        "week": {
+          "key": "2026-W42",
+          "ms": 1559047
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 1559047
+        }
+      },
+      "375025072911417365": {
+        "totalMs": 7251278,
+        "week": {
+          "key": "2026-W42",
+          "ms": 7251278
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 7251278
+        }
+      },
+      "277518017909227520": {
+        "totalMs": 5944104,
+        "week": {
+          "key": "2026-W44",
+          "ms": 460665
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 5944104
+        }
+      },
+      "1511151420731162850": {
+        "totalMs": 482200,
+        "week": {
+          "key": "2026-W42",
+          "ms": 482200
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 482200
+        }
+      },
+      "1559275489967739031": {
+        "totalMs": 9330251,
+        "week": {
+          "key": "2026-W45",
+          "ms": 3479645
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 3479645
+        }
+      },
+      "402828036229300224": {
+        "totalMs": 3548879,
+        "week": {
+          "key": "2026-W42",
+          "ms": 3548879
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 3548879
+        }
+      },
+      "533122006770778133": {
+        "totalMs": 171877191,
+        "week": {
+          "key": "2026-W46",
+          "ms": 47401564
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 90368832
+        }
+      },
+      "677700045100941315": {
+        "totalMs": 13860,
+        "week": {
+          "key": "2026-W42",
+          "ms": 13860
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 13860
+        }
+      },
+      "1146255967860838562": {
+        "totalMs": 6149549,
+        "week": {
+          "key": "2026-W43",
+          "ms": 6109444
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 6149549
+        }
+      },
+      "681306222926102563": {
+        "totalMs": 9215,
+        "week": {
+          "key": "2026-W42",
+          "ms": 9215
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 9215
+        }
+      },
+      "558988884487176207": {
+        "totalMs": 10917956,
+        "week": {
+          "key": "2026-W42",
+          "ms": 10917956
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 10917956
+        }
+      },
+      "215526487841964033": {
+        "totalMs": 113889937,
+        "week": {
+          "key": "2026-W47",
+          "ms": 5447838
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 33809425
+        }
+      },
+      "669394101128396810": {
+        "totalMs": 213329,
+        "week": {
+          "key": "2026-W43",
+          "ms": 213329
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 213329
+        }
+      },
+      "1167605199813218354": {
+        "totalMs": 7683224,
+        "week": {
+          "key": "2026-W44",
+          "ms": 6980997
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 7683224
+        }
+      },
+      "267172397533233154": {
+        "totalMs": 34508773,
+        "week": {
+          "key": "2026-W45",
+          "ms": 121687
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 121687
+        }
+      },
+      "819286030728429649": {
+        "totalMs": 5912280,
+        "week": {
+          "key": "2026-W43",
+          "ms": 5912280
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 5912280
+        }
+      },
+      "1469459451898495161": {
+        "totalMs": 132463768,
+        "week": {
+          "key": "2026-W47",
+          "ms": 90621848
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 107127795
+        }
+      },
+      "454097795582787596": {
+        "totalMs": 6996965,
+        "week": {
+          "key": "2026-W44",
+          "ms": 4313883
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 6996965
+        }
+      },
+      "1338194622912135279": {
+        "totalMs": 10037084,
+        "week": {
+          "key": "2026-W46",
+          "ms": 48762
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 4892635
+        }
+      },
+      "903684301491691601": {
+        "totalMs": 159854,
+        "week": {
+          "key": "2026-W43",
+          "ms": 159854
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 159854
+        }
+      },
+      "244182116026417152": {
+        "totalMs": 57060,
+        "week": {
+          "key": "2026-W43",
+          "ms": 57060
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 57060
+        }
+      },
+      "1427692523337547857": {
+        "totalMs": 9390264,
+        "week": {
+          "key": "2026-W43",
+          "ms": 9390264
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 9390264
+        }
+      },
+      "357603651419897869": {
+        "totalMs": 6598070,
+        "week": {
+          "key": "2026-W43",
+          "ms": 6598070
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 6598070
+        }
+      },
+      "440153488480010259": {
+        "totalMs": 3315417,
+        "week": {
+          "key": "2026-W43",
+          "ms": 3315417
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 3315417
+        }
+      },
+      "326352551345651713": {
+        "totalMs": 1930476,
+        "week": {
+          "key": "2026-W43",
+          "ms": 1930476
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 1930476
+        }
+      },
+      "426821754569228310": {
+        "totalMs": 4128662,
+        "week": {
+          "key": "2026-W43",
+          "ms": 4128662
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 4128662
+        }
+      },
+      "1437921963870916619": {
+        "totalMs": 17623355,
+        "week": {
+          "key": "2026-W47",
+          "ms": 4032552
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 9915870
+        }
+      },
+      "1082876291734327330": {
+        "totalMs": 4444047,
+        "week": {
+          "key": "2026-W43",
+          "ms": 4444047
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 4444047
+        }
+      },
+      "332695948352421889": {
+        "totalMs": 11557970,
+        "week": {
+          "key": "2026-W47",
+          "ms": 1555537
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 7311829
+        }
+      },
+      "1416490487917056115": {
+        "totalMs": 24602800,
+        "week": {
+          "key": "2026-W43",
+          "ms": 24602800
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 24602800
+        }
+      },
+      "265533288830074882": {
+        "totalMs": 1966848,
+        "week": {
+          "key": "2026-W46",
+          "ms": 119350
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 165195
+        }
+      },
+      "253477887552782336": {
+        "totalMs": 306219,
+        "week": {
+          "key": "2026-W43",
+          "ms": 306219
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 306219
+        }
+      },
+      "337816150979248129": {
+        "totalMs": 8277629,
+        "week": {
+          "key": "2026-W43",
+          "ms": 8277629
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 8277629
+        }
+      },
+      "1534234349723979876": {
+        "totalMs": 139589311,
+        "week": {
+          "key": "2026-W47",
+          "ms": 34107782
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 105996418
+        }
+      },
+      "1175192777458466839": {
+        "totalMs": 112042282,
+        "week": {
+          "key": "2026-W47",
+          "ms": 8466087
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 62513836
+        }
+      },
+      "195247435503763457": {
+        "totalMs": 1234266,
+        "week": {
+          "key": "2026-W44",
+          "ms": 1231456
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 1234266
+        }
+      },
+      "1344462797878198347": {
+        "totalMs": 92770395,
+        "week": {
+          "key": "2026-W46",
+          "ms": 11001
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 85841
+        }
+      },
+      "450454494728159235": {
+        "totalMs": 214412,
+        "week": {
+          "key": "2026-W43",
+          "ms": 214412
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 214412
+        }
+      },
+      "688869373124804654": {
+        "totalMs": 22216438,
+        "week": {
+          "key": "2026-W45",
+          "ms": 10945257
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 10945257
+        }
+      },
+      "136135615094849537": {
+        "totalMs": 11045369,
+        "week": {
+          "key": "2026-W43",
+          "ms": 11045369
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 11045369
+        }
+      },
+      "205069806364393474": {
+        "totalMs": 11878283,
+        "week": {
+          "key": "2026-W43",
+          "ms": 11878283
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 11878283
+        }
+      },
+      "534218914255732761": {
+        "totalMs": 1905476238,
+        "week": {
+          "key": "2026-W46",
+          "ms": 1902453760
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 1902453760
+        }
+      },
+      "303373932197707777": {
+        "totalMs": 1583108,
+        "week": {
+          "key": "2026-W43",
+          "ms": 1583108
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 1583108
+        }
+      },
+      "487346342700646411": {
+        "totalMs": 1815434,
+        "week": {
+          "key": "2026-W43",
+          "ms": 1815434
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 1815434
+        }
+      },
+      "1271275158912630956": {
+        "totalMs": 2888135,
+        "week": {
+          "key": "2026-W43",
+          "ms": 2888135
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 2888135
+        }
+      },
+      "149571259296907266": {
+        "totalMs": 9511724,
+        "week": {
+          "key": "2026-W43",
+          "ms": 9511724
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 9511724
+        }
+      },
+      "1129891516068941835": {
+        "totalMs": 342104,
+        "week": {
+          "key": "2026-W43",
+          "ms": 342104
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 342104
+        }
+      },
+      "254823900775579649": {
+        "totalMs": 3101480,
+        "week": {
+          "key": "2026-W43",
+          "ms": 3101480
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 3101480
+        }
+      },
+      "188643902792663040": {
+        "totalMs": 40696676,
+        "week": {
+          "key": "2026-W46",
+          "ms": 6165939
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 6165939
+        }
+      },
+      "1465601754229112832": {
+        "totalMs": 31759255,
+        "week": {
+          "key": "2026-W44",
+          "ms": 18208922
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 31759255
+        }
+      },
+      "1355319825399812201": {
+        "totalMs": 1177857,
+        "week": {
+          "key": "2026-W43",
+          "ms": 1177857
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 1177857
+        }
+      },
+      "1501729224929710200": {
+        "totalMs": 120574,
+        "week": {
+          "key": "2026-W43",
+          "ms": 120574
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 120574
+        }
+      },
+      "414911532850479105": {
+        "totalMs": 8871123,
+        "week": {
+          "key": "2026-W43",
+          "ms": 8871123
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 8871123
+        }
+      },
+      "1139626389054693458": {
+        "totalMs": 8830510,
+        "week": {
+          "key": "2026-W43",
+          "ms": 8830510
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 8830510
+        }
+      },
+      "471823746370502657": {
+        "totalMs": 5212724,
+        "week": {
+          "key": "2026-W43",
+          "ms": 5212724
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 5212724
+        }
+      },
+      "606649807997501460": {
+        "totalMs": 1044358,
+        "week": {
+          "key": "2026-W43",
+          "ms": 1044358
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 1044358
+        }
+      },
+      "1063127513519374427": {
+        "totalMs": 8048709,
+        "week": {
+          "key": "2026-W46",
+          "ms": 331776
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 331776
+        }
+      },
+      "1336432577157795871": {
+        "totalMs": 6935,
+        "week": {
+          "key": "2026-W43",
+          "ms": 6935
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 6935
+        }
+      },
+      "1355482968230989875": {
+        "totalMs": 400166,
+        "week": {
+          "key": "2026-W43",
+          "ms": 400166
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 400166
+        }
+      },
+      "123237737930293250": {
+        "totalMs": 282905,
+        "week": {
+          "key": "2026-W43",
+          "ms": 282905
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 282905
+        }
+      },
+      "350835058959056907": {
+        "totalMs": 993252,
+        "week": {
+          "key": "2026-W43",
+          "ms": 993252
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 993252
+        }
+      },
+      "688848063317409971": {
+        "totalMs": 712588,
+        "week": {
+          "key": "2026-W43",
+          "ms": 712588
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 712588
+        }
+      },
+      "312267166630281218": {
+        "totalMs": 1021975,
+        "week": {
+          "key": "2026-W43",
+          "ms": 1021975
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 1021975
+        }
+      },
+      "1537400393213022278": {
+        "totalMs": 729215,
+        "week": {
+          "key": "2026-W43",
+          "ms": 729215
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 729215
+        }
+      },
+      "726111620907925624": {
+        "totalMs": 1846346,
+        "week": {
+          "key": "2026-W43",
+          "ms": 1846346
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 1846346
+        }
+      },
+      "274234617383616512": {
+        "totalMs": 28184349,
+        "week": {
+          "key": "2026-W46",
+          "ms": 104858
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 3418370
+        }
+      },
+      "358262405765136395": {
+        "totalMs": 47120,
+        "week": {
+          "key": "2026-W43",
+          "ms": 47120
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 47120
+        }
+      },
+      "156508023798497281": {
+        "totalMs": 54373,
+        "week": {
+          "key": "2026-W43",
+          "ms": 54373
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 54373
+        }
+      },
+      "1242312011308601394": {
+        "totalMs": 22885715,
+        "week": {
+          "key": "2026-W45",
+          "ms": 3434359
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 3434359
+        }
+      },
+      "788605638854705162": {
+        "totalMs": 9580660,
+        "week": {
+          "key": "2026-W45",
+          "ms": 2117575
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 2117575
+        }
+      },
+      "1045805406712234075": {
+        "totalMs": 720086,
+        "week": {
+          "key": "2026-W44",
+          "ms": 720086
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 720086
+        }
+      },
+      "309409816013570049": {
+        "totalMs": 24033544,
+        "week": {
+          "key": "2026-W44",
+          "ms": 24033544
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 24033544
+        }
+      },
+      "832623015246168064": {
+        "totalMs": 13844432,
+        "week": {
+          "key": "2026-W47",
+          "ms": 7032204
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 13321959
+        }
+      },
+      "252603157014642689": {
+        "totalMs": 202973346,
+        "week": {
+          "key": "2026-W47",
+          "ms": 28769262
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 143526471
+        }
+      },
+      "1562294378351825017": {
+        "totalMs": 154754958,
+        "week": {
+          "key": "2026-W47",
+          "ms": 9514727
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 91776918
+        }
+      },
+      "557393029875367967": {
+        "totalMs": 10736805,
+        "week": {
+          "key": "2026-W44",
+          "ms": 10736805
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 10736805
+        }
+      },
+      "932253012334878811": {
+        "totalMs": 2701964,
+        "week": {
+          "key": "2026-W44",
+          "ms": 2701964
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 2701964
+        }
+      },
+      "212593515127898112": {
+        "totalMs": 188744,
+        "week": {
+          "key": "2026-W44",
+          "ms": 188744
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 188744
+        }
+      },
+      "724399028942536705": {
+        "totalMs": 13578008,
+        "week": {
+          "key": "2026-W44",
+          "ms": 13578008
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 13578008
+        }
+      },
+      "516434917622546434": {
+        "totalMs": 103948054,
+        "week": {
+          "key": "2026-W47",
+          "ms": 84142601
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 100349930
+        }
+      },
+      "102415310212059136": {
+        "totalMs": 5228665,
+        "week": {
+          "key": "2026-W44",
+          "ms": 5228665
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 5228665
+        }
+      },
+      "1537614117118943353": {
+        "totalMs": 1723605,
+        "week": {
+          "key": "2026-W46",
+          "ms": 1534831
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 1534831
+        }
+      },
+      "304360730147160064": {
+        "totalMs": 3606994,
+        "week": {
+          "key": "2026-W44",
+          "ms": 3606994
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 3606994
+        }
+      },
+      "320760302641610773": {
+        "totalMs": 3668706,
+        "week": {
+          "key": "2026-W44",
+          "ms": 3668706
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 3668706
+        }
+      },
+      "814518895347499079": {
+        "totalMs": 5248176,
+        "week": {
+          "key": "2026-W47",
+          "ms": 29963
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 29963
+        }
+      },
+      "443813023816220702": {
+        "totalMs": 1862655,
+        "week": {
+          "key": "2026-W44",
+          "ms": 1862655
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 1862655
+        }
+      },
+      "516647847857225760": {
+        "totalMs": 2353566,
+        "week": {
+          "key": "2026-W44",
+          "ms": 2353566
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 2353566
+        }
+      },
+      "747915228053897278": {
+        "totalMs": 27591445,
+        "week": {
+          "key": "2026-W46",
+          "ms": 12823260
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 18335296
+        }
+      },
+      "141226926797881344": {
+        "totalMs": 2604808,
+        "week": {
+          "key": "2026-W46",
+          "ms": 18841
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 18841
+        }
+      },
+      "207927752924332032": {
+        "totalMs": 2615373,
+        "week": {
+          "key": "2026-W44",
+          "ms": 2615373
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 2615373
+        }
+      },
+      "413089560977997824": {
+        "totalMs": 9356481,
+        "week": {
+          "key": "2026-W47",
+          "ms": 55367
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 9336167
+        }
+      },
+      "256832879126904832": {
+        "totalMs": 857790,
+        "week": {
+          "key": "2026-W44",
+          "ms": 857790
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 857790
+        }
+      },
+      "213135165365420033": {
+        "totalMs": 13016840,
+        "week": {
+          "key": "2026-W46",
+          "ms": 4598331
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 4598331
+        }
+      },
+      "1000592123340521537": {
+        "totalMs": 1450595,
+        "week": {
+          "key": "2026-W44",
+          "ms": 1450595
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 1450595
+        }
+      },
+      "622812238322860033": {
+        "totalMs": 30115085,
+        "week": {
+          "key": "2026-W47",
+          "ms": 20158
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 24764355
+        }
+      },
+      "414079141323735040": {
+        "totalMs": 220239160,
+        "week": {
+          "key": "2026-W47",
+          "ms": 11142673
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 206191179
+        }
+      },
+      "1324835968024576144": {
+        "totalMs": 34719118,
+        "week": {
+          "key": "2026-W46",
+          "ms": 14824456
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 25507901
+        }
+      },
+      "1299823987387273268": {
+        "totalMs": 4952092,
+        "week": {
+          "key": "2026-W44",
+          "ms": 4952092
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 4952092
+        }
+      },
+      "216916147839172608": {
+        "totalMs": 1114116,
+        "week": {
+          "key": "2026-W44",
+          "ms": 1114116
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 1114116
+        }
+      },
+      "181116290361065472": {
+        "totalMs": 1106504,
+        "week": {
+          "key": "2026-W44",
+          "ms": 1106504
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 1106504
+        }
+      },
+      "1341913604387241994": {
+        "totalMs": 1090324,
+        "week": {
+          "key": "2026-W44",
+          "ms": 1090324
+        },
+        "month": {
+          "key": "2026-10",
+          "ms": 1090324
+        }
+      },
+      "1115278436714422373": {
+        "totalMs": 18812968,
+        "week": {
+          "key": "2026-W47",
+          "ms": 498784
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 18812968
+        }
+      },
+      "236357825683521536": {
+        "totalMs": 285479693,
+        "week": {
+          "key": "2026-W47",
+          "ms": 119794604
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 285479693
+        }
+      },
+      "322052324472258560": {
+        "totalMs": 255418,
+        "week": {
+          "key": "2026-W45",
+          "ms": 255418
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 255418
+        }
+      },
+      "1462604501973209242": {
+        "totalMs": 17739796,
+        "week": {
+          "key": "2026-W47",
+          "ms": 5977458
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 17739796
+        }
+      },
+      "425851128861687828": {
+        "totalMs": 4376778,
+        "week": {
+          "key": "2026-W47",
+          "ms": 4348850
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 4376778
+        }
+      },
+      "308013597295116289": {
+        "totalMs": 145200,
+        "week": {
+          "key": "2026-W45",
+          "ms": 145200
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 145200
+        }
+      },
+      "349064174568996866": {
+        "totalMs": 2744469,
+        "week": {
+          "key": "2026-W45",
+          "ms": 2744469
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 2744469
+        }
+      },
+      "347879601420369931": {
+        "totalMs": 96420,
+        "week": {
+          "key": "2026-W46",
+          "ms": 5570
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 96420
+        }
+      },
+      "611292443362721792": {
+        "totalMs": 6742666,
+        "week": {
+          "key": "2026-W45",
+          "ms": 6742666
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 6742666
+        }
+      },
+      "1216509395589009449": {
+        "totalMs": 4303043,
+        "week": {
+          "key": "2026-W45",
+          "ms": 4303043
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 4303043
+        }
+      },
+      "452536884665516042": {
+        "totalMs": 8205600,
+        "week": {
+          "key": "2026-W45",
+          "ms": 8205600
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 8205600
+        }
+      },
+      "490574695532462081": {
+        "totalMs": 3424263,
+        "week": {
+          "key": "2026-W45",
+          "ms": 3424263
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 3424263
+        }
+      },
+      "361988305006624768": {
+        "totalMs": 2664667,
+        "week": {
+          "key": "2026-W45",
+          "ms": 2664667
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 2664667
+        }
+      },
+      "335292093733797893": {
+        "totalMs": 2649041,
+        "week": {
+          "key": "2026-W45",
+          "ms": 2649041
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 2649041
+        }
+      },
+      "1156962206588608584": {
+        "totalMs": 151692,
+        "week": {
+          "key": "2026-W45",
+          "ms": 151692
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 151692
+        }
+      },
+      "569254034062442535": {
+        "totalMs": 1183738,
+        "week": {
+          "key": "2026-W45",
+          "ms": 1183738
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 1183738
+        }
+      },
+      "404326666593107978": {
+        "totalMs": 4498841,
+        "week": {
+          "key": "2026-W45",
+          "ms": 4498841
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 4498841
+        }
+      },
+      "405901010931023872": {
+        "totalMs": 3175752,
+        "week": {
+          "key": "2026-W46",
+          "ms": 133930
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 3175752
+        }
+      },
+      "351141740381470730": {
+        "totalMs": 2236326,
+        "week": {
+          "key": "2026-W45",
+          "ms": 2236326
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 2236326
+        }
+      },
+      "1515666306915893252": {
+        "totalMs": 2837560,
+        "week": {
+          "key": "2026-W46",
+          "ms": 250445
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 2837560
+        }
+      },
+      "287615304803287040": {
+        "totalMs": 20903,
+        "week": {
+          "key": "2026-W45",
+          "ms": 20903
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 20903
+        }
+      },
+      "448299835733311491": {
+        "totalMs": 67143414,
+        "week": {
+          "key": "2026-W46",
+          "ms": 53405218
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 67143414
+        }
+      },
+      "1333903817388851303": {
+        "totalMs": 19097319,
+        "week": {
+          "key": "2026-W47",
+          "ms": 18967542
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 19097319
+        }
+      },
+      "1300267624978055200": {
+        "totalMs": 11794490,
+        "week": {
+          "key": "2026-W46",
+          "ms": 11794490
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 11794490
+        }
+      },
+      "917049203346272256": {
+        "totalMs": 4805,
+        "week": {
+          "key": "2026-W46",
+          "ms": 4805
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 4805
+        }
+      },
+      "1310194000799731732": {
+        "totalMs": 2688501,
+        "week": {
+          "key": "2026-W46",
+          "ms": 2688501
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 2688501
+        }
+      },
+      "371311941190156310": {
+        "totalMs": 5859295,
+        "week": {
+          "key": "2026-W46",
+          "ms": 5859295
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 5859295
+        }
+      },
+      "507973331442597899": {
+        "totalMs": 231342084,
+        "week": {
+          "key": "2026-W47",
+          "ms": 186933439
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 231342084
+        }
+      },
+      "626217418091397124": {
+        "totalMs": 1178427,
+        "week": {
+          "key": "2026-W46",
+          "ms": 1178427
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 1178427
+        }
+      },
+      "326150362627309568": {
+        "totalMs": 1177828,
+        "week": {
+          "key": "2026-W46",
+          "ms": 1177828
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 1177828
+        }
+      },
+      "515678128085925889": {
+        "totalMs": 11427996,
+        "week": {
+          "key": "2026-W47",
+          "ms": 138552
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 11427996
+        }
+      },
+      "284799381935226890": {
+        "totalMs": 257974,
+        "week": {
+          "key": "2026-W46",
+          "ms": 257974
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 257974
+        }
+      },
+      "219089253118771200": {
+        "totalMs": 3690766,
+        "week": {
+          "key": "2026-W46",
+          "ms": 3690766
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 3690766
+        }
+      },
+      "1036722272263741553": {
+        "totalMs": 26745007,
+        "week": {
+          "key": "2026-W46",
+          "ms": 26745007
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 26745007
+        }
+      },
+      "674737490103369748": {
+        "totalMs": 6609536,
+        "week": {
+          "key": "2026-W46",
+          "ms": 6609536
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 6609536
+        }
+      },
+      "1029295398336077894": {
+        "totalMs": 66670385,
+        "week": {
+          "key": "2026-W47",
+          "ms": 30686298
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 66670385
+        }
+      },
+      "874240016908451860": {
+        "totalMs": 22593226,
+        "week": {
+          "key": "2026-W47",
+          "ms": 638895
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 22593226
+        }
+      },
+      "881511553013260288": {
+        "totalMs": 41462971,
+        "week": {
+          "key": "2026-W47",
+          "ms": 5115269
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 41462971
+        }
+      },
+      "330708444938240011": {
+        "totalMs": 6157122,
+        "week": {
+          "key": "2026-W46",
+          "ms": 6157122
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 6157122
+        }
+      },
+      "960282758431801436": {
+        "totalMs": 5503317,
+        "week": {
+          "key": "2026-W46",
+          "ms": 5503317
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 5503317
+        }
+      },
+      "649037241964036126": {
+        "totalMs": 82393,
+        "week": {
+          "key": "2026-W46",
+          "ms": 82393
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 82393
+        }
+      },
+      "760756093336551425": {
+        "totalMs": 393989,
+        "week": {
+          "key": "2026-W46",
+          "ms": 393989
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 393989
+        }
+      },
+      "408033694700404736": {
+        "totalMs": 3096157,
+        "week": {
+          "key": "2026-W46",
+          "ms": 3096157
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 3096157
+        }
+      },
+      "696414959059337268": {
+        "totalMs": 75127,
+        "week": {
+          "key": "2026-W46",
+          "ms": 75127
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 75127
+        }
+      },
+      "528765294802632714": {
+        "totalMs": 4070058,
+        "week": {
+          "key": "2026-W46",
+          "ms": 4070058
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 4070058
+        }
+      },
+      "469638457661194249": {
+        "totalMs": 3952006,
+        "week": {
+          "key": "2026-W46",
+          "ms": 3952006
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 3952006
+        }
+      },
+      "1217155209248116807": {
+        "totalMs": 4343087,
+        "week": {
+          "key": "2026-W46",
+          "ms": 4343087
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 4343087
+        }
+      },
+      "1064351485896446053": {
+        "totalMs": 5528401,
+        "week": {
+          "key": "2026-W46",
+          "ms": 5528401
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 5528401
+        }
+      },
+      "1219808603863650334": {
+        "totalMs": 11844245,
+        "week": {
+          "key": "2026-W46",
+          "ms": 11844245
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 11844245
+        }
+      },
+      "470052842078601226": {
+        "totalMs": 2957364,
+        "week": {
+          "key": "2026-W46",
+          "ms": 2957364
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 2957364
+        }
+      },
+      "422055138463711242": {
+        "totalMs": 31646,
+        "week": {
+          "key": "2026-W46",
+          "ms": 31646
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 31646
+        }
+      },
+      "765995073019183105": {
+        "totalMs": 2702626,
+        "week": {
+          "key": "2026-W46",
+          "ms": 2702626
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 2702626
+        }
+      },
+      "378585173924511754": {
+        "totalMs": 3176888,
+        "week": {
+          "key": "2026-W46",
+          "ms": 3176888
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 3176888
+        }
+      },
+      "1380566076152221726": {
+        "totalMs": 1103264,
+        "week": {
+          "key": "2026-W47",
+          "ms": 680731
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 1103264
+        }
+      },
+      "723982480075391106": {
+        "totalMs": 36636,
+        "week": {
+          "key": "2026-W47",
+          "ms": 36636
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 36636
+        }
+      },
+      "711960458739056671": {
+        "totalMs": 1498077,
+        "week": {
+          "key": "2026-W47",
+          "ms": 1498077
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 1498077
+        }
+      },
+      "939406269868040203": {
+        "totalMs": 13423496,
+        "week": {
+          "key": "2026-W47",
+          "ms": 13423496
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 13423496
+        }
+      },
+      "561544185300123656": {
+        "totalMs": 2908235,
+        "week": {
+          "key": "2026-W47",
+          "ms": 2908235
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 2908235
+        }
+      },
+      "849376689662459995": {
+        "totalMs": 4127707,
+        "week": {
+          "key": "2026-W47",
+          "ms": 4127707
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 4127707
+        }
+      },
+      "295283758435926016": {
+        "totalMs": 2205360,
+        "week": {
+          "key": "2026-W47",
+          "ms": 2205360
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 2205360
+        }
+      },
+      "883830849756348456": {
+        "totalMs": 120554,
+        "week": {
+          "key": "2026-W47",
+          "ms": 120554
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 120554
+        }
+      },
+      "401035243118919690": {
+        "totalMs": 2495282,
+        "week": {
+          "key": "2026-W47",
+          "ms": 2495282
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 2495282
+        }
+      },
+      "1357839061116649625": {
+        "totalMs": 47181,
+        "week": {
+          "key": "2026-W47",
+          "ms": 47181
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 47181
+        }
+      },
+      "468556915643908127": {
+        "totalMs": 227377,
+        "week": {
+          "key": "2026-W47",
+          "ms": 227377
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 227377
+        }
+      },
+      "1274094123443294290": {
+        "totalMs": 1907893,
+        "week": {
+          "key": "2026-W47",
+          "ms": 1907893
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 1907893
+        }
+      },
+      "302111829570617345": {
+        "totalMs": 4565414,
+        "week": {
+          "key": "2026-W47",
+          "ms": 4565414
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 4565414
+        }
+      },
+      "443081195325095938": {
+        "totalMs": 22051144,
+        "week": {
+          "key": "2026-W47",
+          "ms": 22051144
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 22051144
+        }
+      },
+      "556256600227053570": {
+        "totalMs": 13258413,
+        "week": {
+          "key": "2026-W47",
+          "ms": 13258413
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 13258413
+        }
+      },
+      "176891840870612993": {
+        "totalMs": 10935482,
+        "week": {
+          "key": "2026-W47",
+          "ms": 10935482
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 10935482
+        }
+      },
+      "1072238570678517831": {
+        "totalMs": 3108148,
+        "week": {
+          "key": "2026-W47",
+          "ms": 3108148
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 3108148
+        }
+      },
+      "783479887410233394": {
+        "totalMs": 161009293,
+        "week": {
+          "key": "2026-W47",
+          "ms": 161009293
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 161009293
+        }
+      },
+      "1210315096081834037": {
+        "totalMs": 3041157,
+        "week": {
+          "key": "2026-W47",
+          "ms": 3041157
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 3041157
+        }
+      },
+      "350804211400704011": {
+        "totalMs": 18330795,
+        "week": {
+          "key": "2026-W47",
+          "ms": 18330795
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 18330795
+        }
+      },
+      "1275602445707509803": {
+        "totalMs": 6126,
+        "week": {
+          "key": "2026-W47",
+          "ms": 6126
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 6126
+        }
+      },
+      "684516265330606343": {
+        "totalMs": 3815444,
+        "week": {
+          "key": "2026-W47",
+          "ms": 3815444
+        },
+        "month": {
+          "key": "2026-11",
+          "ms": 3815444
+        }
+      }
+    },
+    "sessions": {
+      "1273653944169660427:1188217565005226025": {
+        "since": 1792544872029,
+        "channelId": "1490385246775017572"
+      },
+      "1273653944169660427:606649807997501460": {
+        "since": 1792786773187,
+        "channelId": "1563280920784543956"
+      },
+      "1273653944169660427:726111620907925624": {
+        "since": 1792791396215,
+        "channelId": "1489240283051856023"
+      },
+      "1273653944169660427:1139626389054693458": {
+        "since": 1792791400825,
+        "channelId": "1489240283051856023"
+      },
+      "1273653944169660427:1341913604387241994": {
+        "since": 1793410571584,
+        "channelId": "1565898577547370646"
+      },
+      "1273653944169660427:371311941190156310": {
+        "since": 1794325314743,
+        "channelId": "1490385246775017572"
+      },
+      "1273653944169660427:1154582352052371566": {
+        "since": 1794949840315,
+        "channelId": "1490385246775017572"
+      },
+      "1273653944169660427:881511553013260288": {
+        "since": 1794950578621,
+        "channelId": "1572361432186749048"
+      },
+      "1273653944169660427:176891840870612993": {
+        "since": 1794950581448,
+        "channelId": "1572361434183114844"
+      },
+      "1273653944169660427:556256600227053570": {
+        "since": 1794953010334,
+        "channelId": "1572361432186749048"
+      },
+      "1273653944169660427:350804211400704011": {
+        "since": 1795106838255,
+        "channelId": "1490385246775017572"
+      },
+      "1273653944169660427:846768902347685899": {
+        "since": 1795108839234,
+        "channelId": "1490385246775017572"
+      },
+      "1273653944169660427:1534234349723979876": {
+        "since": 1795109478469,
+        "channelId": "1573028037933400198"
+      },
+      "1273653944169660427:1437921963870916619": {
+        "since": 1795109478972,
+        "channelId": "1573028037933400198"
+      },
+      "1273653944169660427:751067226399965184": {
+        "since": 1795109479328,
+        "channelId": "1573028037933400198"
+      },
+      "1273653944169660427:252603157014642689": {
+        "since": 1795109479657,
+        "channelId": "1573028037933400198"
+      },
+      "1273653944169660427:684516265330606343": {
+        "since": 1795109480008,
+        "channelId": "1573028037933400198"
+      },
+      "1273653944169660427:783479887410233394": {
+        "since": 1795109480555,
+        "channelId": "1573028039896342553"
+      },
+      "1273653944169660427:1539359564976095232": {
+        "since": 1795109480965,
+        "channelId": "1573028039896342553"
+      },
+      "1273653944169660427:1029295398336077894": {
+        "since": 1795109481359,
+        "channelId": "1573028039896342553"
+      },
+      "1273653944169660427:254417470641668107": {
+        "since": 1795109481666,
+        "channelId": "1573028039896342553"
+      },
+      "1273653944169660427:507973331442597899": {
+        "since": 1795109493687,
+        "channelId": "1573028037933400198"
+      }
+    },
+    "loungeAccess": {}
+  },
+  "lclAbertoEm": "2026-10-30",
+  "sextaAbertaEm": "2026-11-13",
+  "sextaRank": {
+    "date": "2026-11-06",
+    "gains": {
+      "297751389227188226": 81,
+      "622812238322860033": 81,
+      "405901010931023872": 81,
+      "252603157014642689": 133,
+      "860875184831332352": 81,
+      "414079141323735040": 78,
+      "208931305792995328": 78,
+      "1211059609465262223": 78,
+      "1539359564976095232": 78
+    }
+  },
+  "missoes": {
+    "week": "2026-W47",
+    "users": {
+      "347517396954644480": {
+        "jogos": 3,
+        "vitorias": 1,
+        "bonus": {
+          "jogar3": true
+        }
+      },
+      "208931305792995328": {
+        "jogos": 4,
+        "vitorias": 2,
+        "bonus": {
+          "jogar3": true,
+          "vencer2": true
+        }
+      },
+      "1211059609465262223": {
+        "jogos": 2,
+        "vitorias": 0,
+        "bonus": {}
+      },
+      "1462604501973209242": {
+        "jogos": 2,
+        "vitorias": 0,
+        "bonus": {}
+      },
+      "1562294378351825017": {
+        "jogos": 1,
+        "vitorias": 0,
+        "bonus": {}
+      },
+      "215526487841964033": {
+        "jogos": 2,
+        "vitorias": 1,
+        "bonus": {}
+      },
+      "507973331442597899": {
+        "jogos": 8,
+        "vitorias": 5,
+        "bonus": {
+          "vencer2": true,
+          "jogar3": true
+        }
+      },
+      "1539359564976095232": {
+        "jogos": 6,
+        "vitorias": 2,
+        "bonus": {
+          "jogar3": true,
+          "vencer2": true
+        }
+      },
+      "1029295398336077894": {
+        "jogos": 8,
+        "vitorias": 6,
+        "bonus": {
+          "vencer2": true,
+          "jogar3": true
+        }
+      },
+      "860875184831332352": {
+        "jogos": 4,
+        "vitorias": 2,
+        "bonus": {
+          "vencer2": true,
+          "jogar3": true
+        }
+      },
+      "1534234349723979876": {
+        "jogos": 6,
+        "vitorias": 5,
+        "bonus": {
+          "jogar3": true,
+          "vencer2": true
+        }
+      },
+      "751067226399965184": {
+        "jogos": 3,
+        "vitorias": 2,
+        "bonus": {
+          "jogar3": true,
+          "vencer2": true
+        }
+      },
+      "1469459451898495161": {
+        "jogos": 4,
+        "vitorias": 1,
+        "bonus": {
+          "jogar3": true
+        }
+      },
+      "939406269868040203": {
+        "jogos": 2,
+        "vitorias": 1,
+        "bonus": {}
+      },
+      "849376689662459995": {
+        "jogos": 1,
+        "vitorias": 1,
+        "bonus": {}
+      },
+      "401035243118919690": {
+        "jogos": 1,
+        "vitorias": 0,
+        "bonus": {}
+      },
+      "561544185300123656": {
+        "jogos": 1,
+        "vitorias": 0,
+        "bonus": {}
+      },
+      "883830849756348456": {
+        "jogos": 1,
+        "vitorias": 0,
+        "bonus": {}
+      },
+      "254417470641668107": {
+        "jogos": 1,
+        "vitorias": 1,
+        "bonus": {}
+      },
+      "295283758435926016": {
+        "jogos": 1,
+        "vitorias": 1,
+        "bonus": {}
+      },
+      "297751389227188226": {
+        "jogos": 2,
+        "vitorias": 2,
+        "bonus": {
+          "vencer2": true
+        }
+      },
+      "236357825683521536": {
+        "jogos": 6,
+        "vitorias": 3,
+        "bonus": {
+          "jogar3": true,
+          "vencer2": true
+        }
+      },
+      "176891840870612993": {
+        "jogos": 4,
+        "vitorias": 2,
+        "bonus": {
+          "vencer2": true,
+          "jogar3": true
+        }
+      },
+      "832623015246168064": {
+        "jogos": 2,
+        "vitorias": 2,
+        "bonus": {
+          "vencer2": true
+        }
+      },
+      "516434917622546434": {
+        "jogos": 6,
+        "vitorias": 2,
+        "bonus": {
+          "jogar3": true,
+          "vencer2": true
+        }
+      },
+      "556256600227053570": {
+        "jogos": 4,
+        "vitorias": 3,
+        "bonus": {
+          "jogar3": true,
+          "vencer2": true
+        }
+      },
+      "1072238570678517831": {
+        "jogos": 1,
+        "vitorias": 0,
+        "bonus": {}
+      },
+      "252603157014642689": {
+        "jogos": 5,
+        "vitorias": 0,
+        "bonus": {
+          "jogar3": true
+        }
+      },
+      "1154582352052371566": {
+        "jogos": 1,
+        "vitorias": 0,
+        "bonus": {}
+      },
+      "783479887410233394": {
+        "jogos": 2,
+        "vitorias": 1,
+        "bonus": {}
+      },
+      "1210315096081834037": {
+        "jogos": 1,
+        "vitorias": 1,
+        "bonus": {}
+      },
+      "881511553013260288": {
+        "jogos": 1,
+        "vitorias": 1,
+        "bonus": {}
+      },
+      "846768902347685899": {
+        "jogos": 2,
+        "vitorias": 1,
+        "bonus": {}
+      },
+      "414079141323735040": {
+        "jogos": 2,
+        "vitorias": 0,
+        "bonus": {}
+      },
+      "1175192777458466839": {
+        "jogos": 2,
+        "vitorias": 0,
+        "bonus": {}
+      },
+      "1091489624452505621": {
+        "jogos": 2,
+        "vitorias": 2,
+        "bonus": {
+          "vencer2": true
+        }
+      },
+      "389127709248454656": {
+        "jogos": 2,
+        "vitorias": 2,
+        "bonus": {
+          "vencer2": true
+        }
+      },
+      "1333903817388851303": {
+        "jogos": 1,
+        "vitorias": 1,
+        "bonus": {}
+      },
+      "1437921963870916619": {
+        "jogos": 1,
+        "vitorias": 1,
+        "bonus": {}
+      },
+      "1537126110079356948": {
+        "jogos": 1,
+        "vitorias": 0,
+        "bonus": {}
+      },
+      "684516265330606343": {
+        "jogos": 1,
+        "vitorias": 0,
+        "bonus": {}
+      }
+    }
+  },
+  "duelos": [
+    {
+      "id": "d1792514422580",
+      "a": "1091489624452505621",
+      "b": "1437921963870916619",
+      "pontos": 50,
+      "status": "aceito",
+      "createdAt": "2026-10-20T16:40:22.580Z"
+    },
+    {
+      "id": "d1792514461749",
+      "a": "351176747955519498",
+      "b": "860875184831332352",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-10-20T16:41:01.749Z",
+      "winnerId": "860875184831332352"
+    },
+    {
+      "id": "d1792525762482",
+      "a": "860875184831332352",
+      "b": "389127709248454656",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-10-20T19:49:22.482Z",
+      "winnerId": "860875184831332352",
+      "loserId": "389127709248454656",
+      "completedAt": "2026-10-20T19:58:38.416Z"
+    },
+    {
+      "id": "d1792526393669",
+      "a": "389127709248454656",
+      "b": "860875184831332352",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-10-20T19:59:53.669Z",
+      "winnerId": "860875184831332352",
+      "loserId": "389127709248454656",
+      "completedAt": "2026-10-20T20:03:17.055Z"
+    },
+    {
+      "id": "d1792526526396",
+      "a": "389127709248454656",
+      "b": "860875184831332352",
+      "pontos": 50,
+      "status": "recusado",
+      "createdAt": "2026-10-20T20:02:06.396Z"
+    },
+    {
+      "id": "d1792526656926",
+      "a": "389127709248454656",
+      "b": "860875184831332352",
+      "pontos": 200,
+      "status": "concluido",
+      "createdAt": "2026-10-20T20:04:16.926Z",
+      "winnerId": "389127709248454656",
+      "loserId": "860875184831332352",
+      "completedAt": "2026-10-20T20:11:49.634Z"
+    },
+    {
+      "id": "d1792527257781",
+      "a": "860875184831332352",
+      "b": "208931305792995328",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-10-20T20:14:17.781Z",
+      "winnerId": "208931305792995328",
+      "loserId": "860875184831332352",
+      "completedAt": "2026-10-20T20:17:15.552Z"
+    },
+    {
+      "id": "d1792528148232",
+      "a": "860875184831332352",
+      "b": "294603098599456769",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-10-20T20:29:08.232Z",
+      "winnerId": "860875184831332352",
+      "loserId": "294603098599456769",
+      "completedAt": "2026-10-20T20:31:45.776Z"
+    },
+    {
+      "id": "d1792590567338",
+      "a": "860875184831332352",
+      "b": "1091489624452505621",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-10-21T13:49:27.338Z",
+      "winnerId": "860875184831332352",
+      "loserId": "1091489624452505621",
+      "completedAt": "2026-10-21T13:54:27.162Z"
+    },
+    {
+      "id": "d1792590897040",
+      "a": "1091489624452505621",
+      "b": "860875184831332352",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-10-21T13:54:57.040Z",
+      "winnerId": "860875184831332352",
+      "loserId": "1091489624452505621",
+      "completedAt": "2026-10-21T14:02:47.864Z"
+    },
+    {
+      "id": "d1792591239229",
+      "a": "351176747955519498",
+      "b": "751067226399965184",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-10-21T14:00:39.229Z",
+      "winnerId": "751067226399965184",
+      "loserId": "351176747955519498",
+      "completedAt": "2026-10-21T14:12:54.353Z"
+    },
+    {
+      "id": "d1792591311086",
+      "a": "351176747955519498",
+      "b": "860875184831332352",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-10-21T14:01:51.086Z",
+      "winnerId": "860875184831332352",
+      "loserId": "351176747955519498",
+      "completedAt": "2026-10-23T13:43:16.930Z"
+    },
+    {
+      "id": "d1792591372041",
+      "a": "208931305792995328",
+      "b": "860875184831332352",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-10-21T14:02:52.041Z",
+      "winnerId": "208931305792995328",
+      "loserId": "860875184831332352",
+      "completedAt": "2026-10-21T14:05:06.045Z"
+    },
+    {
+      "id": "d1792591530642",
+      "a": "860875184831332352",
+      "b": "208931305792995328",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-10-21T14:05:30.642Z",
+      "winnerId": "208931305792995328",
+      "loserId": "860875184831332352",
+      "completedAt": "2026-10-21T14:09:18.425Z"
+    },
+    {
+      "id": "d1792591935343",
+      "a": "215526487841964033",
+      "b": "208931305792995328",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-10-21T14:12:15.343Z",
+      "winnerId": "208931305792995328",
+      "loserId": "215526487841964033",
+      "completedAt": "2026-10-21T14:17:30.465Z"
+    },
+    {
+      "id": "d1792592169969",
+      "a": "351176747955519498",
+      "b": "1091489624452505621",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-10-21T14:16:09.969Z",
+      "winnerId": "1091489624452505621",
+      "loserId": "351176747955519498",
+      "completedAt": "2026-10-21T14:23:32.390Z"
+    },
+    {
+      "id": "d1792936830940",
+      "a": "860875184831332352",
+      "b": "1211059609465262223",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-10-25T14:00:30.940Z",
+      "winnerId": "860875184831332352",
+      "loserId": "1211059609465262223",
+      "completedAt": "2026-10-25T14:05:41.887Z"
+    },
+    {
+      "id": "d1792937430160",
+      "a": "860875184831332352",
+      "b": "1211059609465262223",
+      "pontos": 10,
+      "status": "concluido",
+      "createdAt": "2026-10-25T14:10:30.160Z",
+      "winnerId": "1211059609465262223",
+      "loserId": "860875184831332352",
+      "completedAt": "2026-10-25T14:15:42.315Z"
+    },
+    {
+      "id": "d1792937776323",
+      "a": "860875184831332352",
+      "b": "1211059609465262223",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-10-25T14:16:16.323Z",
+      "winnerId": "860875184831332352",
+      "loserId": "1211059609465262223",
+      "completedAt": "2026-10-25T14:26:12.564Z"
+    },
+    {
+      "id": "d1792945907963",
+      "a": "1211059609465262223",
+      "b": "1539359564976095232",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-10-25T16:31:47.963Z",
+      "winnerId": "1539359564976095232"
+    },
+    {
+      "id": "d1792946748478",
+      "a": "1211059609465262223",
+      "b": "1539359564976095232",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-10-25T16:45:48.478Z",
+      "winnerId": "1539359564976095232"
+    },
+    {
+      "id": "d1792947579935",
+      "a": "1211059609465262223",
+      "b": "1539359564976095232",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-10-25T16:59:39.935Z",
+      "winnerId": "1539359564976095232"
+    },
+    {
+      "id": "d1792947747083",
+      "a": "1211059609465262223",
+      "b": "1539359564976095232",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-10-25T17:02:27.083Z",
+      "winnerId": "1539359564976095232"
+    },
+    {
+      "id": "d1793031727978",
+      "a": "860875184831332352",
+      "b": "309409816013570049",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-10-26T16:22:07.978Z",
+      "winnerId": "860875184831332352",
+      "loserId": "309409816013570049",
+      "completedAt": "2026-10-26T16:26:11.164Z"
+    },
+    {
+      "id": "d1793032021184",
+      "a": "860875184831332352",
+      "b": "309409816013570049",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-10-26T16:27:01.184Z",
+      "winnerId": "860875184831332352",
+      "loserId": "309409816013570049",
+      "completedAt": "2026-10-26T16:32:09.935Z"
+    },
+    {
+      "id": "d1793032360713",
+      "a": "860875184831332352",
+      "b": "309409816013570049",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-10-26T16:32:40.713Z",
+      "winnerId": "860875184831332352",
+      "loserId": "309409816013570049",
+      "completedAt": "2026-10-26T16:35:56.518Z"
+    },
+    {
+      "id": "d1793032640843",
+      "a": "1211059609465262223",
+      "b": "309409816013570049",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-10-26T16:37:20.843Z",
+      "winnerId": "1211059609465262223",
+      "loserId": "309409816013570049",
+      "completedAt": "2026-10-26T16:41:56.064Z"
+    },
+    {
+      "id": "d1793032920156",
+      "a": "1211059609465262223",
+      "b": "309409816013570049",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-10-26T16:42:00.156Z",
+      "winnerId": "1211059609465262223",
+      "loserId": "309409816013570049",
+      "completedAt": "2026-10-26T16:46:50.565Z"
+    },
+    {
+      "id": "d1793033037818",
+      "a": "860875184831332352",
+      "b": "348677413753847820",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-10-26T16:43:57.818Z",
+      "winnerId": "860875184831332352",
+      "loserId": "348677413753847820",
+      "completedAt": "2026-10-26T16:49:47.069Z"
+    },
+    {
+      "id": "d1793033395350",
+      "a": "860875184831332352",
+      "b": "348677413753847820",
+      "pontos": 50,
+      "status": "aceito",
+      "createdAt": "2026-10-26T16:49:55.350Z"
+    },
+    {
+      "id": "d1793725839986",
+      "a": "860875184831332352",
+      "b": "1562294378351825017",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-11-03T17:10:39.986Z",
+      "winnerId": "860875184831332352",
+      "loserId": "1562294378351825017",
+      "completedAt": "2026-11-03T17:14:03.994Z"
+    },
+    {
+      "id": "d1793726053677",
+      "a": "860875184831332352",
+      "b": "1562294378351825017",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-11-03T17:14:13.677Z",
+      "winnerId": "860875184831332352",
+      "loserId": "1562294378351825017",
+      "completedAt": "2026-11-03T17:18:53.451Z"
+    },
+    {
+      "id": "d1794575816404",
+      "a": "860875184831332352",
+      "b": "1324835968024576144",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-11-13T13:16:56.404Z",
+      "winnerId": "1324835968024576144",
+      "loserId": "860875184831332352",
+      "completedAt": "2026-11-13T13:20:06.595Z"
+    },
+    {
+      "id": "d1794576014224",
+      "a": "860875184831332352",
+      "b": "1324835968024576144",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-11-13T13:20:14.224Z",
+      "winnerId": "860875184831332352",
+      "loserId": "1324835968024576144",
+      "completedAt": "2026-11-13T13:23:39.597Z"
+    },
+    {
+      "id": "d1794576229620",
+      "a": "860875184831332352",
+      "b": "1324835968024576144",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-11-13T13:23:49.620Z",
+      "winnerId": "1324835968024576144",
+      "loserId": "860875184831332352",
+      "completedAt": "2026-11-13T13:31:46.237Z"
+    },
+    {
+      "id": "d1794577272089",
+      "a": "860875184831332352",
+      "b": "1324835968024576144",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-11-13T13:41:12.089Z",
+      "winnerId": "860875184831332352",
+      "loserId": "1324835968024576144",
+      "completedAt": "2026-11-14T19:09:29.969Z"
+    },
+    {
+      "id": "d1794683423029",
+      "a": "860875184831332352",
+      "b": "1324835968024576144",
+      "pontos": 100,
+      "status": "concluido",
+      "createdAt": "2026-11-14T19:10:23.029Z",
+      "winnerId": "860875184831332352",
+      "loserId": "1324835968024576144",
+      "completedAt": "2026-11-14T19:25:40.543Z"
+    },
+    {
+      "id": "d1794751312636",
+      "a": "860875184831332352",
+      "b": "1324835968024576144",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-11-15T14:01:52.636Z",
+      "winnerId": "860875184831332352",
+      "loserId": "1324835968024576144",
+      "completedAt": "2026-11-15T14:06:57.600Z"
+    },
+    {
+      "id": "d1794751626300",
+      "a": "860875184831332352",
+      "b": "1324835968024576144",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-11-15T14:07:06.300Z",
+      "winnerId": "1324835968024576144",
+      "loserId": "860875184831332352",
+      "completedAt": "2026-11-15T14:09:33.149Z"
+    },
+    {
+      "id": "d1794751781787",
+      "a": "860875184831332352",
+      "b": "1324835968024576144",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-11-15T14:09:41.787Z",
+      "winnerId": "860875184831332352",
+      "loserId": "1324835968024576144",
+      "completedAt": "2026-11-15T14:11:54.137Z"
+    },
+    {
+      "id": "d1794751921714",
+      "a": "860875184831332352",
+      "b": "1324835968024576144",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-11-15T14:12:01.714Z",
+      "winnerId": "860875184831332352",
+      "loserId": "1324835968024576144",
+      "completedAt": "2026-11-15T14:15:01.767Z"
+    },
+    {
+      "id": "d1794752106256",
+      "a": "860875184831332352",
+      "b": "1324835968024576144",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-11-15T14:15:06.256Z",
+      "winnerId": "860875184831332352",
+      "loserId": "1324835968024576144",
+      "completedAt": "2026-11-15T14:18:13.387Z"
+    },
+    {
+      "id": "d1794752299171",
+      "a": "860875184831332352",
+      "b": "1324835968024576144",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-11-15T14:18:19.171Z",
+      "winnerId": "1324835968024576144",
+      "loserId": "860875184831332352",
+      "completedAt": "2026-11-15T14:22:16.098Z"
+    },
+    {
+      "id": "d1794752544999",
+      "a": "860875184831332352",
+      "b": "1324835968024576144",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-11-15T14:22:24.999Z",
+      "winnerId": "1324835968024576144",
+      "loserId": "860875184831332352",
+      "completedAt": "2026-11-15T14:25:44.797Z"
+    },
+    {
+      "id": "d1794752731595",
+      "a": "860875184831332352",
+      "b": "1324835968024576144",
+      "pontos": 50,
+      "status": "concluido",
+      "createdAt": "2026-11-15T14:25:31.595Z",
+      "winnerId": "860875184831332352",
+      "loserId": "1324835968024576144",
+      "completedAt": "2026-11-15T14:29:17.981Z"
+    }
+  ],
+  "sextaEncerradaEm": "2026-11-13",
+  "socialUltimoSlot": "2026-11-19#8",
+  "posterSlots": {
+    "1487953358407860235": "2026-10-22#10",
+    "1544297359918506004": "2026-10-22#10"
+  },
+  "posterUltimoSlot": "2026-10-22#10",
+  "lclEncerradoEm": "2026-10-23",
+  "torneioPreviewSlots": {
+    "1561015228185968740": "2026-10-22#10",
+    "1489237952356941976": "2026-10-22#10"
+  },
+  "torneioPreviewUltimoSlot": "2026-10-22#10",
+  "torneioHabilitado": true,
+  "torneio": null,
+  "torneioAbertoEm": "2026-10-20",
+  "torneioHistorico": [],
+  "communitySchedule": {
+    "weekKey": "2026-11-16",
+    "posts": {
+      "1487953358407860235": {
+        "guildId": "1273653944169660427",
+        "channelId": "1487953358407860235",
+        "messageId": "1571842392481333371"
+      },
+      "1544297359918506004": {
+        "guildId": "1273653944169660427",
+        "channelId": "1544297359918506004",
+        "messageId": "1571842398273937471"
+      }
+    },
+    "dedupeCheckedAt": {
+      "1487953358407860235": 1795089372195,
+      "1544297359918506004": 1795089372195
+    },
+    "uiVersion": 4,
+    "dailySlot": "2026-11-19"
+  },
+  "weeklyRankPostKey": "2026-11-16",
+  "topOneAnnouncements": {
+    "classic": "1534234349723979876",
+    "duelo": "860875184831332352",
+    "infernal": "236357825683521536"
+  },
+  "weeklySummary": {
+    "current": {
+      "weekKey": "2026-W47",
+      "startedAt": "2026-11-16T18:22:00.607Z",
+      "guildId": "1273653944169660427",
+      "matches": 11,
+      "duelos": 0,
+      "mvps": [
+        {
+          "discordId": "215526487841964033",
+          "nickname": "denonBR#br1"
+        },
+        {
+          "discordId": "751067226399965184",
+          "nickname": "BelaFortune#br1"
+        },
+        {
+          "discordId": "939406269868040203",
+          "nickname": "akanis#exe"
+        },
+        {
+          "discordId": "254417470641668107",
+          "nickname": "Wadanowarrior#BR1"
+        },
+        {
+          "discordId": "297751389227188226",
+          "nickname": "Yasoka#Yasuo"
+        },
+        {
+          "discordId": "556256600227053570",
+          "nickname": "DUDA GAMER#aoba"
+        },
+        {
+          "discordId": "783479887410233394",
+          "nickname": "MESTREAPOSENTADO#XDD"
+        },
+        {
+          "discordId": "1469459451898495161",
+          "nickname": "too slow#1v9"
+        },
+        {
+          "discordId": "1091489624452505621",
+          "nickname": "Jotaka#d1ana"
+        },
+        {
+          "discordId": "347517396954644480",
+          "nickname": "Death死#Arkae"
+        },
+        {
+          "discordId": "1539359564976095232",
+          "nickname": "PAYASUO ASSASINO#SHACO"
+        }
+      ],
+      "playerWins": {
+        "215526487841964033": 1,
+        "507973331442597899": 5,
+        "1539359564976095232": 2,
+        "1029295398336077894": 6,
+        "860875184831332352": 2,
+        "208931305792995328": 2,
+        "1534234349723979876": 5,
+        "751067226399965184": 2,
+        "939406269868040203": 1,
+        "849376689662459995": 1,
+        "254417470641668107": 1,
+        "295283758435926016": 1,
+        "297751389227188226": 2,
+        "236357825683521536": 3,
+        "176891840870612993": 2,
+        "832623015246168064": 2,
+        "556256600227053570": 3,
+        "783479887410233394": 1,
+        "516434917622546434": 2,
+        "1210315096081834037": 1,
+        "1469459451898495161": 1,
+        "881511553013260288": 1,
+        "846768902347685899": 1,
+        "1091489624452505621": 2,
+        "389127709248454656": 2,
+        "1333903817388851303": 1,
+        "347517396954644480": 1,
+        "1437921963870916619": 1
+      }
+    }
+  }
 }

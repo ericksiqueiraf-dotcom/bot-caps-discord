@@ -211,7 +211,6 @@ function buildSlashCommands() {
           .addChoices(
             { name: 'DUELO (dos duelos 1v1)', value: 'duelo' },
             { name: 'CLASSIC', value: 'classic' },
-            { name: 'CLASSIC TIER S', value: 'tiers' },
             { name: 'TWISTED TREELINE 3X3', value: 'tt3x3' },
             { name: 'INFERNAL', value: 'infernal' }
           )
@@ -227,7 +226,6 @@ function buildSlashCommands() {
           .addChoices(
             { name: 'DUELO (dos duelos 1v1)', value: 'duelo' },
             { name: 'CLASSIC', value: 'classic' },
-            { name: 'CLASSIC TIER S', value: 'tiers' },
             { name: 'TWISTED TREELINE 3X3', value: 'tt3x3' },
             { name: 'INFERNAL', value: 'infernal' }
           )

@@ -961,13 +961,10 @@ async function handleLeaderboardCommand(message, args = []) {
     return await sendToMessageChannel(message, { embeds: [embed] });
   }
 
-  const tierSOnly = view.view === 'tiers';
   const mode = view.view === 'tt3x3' ? QUEUE_MODES.ARAM : QUEUE_MODES.CLASSIC;
   const format = view.view === 'tt3x3' ? '3x3' : null;
   const embed = buildLeaderboardEmbed(statsData, mode, format, {
-    tierSOnly,
-    tierResolver: buildVipTierResolver(message.guild),
-    excludeTierS: !tierSOnly && mode === QUEUE_MODES.CLASSIC
+    tierResolver: buildVipTierResolver(message.guild)
   });
   await sendToMessageChannel(message, { embeds: [embed] });
 }
@@ -986,13 +983,10 @@ async function handleTopTenCommand(message, args = []) {
     return await sendToMessageChannel(message, { embeds: [embed] });
   }
 
-  const tierSOnly = view.view === 'tiers';
   const mode = view.view === 'tt3x3' ? QUEUE_MODES.ARAM : QUEUE_MODES.CLASSIC;
   const format = view.view === 'tt3x3' ? '3x3' : null;
   const embed = buildTopTenEmbed(statsData, seasonMeta, mode, format, {
-    tierSOnly,
-    tierResolver: buildVipTierResolver(message.guild),
-    excludeTierS: !tierSOnly && mode === QUEUE_MODES.CLASSIC
+    tierResolver: buildVipTierResolver(message.guild)
   });
   await sendToMessageChannel(message, { embeds: [embed] });
 }
@@ -1977,7 +1971,7 @@ function buildAjudaEmbed(page = 1) {
       .setTitle('📚 Guia de Comandos (2/2) — Ranking e extras')
       .setDescription('Ranking, clube VIP, salas temporárias e extras. Página 1 no `!ajuda`.')
       .addFields(
-        { name: '🏆 Ranking e pós-jogo', value: '`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!palpite <1|2> <10-100> [sala]` • Aposta na partida ativa, também como espectador; indique a sala se houver várias (ex.: `!palpite 1 50 A`)\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking CLASSIC (pontos custom)\n`!placar tiers` • Só Esmeralda+\n`!placar duelo` • TOP 10 dos duelos 1v1 (vitórias em duelo)\n`!placar tt` • TWISTED TREELINE 3x3 (antigo 3x3)\n`!top10` • Top 10 (classic, tiers, duelo ou tt)\n`!topstreak` • Ranking Streak 🔥 (classic ou tt)\n`!toprankinfernal` • Quem mais pegou INFERNAL na temporada 🔥\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
+        { name: '🏆 Ranking e pós-jogo', value: '`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!palpite <1|2> <10-100> [sala]` • Aposta na partida ativa, também como espectador; indique a sala se houver várias (ex.: `!palpite 1 50 A`)\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking CLASSIC geral (pontos custom, todos os elos)\n`!placar duelo` • TOP 10 dos duelos 1v1 (vitórias em duelo)\n`!placar tt` • TWISTED TREELINE 3x3 (antigo 3x3)\n`!top10` • Top 10 (classic, duelo ou tt)\n`!topstreak` • Ranking Streak 🔥 (classic ou tt)\n`!toprankinfernal` • Quem mais pegou INFERNAL na temporada 🔥\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL (prioridade na espera + proteção na roleta)' },
         { name: '💎 Clube VIP', value: '`!clube` • Tiers, assinatura PIX e renovação -10%\n`!querolive` • Entrar/sair do ping 🔴 Ao Vivo\n`!live <link>` • Divulgar live Twitch/YouTube/Kick (Lendário 6h, VIP 12h, Apoiador 24h)' },
         { name: '🔊 Salas temporárias (dono da sala)', value: 'Entre no ➕・criar-sala para ganhar sua sala\n`!salahub` • Lista as salas ativas\n`!sala` • Mostra sua sala • `!sala <nome>` renomeia\n`!convidar @u` • Chama alguém p/ sua sala\n`!salalock` • Tranca (`!salalock abrir` destranca)\n`!salalimit <0-99>` • Limite de usuários (0 = sem limite)\n`!salaexpulsar @u` • Remove alguém da sala\n`!limparvoz` • Apaga sua sala (dentro dela)' },
         { name: '🎁 Extras', value: '`!convite` • Seu link pessoal (traga gente e ganhe recompensas)\n`!topconvites` • Ranking de quem mais trouxe gente\n`!torneio` • Torneio CAPS ARENA — fase de pontos + final (entrar, lista, status, classificacao — staff: `!torneioon`/`!torneiooff`/`!torneio start`)\n`!tempo` • Seu tempo em call • `!topvoz` • Ranking de call\n`!palpite <1|2> <10-100> [sala]` • Bolão de partida ativa, também para espectadores (ex.: `!palpite 1 50 A`) • `!missoes` • Missões da semana\n`!duelo @u [10-200]` • Desafio de PDL — quem matar primeiro vence (`!duelo aceitar`/`recusar`; staff declara com `!duelo vitoria @vitorioso @perdedor`) • `!duelo rank` • Top 10 dos duelos\n`!social` • Instagram, Twitch, TikTok e YouTube oficiais da CAPS ARENA\n🌅 Primeira vitória do dia vale +50% PDL (automático)\n`!regras` • Regulamento completo' },
@@ -2812,7 +2806,7 @@ async function buildOnboardingGuideEmbed(guild) {
         name: '📈 Acompanhe sua evolução',
         value:
           '`!perfil` — Seu card com MMR e histórico\n' +
-          '`!placar` — Ranking CLASSIC • `!placar tiers` só Esmeralda+\n' +
+          '`!placar` — Ranking CLASSIC geral (todos os elos)\n' +
           '`!top10 duelo` — Top 10 dos duelos • `!top10 tt` — Twisted Treeline 3x3\n' +
           '`!topstreak` — Maiores sequências de vitória ativas\n' +
           '`!temporadas` — Períodos arquivados'

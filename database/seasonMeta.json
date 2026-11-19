@@ -1,7 +1,7 @@
 {
   "currentSeason": 2,
-  "startedAt": "2026-09-29T20:37:37.576Z",
-  "phase": "testing",
-  "officialSeasonStarted": false,
-  "testingCycle": 5
+  "startedAt": "2026-11-03T18:00:26.321Z",
+  "phase": "official",
+  "officialSeasonStarted": true,
+  "testingCycle": 6
 }
