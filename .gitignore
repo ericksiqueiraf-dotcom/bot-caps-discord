@@ -8,3 +8,6 @@ bot.stderr.log
 # Backups locais (os ZIPs contem .env com tokens - NUNCA subir)
 backups/
 *.log
+# Backups automaticos do banco local (espelho do Mongo)
+database/backup-*.json
+database/*.backup-*.json
