@@ -36,7 +36,11 @@ const KNOWN_EXPORT_GAPS = {
   },
   'services/contentTextService.js': { caps: [], lcl: [] },
   'services/dataService.js': {
-    caps: ['loadVipSubscriptions', 'saveVipSubscriptions'],
+    caps: [
+      'loadVipSubscriptions', 'saveVipSubscriptions',
+      'loadRiotTournamentCallbacks', 'loadRiotTournamentMatches',
+      'saveRiotTournamentCallbacks', 'saveRiotTournamentMatches'
+    ],
     lcl: [
       'DEFAULT_GUILD_SETTINGS', 'getGuildSetting', 'loadAdminUsers', 'loadDashboardMeta',
       'loadGuildSettings', 'loadInterBusca', 'loadInterMatches', 'loadInterRanking', 'loadLclQueue',
@@ -44,14 +48,15 @@ const KNOWN_EXPORT_GAPS = {
       'saveInterRanking', 'saveLclQueue'
     ]
   },
-  'services/riotService.js': { caps: [], lcl: [] },
+  'services/riotService.js': { caps: ['pickCommonMatchId', 'rankCommonMatchIds', 'countPlayerGroupsPresent'], lcl: [] },
   // tempVoiceService NÃO é o mesmo módulo: são duas implementações diferentes
   // (CAPS expõe deleteTempRoom/inviteToTempRoom/...; LCL expõe handleHubCommand/...).
   'services/tempVoiceService.js': {
     caps: [
       'canCreateTempVoice', 'deleteTempRoom', 'getAllTempRooms', 'getTempRoomOwner', 'getUserTempRoom',
       'handleTempVoiceStateUpdate', 'inviteToTempRoom', 'isManagedTempVoiceChannel', 'isTempRoomOwner',
-      'kickFromTempRoom', 'listTempRooms', 'renameTempRoom', 'setTempRoomLimit', 'setTempRoomLock'
+      'kickFromTempRoom', 'listTempRooms', 'renameTempRoom', 'setTempRoomLimit', 'setTempRoomLock',
+      'scheduleExistingEmptyTempRooms'
     ],
     lcl: [
       'TEMP_ROOM_PREFIX', 'TEMP_TOPIC_PREFIX', 'buildTempRoomName', 'findOwnedTempRoom', 'getAllowedRoleIds',
@@ -73,7 +78,12 @@ const KNOWN_EXPORT_GAPS = {
       'getQueueFeedChannelId', 'getRankTierFromRoleName', 'getVipSeal', 'isRankRole',
       'isRecentVipSubscription', 'parseLiveLink', 'parseQueueJoinButtonId', 'postQueueFeedMessage',
       'runClubePromoTick', 'shouldPostClubePromo', 'startClubePromoScheduler',
-      'STAFF2_SECTIONS'
+      'STAFF2_SECTIONS',
+      // Drift antigo CAPS-only (nao relacionado as estatisticas pos-partida)
+      'announceTopOneChanges', 'buildMvpMuralEmbed', 'getAvatarFrameType', 'getTopOneBadges',
+      'recordWeeklyActivity', 'startWeeklySummaryScheduler',
+      // Estatisticas pos-partida (Match-V5 por PUUID)
+      'CAPS_GRADE_CS_BASELINE', 'buildMatchStatsEmbed', 'computeCapsGrade', 'postMatchStatsLog'
     ],
     lcl: [
       'DESAFIO_RULES_SECTIONS', 'LCL_QUEUE_BUTTON_IDS', 'LCL_TEAM_SIZE', 'addLclPresence',

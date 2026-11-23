@@ -218,6 +218,57 @@ function buildInsightsFromMatches(matches, puuid, championCatalog) {
   };
 }
 
+// ─── Busca da partida custom por PUUID ──────────────────────────────────────
+// Depois de uma partida, cruzamos o historico recente de cada jogador para
+// descobrir qual matchId aparece na maioria dos puuids. Isso evita depender de
+// link de lobby ou codigo de torneio.
+
+// Conta em quantas listas cada matchId aparece e devolve os mais votados.
+function rankCommonMatchIds(matchIdLists) {
+  const votes = new Map();
+  for (const list of Array.isArray(matchIdLists) ? matchIdLists : []) {
+    if (!Array.isArray(list)) continue;
+    for (const id of new Set(list)) {
+      if (!id) continue;
+      votes.set(id, (votes.get(id) || 0) + 1);
+    }
+  }
+  return [...votes.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([matchId, count]) => ({ matchId, votes: count }));
+}
+
+// Escolhe o matchId com mais votos. Exige `minVotes` (padrao: maioria, minimo 3).
+function pickCommonMatchId(matchIdLists, minVotes) {
+  const lists = (Array.isArray(matchIdLists) ? matchIdLists : []).filter(Array.isArray);
+  if (lists.length === 0) return null;
+  const ranked = rankCommonMatchIds(lists);
+  if (ranked.length === 0) return null;
+  const required = Math.max(1, Number(minVotes) || Math.max(3, Math.ceil(lists.length / 2)));
+  const best = ranked[0];
+  return best.votes >= required ? { ...best, required } : null;
+}
+
+function createTaggedRiotError(message, code) {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
+
+// Conta quantos jogadores (grupos de puuids) aparecem na partida.
+// Cada grupo representa um jogador com 1 ou 2 contas vinculadas.
+function countPlayerGroupsPresent(participants, playerGroups) {
+  const presentPuuids = new Set(
+    (Array.isArray(participants) ? participants : []).map((participant) => String(participant?.puuid))
+  );
+  let count = 0;
+  for (const group of Array.isArray(playerGroups) ? playerGroups : []) {
+    const puuids = Array.isArray(group?.puuids) ? group.puuids : (Array.isArray(group) ? group : []);
+    if (puuids.some((puuid) => presentPuuids.has(String(puuid)))) count += 1;
+  }
+  return count;
+}
+
 function createRiotService(apiKey, region = DEFAULT_REGION) {
   if (!apiKey) {
     throw new Error('RIOT_API_KEY nao foi configurada no arquivo .env.');
@@ -481,6 +532,103 @@ function createRiotService(apiKey, region = DEFAULT_REGION) {
     return insights;
   }
 
+  // Busca a partida que contenha a maioria dos jogadores (por conta principal ou
+  // secundaria). `playerGroups` e uma lista [{ puuids: [...] }], uma por jogador.
+  // Retorna o objeto da partida (Match-V5) ou null se ainda nao estiver indexada.
+  // Lanca erro com code RATE_LIMITED / AUTH_FAILED para o retry decidir o backoff.
+  async function findCustomMatchByPuuids({ puuids = [], playerGroups = null, startTimeMs = null, count = 5 } = {}) {
+    const groups = Array.isArray(playerGroups)
+      ? playerGroups
+        .map((group) => [...new Set(
+          (Array.isArray(group?.puuids) ? group.puuids : []).filter(Boolean).map((puuid) => String(puuid))
+        )])
+        .filter((group) => group.length > 0)
+      : [];
+
+    const flatPuuids = [...new Set(
+      (groups.length
+        ? groups.flat()
+        : (Array.isArray(puuids) ? puuids : [])
+      ).filter(Boolean).map((puuid) => String(puuid))
+    )].slice(0, 20);
+
+    // Com menos de 3 confirmacoes o risco de pegar a partida errada e alto.
+    if (flatPuuids.length < 3) return null;
+
+    const totalPlayers = groups.length || flatPuuids.length;
+    const requiredPlayers = Math.max(3, Math.ceil(totalPlayers / 2));
+
+    const startSeconds = Number.isFinite(Number(startTimeMs))
+      ? Math.max(0, Math.floor(Number(startTimeMs) / 1000) - 15 * 60)
+      : null;
+
+    const histories = await Promise.all(flatPuuids.map(async (puuid) => {
+      try {
+        const response = await regionalClient.get(
+          `/lol/match/v5/matches/by-puuid/${encodeURIComponent(puuid)}/ids`,
+          {
+            params: {
+              start: 0,
+              count: Math.min(20, Math.max(1, Number(count) || 5)),
+              ...(startSeconds ? { startTime: startSeconds } : {})
+            }
+          }
+        );
+        return Array.isArray(response.data) ? response.data : [];
+      } catch (error) {
+        const status = error.response?.status;
+        if (status === 429) {
+          throw createTaggedRiotError('Limite de requisicoes da Riot atingido.', 'RATE_LIMITED');
+        }
+        if (status === 403) {
+          throw createTaggedRiotError('A chave da Riot API esta invalida ou expirou.', 'AUTH_FAILED');
+        }
+        return [];
+      }
+    }));
+
+    const ranked = rankCommonMatchIds(histories).slice(0, 3);
+    if (ranked.length === 0) return null;
+
+    for (const candidate of ranked) {
+      if (candidate.votes < requiredPlayers) break;
+
+      let match;
+      try {
+        const response = await regionalClient.get(`/lol/match/v5/matches/${encodeURIComponent(candidate.matchId)}`);
+        match = response.data;
+      } catch (error) {
+        const status = error.response?.status;
+        if (status === 429) {
+          throw createTaggedRiotError('Limite de requisicoes da Riot atingido.', 'RATE_LIMITED');
+        }
+        if (status === 403) {
+          throw createTaggedRiotError('A chave da Riot API esta invalida ou expirou.', 'AUTH_FAILED');
+        }
+        continue;
+      }
+
+      const info = match?.info;
+      if (!info) continue;
+
+      // So aceitamos custom games (queueId 0).
+      if (Number(info.queueId) !== 0) continue;
+
+      // Janela de tempo: a partida tem que ter comecado perto do !vitoria.
+      if (startSeconds && Number(info.gameStartTimestamp) < startSeconds * 1000) continue;
+
+      const participants = Array.isArray(info.participants) ? info.participants : [];
+      const present = groups.length
+        ? countPlayerGroupsPresent(participants, groups)
+        : participants.filter((participant) => flatPuuids.includes(String(participant.puuid))).length;
+      if (present < requiredPlayers) continue;
+
+      return match;
+    }
+
+    return null;
+  }
+
   function invalidateCache(puuid) {
     rankProfileCache.delete(puuid);
     matchInsightsCache.delete(puuid);
@@ -489,11 +637,15 @@ function createRiotService(apiKey, region = DEFAULT_REGION) {
   return {
     getPlayerRankProfile,
     getMatchInsights,
+    findCustomMatchByPuuids,
     convertRankToMmr,
     invalidateCache
   };
 }
 
 module.exports = {
-  createRiotService
+  createRiotService,
+  pickCommonMatchId,
+  rankCommonMatchIds,
+  countPlayerGroupsPresent
 };

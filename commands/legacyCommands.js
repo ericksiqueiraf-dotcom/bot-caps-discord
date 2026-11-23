@@ -12,6 +12,8 @@ const { castVictoryVote } = require('../application/use-cases/castVictoryVote');
 const { handleStartCommandFlow, handleVoteCommandFlow } = require('./handlers/matchCommandHandlers');
 const { handleEnterCommandFlow } = require('./handlers/queueCommandHandlers');
 const { handleVictoryCommandFlow } = require('./handlers/victoryCommandHandlers');
+const { publishMatchStats } = require('../application/use-cases/publishMatchStats');
+const { MAX_ACCOUNTS, splitRiotIdInput, isValidRiotIdFormat } = require('../domain/accounts/riotIdInput');
 const votePanel = require('./handlers/resultVotePanel');
 
 const { 
@@ -468,41 +470,134 @@ async function handleEnterCommand(message, args) {
 
 async function handleRegisterCommand(message, args) {
   try {
-    const nickname = args.join(' ').trim();
-    if (!nickname) {
-      await replyToMessage(message, '❌ Use `!cadastrar SeuNick#TAG` para vincular sua conta Riot.');
+    const input = args.join(' ').trim();
+    if (!input) {
+      await replyToMessage(message, '❌ Use `!cadastrar SeuNick#TAG` para vincular sua conta Riot.\nVocê pode vincular uma **segunda conta** (smurf) assim: `!cadastrar Nick#TAG Smurf#TAG`.');
       return;
     }
-    await replyToMessage(message, '⏳ Validando sua conta na Riot...');
-    const rankProfile = await global.riotService.getPlayerRankProfile(nickname);
-    const levelGate = getSummonerLevelGate(rankProfile.summonerLevel);
-    if (!levelGate.ok) {
-      await replyToMessage(message, `❌ Conta level ${levelGate.level}. O mínimo para jogar na CAPS Arena é level ${levelGate.minLevel} — upe sua conta e tente de novo.`);
+
+    const accountInputs = splitRiotIdInput(input);
+    if (accountInputs.length === 0 || accountInputs.some((account) => !isValidRiotIdFormat(account))) {
+      await replyToMessage(message, '❌ Formato invalido. Use `!cadastrar Nick#TAG` ou `!cadastrar Nick#TAG Smurf#TAG`.');
       return;
     }
+    if (accountInputs.length > MAX_ACCOUNTS) {
+      await replyToMessage(message, `❌ Você pode vincular no máximo **${MAX_ACCOUNTS} contas** (principal + 1 secundária).`);
+      return;
+    }
+
+    await replyToMessage(message, accountInputs.length > 1
+      ? '⏳ Validando suas 2 contas na Riot...'
+      : '⏳ Validando sua conta na Riot...');
+
+    const profiles = [];
+    for (const accountInput of accountInputs) {
+      const rankProfile = await global.riotService.getPlayerRankProfile(accountInput);
+      const levelGate = getSummonerLevelGate(rankProfile.summonerLevel);
+      if (!levelGate.ok) {
+        await replyToMessage(message, `❌ Conta **${rankProfile.nickname}** level ${levelGate.level}. O mínimo para jogar na CAPS Arena é level ${levelGate.minLevel} — upe essa conta e tente de novo.`);
+        return;
+      }
+      profiles.push(rankProfile);
+    }
+
+    // Se a mesma conta foi digitada duas vezes, mantem so uma.
+    const uniqueProfiles = [];
+    for (const profile of profiles) {
+      if (!uniqueProfiles.some((entry) => String(entry.puuid) === String(profile.puuid))) {
+        uniqueProfiles.push(profile);
+      }
+    }
+
     const playerStats = await loadPlayerStats();
+
+    // Nenhuma das contas pode estar vinculada a outro membro (principal ou secundaria).
+    for (const profile of uniqueProfiles) {
+      const conflictingAccount = Object.values(playerStats.players || {}).find((player) => {
+        if (String(player.discordId || '') === String(message.author.id)) return false;
+        const puuids = [player.puuid, ...(Array.isArray(player.altPuuids) ? player.altPuuids : [])]
+          .filter(Boolean)
+          .map(String);
+        return puuids.includes(String(profile.puuid));
+      });
+      if (conflictingAccount) {
+        await replyToMessage(message, `❌ A conta **${profile.nickname}** já está vinculada a outro membro. Não alterei o cadastro.`);
+        return;
+      }
+    }
+
+    const [primary, ...secondary] = uniqueProfiles;
+
+    // Se a conta secundaria ja tem historico proprio neste Discord, nao absorve
+    // silenciosamente (evita perder partidas). Pede pro staff resolver.
+    for (const profile of secondary) {
+      const existingEntry = Object.values(playerStats.players || {}).find((player) =>
+        String(player.discordId || '') === String(message.author.id) &&
+        String(player.puuid || '') === String(profile.puuid));
+      const games = Number(existingEntry?.modes?.classic?.customWins || 0) +
+        Number(existingEntry?.modes?.classic?.customLosses || 0);
+      if (existingEntry && games > 0) {
+        await replyToMessage(message, `⚠️ A conta **${profile.nickname}** já tem ${games} partida(s) registradas em outro cadastro seu. Peça ao staff para unificar antes de vinculá-la como secundária.`);
+        return;
+      }
+    }
 
     // Busca entrada anterior do mesmo discordId para migrar o histórico de partidas
     const previousEntries = Object.values(playerStats.players || {}).filter(p => p.discordId === message.author.id);
     const previousEntry = previousEntries.sort((a, b) => new Date(b.registeredAt || 0) - new Date(a.registeredAt || 0))[0] || null;
 
-    const storedStats = getStoredPlayerStats(playerStats, { discordId: message.author.id, nickname: rankProfile.nickname, puuid: rankProfile.puuid });
-    upsertPlayerStats(playerStats, { discordId: message.author.id, nickname: rankProfile.nickname, puuid: rankProfile.puuid }, {
-      registeredNickname: rankProfile.nickname,
+    const storedStats = getStoredPlayerStats(playerStats, { discordId: message.author.id, nickname: primary.nickname, puuid: primary.puuid });
+
+    // Decide as contas secundarias:
+    // - 2 contas no comando -> define principal + secundaria.
+    // - 1 conta que ja e a principal -> mantem a secundaria existente.
+    // - 1 conta que era a secundaria -> ela vira principal e a antiga principal vira secundaria.
+    // - 1 conta nova -> cadastro limpo (sem secundaria).
+    let finalAltPuuids = secondary.map((profile) => profile.puuid);
+    let finalAltNicknames = secondary.map((profile) => profile.nickname);
+    if (secondary.length === 0 && previousEntry) {
+      const existingAltPuuids = Array.isArray(previousEntry.altPuuids) ? previousEntry.altPuuids : [];
+      const existingAltNicknames = Array.isArray(previousEntry.altNicknames) ? previousEntry.altNicknames : [];
+      if (String(previousEntry.puuid || '') === String(primary.puuid)) {
+        finalAltPuuids = existingAltPuuids;
+        finalAltNicknames = existingAltNicknames;
+      } else if (existingAltPuuids.map(String).includes(String(primary.puuid))) {
+        finalAltPuuids = [previousEntry.puuid];
+        finalAltNicknames = [previousEntry.registeredNickname || previousEntry.nickname];
+      }
+    }
+    // Nunca deixa a principal aparecer tambem como secundaria.
+    const dedupedAlts = finalAltPuuids
+      .map((puuid, index) => ({ puuid, nickname: finalAltNicknames[index] || null }))
+      .filter((entry) => entry.puuid && String(entry.puuid) !== String(primary.puuid));
+    finalAltPuuids = dedupedAlts.map((entry) => entry.puuid);
+    finalAltNicknames = dedupedAlts.map((entry) => entry.nickname);
+
+    upsertPlayerStats(playerStats, { discordId: message.author.id, nickname: primary.nickname, puuid: primary.puuid }, {
+      registeredNickname: primary.nickname,
       registeredAt: new Date().toISOString(),
-      tier: rankProfile.tier,
-      rank: rankProfile.rank,
-      leaguePoints: rankProfile.leaguePoints,
-      baseMmr: rankProfile.mmr,
-      puuid: rankProfile.puuid,
-      summonerId: rankProfile.summonerId,
-      isFallbackUnranked: Boolean(rankProfile.isFallbackUnranked),
-      modes: syncBaseMmrAcrossModes(previousEntry || storedStats, rankProfile.mmr)
+      tier: primary.tier,
+      rank: primary.rank,
+      leaguePoints: primary.leaguePoints,
+      baseMmr: primary.mmr,
+      puuid: primary.puuid,
+      summonerId: primary.summonerId,
+      isFallbackUnranked: Boolean(primary.isFallbackUnranked),
+      altPuuids: finalAltPuuids,
+      altNicknames: finalAltNicknames,
+      modes: syncBaseMmrAcrossModes(previousEntry || storedStats, primary.mmr)
     });
     await savePlayerStats(playerStats);
     const gate = await grantRegisteredPlayerRole(message.guild, message.author.id);
-    await syncMemberRankRole(message.guild, message.author.id, rankProfile.mmr);
-    const rankStr = rankProfile.isFallbackUnranked ? 'Unranked (base Gold IV)' : `${rankProfile.tier} ${rankProfile.rank} — ${rankProfile.leaguePoints} PDL`;
+    await syncMemberRankRole(message.guild, message.author.id, primary.mmr);
+
+    const formatAccount = (profile) => {
+      const rankStr = profile.isFallbackUnranked
+        ? 'Unranked (base Gold IV)'
+        : `${profile.tier} ${profile.rank} — ${profile.leaguePoints} PDL`;
+      return `🎮 **${profile.nickname}** · ${rankStr}`;
+    };
+
     let accessLine = '';
     if (gate.ok && !gate.alreadyHad) {
       accessLine = '\n**Salas liberadas.** Voce ja pode ver os canais de texto e voz do servidor.';
@@ -511,10 +606,16 @@ async function handleRegisterCommand(message, args) {
     } else if (gate.reason !== 'not_configured') {
       accessLine = '\n_Nao foi possivel atribuir o cargo automaticamente. Staff: confira o ID em config, permissoes Manage Roles e hierarquia dos cargos._';
     }
+
+    const secondaryLine = finalAltNicknames.length
+      ? `\n➕ Conta secundária: 🎮 **${finalAltNicknames[0]}**\n_As estatísticas pós-partida reconhecem as duas contas._`
+      : '';
+
     await replyToMessage(message,
-      `✅ Conta vinculada com sucesso!\n` +
-      `🎮 **${rankProfile.nickname}** · ${rankStr}\n` +
-      `Agora e so usar \`!entrar\` para entrar na fila rapidinho! 🚀` +
+      `✅ Conta${finalAltNicknames.length ? 's vinculadas' : ' vinculada'} com sucesso!\n` +
+      `${formatAccount(primary)}` +
+      secondaryLine +
+      `\nAgora e so usar \`!entrar\` para entrar na fila rapidinho! 🚀` +
       accessLine
     );
   } catch (error) {
@@ -566,13 +667,30 @@ async function handleNickUpdateCommand(message, args = [], targetUserOverride = 
       return;
     }
     const playerStats = await loadPlayerStats();
-    const conflictingAccount = Object.values(playerStats.players || {}).find((player) =>
-      String(player.puuid || '') === String(rankProfile.puuid) && String(player.discordId || '') !== String(targetUser.id));
+    const conflictingAccount = Object.values(playerStats.players || {}).find((player) => {
+      if (String(player.discordId || '') === String(targetUser.id)) return false;
+      const puuids = [player.puuid, ...(Array.isArray(player.altPuuids) ? player.altPuuids : [])]
+        .filter(Boolean)
+        .map(String);
+      return puuids.includes(String(rankProfile.puuid));
+    });
     if (conflictingAccount) {
       await replyToMessage(message, `❌ A conta **${rankProfile.nickname}** já está vinculada a outro membro. Não alterei o cadastro.`);
       return;
     }
     const storedStats = getStoredPlayerStats(playerStats, { discordId: targetUser.id, nickname: rankProfile.nickname, puuid: rankProfile.puuid });
+
+    // Mantem a conta secundaria, a menos que o novo nick principal seja ela.
+    const currentAltPuuids = Array.isArray(storedStats.altPuuids) ? storedStats.altPuuids : [];
+    const currentAltNicknames = Array.isArray(storedStats.altNicknames) ? storedStats.altNicknames : [];
+    const nextAltPuuids = [];
+    const nextAltNicknames = [];
+    currentAltPuuids.forEach((puuid, index) => {
+      if (String(puuid) === String(rankProfile.puuid)) return;
+      nextAltPuuids.push(puuid);
+      if (currentAltNicknames[index]) nextAltNicknames.push(currentAltNicknames[index]);
+    });
+
     upsertPlayerStats(playerStats, { discordId: targetUser.id, nickname: rankProfile.nickname, puuid: rankProfile.puuid }, {
       registeredNickname: rankProfile.nickname,
       registeredAt: new Date().toISOString(),
@@ -583,6 +701,8 @@ async function handleNickUpdateCommand(message, args = [], targetUserOverride = 
       puuid: rankProfile.puuid,
       summonerId: rankProfile.summonerId,
       isFallbackUnranked: Boolean(rankProfile.isFallbackUnranked),
+      altPuuids: nextAltPuuids,
+      altNicknames: nextAltNicknames,
       modes: syncBaseMmrAcrossModes(storedStats, rankProfile.mmr)
     });
     await savePlayerStats(playerStats);
@@ -1982,7 +2102,7 @@ function buildAjudaEmbed(page = 1) {
     .setTitle('📚 Guia de Comandos (1/2) — O essencial')
     .setDescription('O básico para jogar na CAPS Arena. O resto está no `!ajuda2`.')
     .addFields(
-      { name: '🕹️ Cadastro (1x)', value: '`!cadastrar Nick#TAG` • Vincula sua conta Riot\n`!nick Nick#TAG` • Atualiza seu nick' },
+      { name: '🕹️ Cadastro (1x)', value: '`!cadastrar Nick#TAG` • Vincula sua conta Riot\n`!cadastrar Nick#TAG Smurf#TAG` • Vincula principal + 1 secundária (smurf)\n`!nick Nick#TAG` • Atualiza seu nick principal' },
       { name: '🎮 Fila e voto', value: '`!entrar` • Fila Classic (no canal Lobby Classic ou Lobby TIER S)\n`!entrar aram` • Fila ARAM\n`!entrar aram 2x2` • ARAM formato (1x1 até 5x5)\n`!fila` • Mostra jogadores em sala\n`!espera` • Entra na espera (🔥 INFERNAL entra na posição 5)\n`!esperatiers` • Espera do Lobby TIER S (só Esmeralda+)\n`!espera ver` • Mostra a ordem • `!espera sair` • Sai da espera\n`!sair` • Sai da sala\n`!votar 1/2` • Vota no vencedor (abre painel com botões p/ os 10 votarem)\n`!votar` • Reabre o painel de votação' },
       { name: '➡️ Página 2', value: '`!ajuda2` • Ranking, clube VIP, salas temporárias, torneio, convites e tempo em call\n`!staff` • Guia da staff (restrito)' }
     );
@@ -2583,6 +2703,7 @@ async function handleVictoryCommand(message, args) {
         updateQueueDashboard,
         saveSystemMeta,
         postMatchHistoryLog,
+        publishMatchStats,
         getSeasonDisplayLabel,
         loadSeasonMeta,
         loadPlayerStats,
@@ -2784,6 +2905,8 @@ async function buildOnboardingGuideEmbed(guild) {
         value:
           'Vincule seu Nick da Riot ao seu Discord:\n' +
           '```\n!cadastrar SeuNick#TAG\n```\n' +
+          'Joga em smurf? Vincule até **2 contas** (principal + secundária):\n' +
+          '```\n!cadastrar Nick#TAG Smurf#TAG\n```\n' +
           '✅ Após isso, você **nunca mais precisará digitar seu nick**.\n' +
           '> Se trocar de nick na Riot: `!nick NovoNick#TAG`'
       },

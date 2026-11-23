@@ -7,8 +7,8 @@ const { getStatsBucketLabel } = require('../utils/lobbyUtils');
 
 // ─── Views do menu de ranking ────────────────────────────────────────────────
 
-test('menu de ranking tem exatamente as 5 views ativas', () => {
-  assert.deepEqual([...RANKING_VIEWS], ['duelo', 'classic', 'tiers', 'infernal', 'tt3x3']);
+test('menu de ranking tem exatamente as 4 views ativas', () => {
+  assert.deepEqual([...RANKING_VIEWS], ['duelo', 'classic', 'infernal', 'tt3x3']);
 });
 
 test('sem argumento o ranking cai no CLASSIC', () => {
@@ -35,12 +35,15 @@ test('twisted treeline: aceita 3x3, tt, tt3x3, twisted e treeline', () => {
   }
 });
 
-test('classic, tiers e infernal seguem aceitos', () => {
+test('classic e infernal seguem aceitos; tiers virou aviso de unificacao', () => {
   assert.equal(parseRankingView(['classic']).view, 'classic');
-  assert.equal(parseRankingView(['tiers']).view, 'tiers');
-  assert.equal(parseRankingView(['tier-s']).view, 'tiers');
-  assert.equal(parseRankingView(['s']).view, 'tiers');
   assert.equal(parseRankingView(['infernal']).view, 'infernal');
+
+  for (const token of ['tiers', 'tier-s', 's']) {
+    const view = parseRankingView([token]);
+    assert.equal(view.ok, false, `${token} deveria avisar da unificacao`);
+    assert.match(view.message, /unificado/i);
+  }
 });
 
 test('rankings retirados (2x2, 4x4, 5x5, aram) respondem com aviso', () => {

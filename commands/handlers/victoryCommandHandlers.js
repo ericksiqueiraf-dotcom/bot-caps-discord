@@ -30,6 +30,7 @@ async function handleVictoryCommandFlow({
     updateQueueDashboard,
     saveSystemMeta,
     postMatchHistoryLog,
+    publishMatchStats,
     getSeasonDisplayLabel,
     loadSeasonMeta,
     loadPlayerStats,
@@ -200,6 +201,17 @@ async function handleVictoryCommandFlow({
     letter: match.letter || '?',
     periodLabel: getSeasonDisplayLabel(await loadSeasonMeta())
   });
+
+  // Estatisticas reais da partida (KDA/CS/ouro/dano/visao/Nota CAPS).
+  // Busca em background com retry porque a Riot demora a indexar a custom.
+  // Nunca quebra o !vitoria.
+  if (typeof publishMatchStats === 'function') {
+    try {
+      publishMatchStats({ guild: message.guild, match, winningTeam, deps: { loadPlayerStats } });
+    } catch (error) {
+      console.error('[MATCH STATS] Falha ao iniciar publicacao:', error?.message || error);
+    }
+  }
 
   const playerDeltas = {};
   for (const player of winners) {

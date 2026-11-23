@@ -2745,6 +2745,16 @@ function buildPlayerCardEmbed(playerStats, targetUser, vipTierName = null, insig
     embed.addFields({ name: '🏅 Conquistas da temporada', value: topOneBadges.join(' • ') });
   }
 
+  const altNicknames = (Array.isArray(playerStats.altNicknames) ? playerStats.altNicknames : [])
+    .filter(Boolean);
+  if (altNicknames.length) {
+    embed.addFields({
+      name: '🔗 Contas vinculadas',
+      value: [`\`${riotNickname || playerStats.nickname}\``, ...altNicknames.map((nick) => `\`${nick}\``)].join(' • '),
+      inline: false
+    });
+  }
+
   if (insights) {
     const bullets = [];
 
@@ -3136,6 +3146,234 @@ async function postMatchHistoryLog(guild, payload) {
   });
 
   await channel.send({ embeds: [summaryEmbed, detailEmbed] }).catch(() => null);
+}
+
+// ─── Estatisticas reais da partida (Match-V5) ───────────────────────────────
+// Nota CAPS: estimativa propria baseada em KDA, participacao em abates, dano,
+// farm, visao e mortes. NAO e a nota oficial do cliente do LoL.
+
+const CAPS_GRADE_CS_BASELINE = Object.freeze({
+  TOP: 6.0,
+  JUNGLE: 5.0,
+  MIDDLE: 6.5,
+  BOTTOM: 7.0,
+  UTILITY: 1.5
+});
+
+const CAPS_GRADE_DAMAGE_BASELINE = Object.freeze({
+  UTILITY: 0.12
+});
+
+const CAPS_GRADE_DEFAULT = Object.freeze({
+  csBaseline: 5.5,
+  damageShare: 0.20
+});
+
+function clampNumber(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function formatCompactNumber(value) {
+  const number = Number(value || 0);
+  if (!Number.isFinite(number)) return '0';
+  if (Math.abs(number) >= 1000) return `${(number / 1000).toFixed(1)}k`;
+  return String(Math.round(number));
+}
+
+function formatGameDuration(totalSeconds) {
+  const seconds = Math.max(0, Math.round(Number(totalSeconds) || 0));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
+function getParticipantRole(participant) {
+  const role = String(participant?.teamPosition || participant?.individualPosition || '').toUpperCase();
+  return CAPS_GRADE_CS_BASELINE[role] ? role : null;
+}
+
+function getParticipantRiotId(participant) {
+  if (participant?.riotIdGameName && participant?.riotIdTagline) {
+    return `${participant.riotIdGameName}#${participant.riotIdTagline}`;
+  }
+  return participant?.summonerName || participant?.riotId || 'Jogador';
+}
+
+function getGradeLabel(score) {
+  if (score >= 9.0) return 'S+';
+  if (score >= 8.0) return 'S';
+  if (score >= 7.0) return 'A';
+  if (score >= 6.0) return 'B';
+  if (score >= 5.0) return 'C';
+  return 'D';
+}
+
+function computeCapsGrade(participant, teamStats = {}) {
+  const stats = participant || {};
+  const minutes = Math.max(
+    1,
+    Number(teamStats.gameDurationMinutes) ||
+      Number(stats.timePlayed || 0) / 60 ||
+      1
+  );
+
+  const role = getParticipantRole(stats);
+  const kills = Number(stats.kills || 0);
+  const deaths = Number(stats.deaths || 0);
+  const assists = Number(stats.assists || 0);
+  const teamKills = Math.max(1, Number(teamStats.teamKills || 0));
+  const teamDamage = Math.max(1, Number(teamStats.teamDamage || 0));
+  const damage = Number(stats.totalDamageDealtToChampions || 0);
+  const cs = Number(stats.totalMinionsKilled || 0) + Number(stats.neutralMinionsKilled || 0);
+  const vision = Number(stats.visionScore || 0);
+
+  const kda = (kills + assists) / Math.max(1, deaths);
+  const killParticipation = (kills + assists) / teamKills;
+  const damageShare = damage / teamDamage;
+  const csPerMinute = cs / minutes;
+  const visionPerMinute = vision / minutes;
+
+  const csBaseline = role ? CAPS_GRADE_CS_BASELINE[role] : CAPS_GRADE_DEFAULT.csBaseline;
+  const damageBaseline = role
+    ? (CAPS_GRADE_DAMAGE_BASELINE[role] ?? CAPS_GRADE_DEFAULT.damageShare)
+    : CAPS_GRADE_DEFAULT.damageShare;
+
+  let score = 5.0;
+  score += clampNumber((kda - 2.5) * 0.7, -2.0, 2.0);
+  score += clampNumber((killParticipation - 0.5) * 2.0, -1.0, 1.0);
+  score += clampNumber((damageShare - damageBaseline) * 6.0, -1.5, 1.5);
+  score += clampNumber((csPerMinute - csBaseline) * 0.35, -1.2, 1.2);
+  score += clampNumber((visionPerMinute - 1.0) * 0.8, -0.8, 1.2);
+  score -= clampNumber((deaths - 4) * 0.15, 0, 1.2);
+
+  score = Math.round(clampNumber(score, 0, 10) * 10) / 10;
+
+  return {
+    score,
+    grade: getGradeLabel(score),
+    kda: Math.round(kda * 10) / 10,
+    killParticipation: Math.round(killParticipation * 100),
+    damageShare: Math.round(damageShare * 100),
+    csPerMinute: Math.round(csPerMinute * 10) / 10,
+    visionPerMinute: Math.round(visionPerMinute * 10) / 10
+  };
+}
+
+function buildMatchStatsEmbed({
+  match,
+  playersByPuuid = {},
+  winningTeam = '1',
+  letter = '?',
+  modeLabel = 'CLASSIC',
+  formatLabel = '5x5'
+} = {}) {
+  const info = match?.info || {};
+  const participants = Array.isArray(info.participants) ? info.participants : [];
+  const durationSeconds = Number(info.gameDuration || 0);
+  const durationMinutes = Math.max(1, durationSeconds / 60);
+  const winningTeamId = Number(winningTeam);
+
+  const teams = [1, 2].map((teamId) => {
+    const members = participants.filter((participant) => Number(participant.teamId) === teamId);
+    const teamKills = members.reduce((sum, participant) => sum + Number(participant.kills || 0), 0);
+    const teamDamage = members.reduce((sum, participant) => sum + Number(participant.totalDamageDealtToChampions || 0), 0);
+    return { teamId, members, teamKills, teamDamage };
+  });
+
+  const objectivesText = (teamId) => {
+    const team = (info.teams || []).find((entry) => Number(entry.teamId) === teamId);
+    const objectives = team?.objectives || {};
+    const count = (key) => Number(objectives[key]?.kills || 0);
+    return `${count('dragon')} dragões • ${count('baron')} barões • ${count('tower')} torres`;
+  };
+
+  const embed = new EmbedBuilder()
+    .setColor(winningTeamId === 1 ? THEME.SUCCESS : THEME.WARNING)
+    .setTitle(`📊 Estatísticas — Lobby ${letter} (${modeLabel} ${formatLabel})`)
+    .setDescription([
+      `**Duração:** \`${formatGameDuration(durationSeconds)}\` • **Vencedor:** **Equipe ${winningTeam}**`,
+      `**Abates:** Equipe 1 \`${teams[0].teamKills}\` × \`${teams[1].teamKills}\` Equipe 2`,
+      `**Objetivos Equipe 1:** ${objectivesText(1)}`,
+      `**Objetivos Equipe 2:** ${objectivesText(2)}`
+    ].join('\n'))
+    .setFooter({ text: `${FOOTER_PREFIX} • Nota CAPS é uma estimativa própria, não a nota oficial do cliente LoL.` })
+    .setTimestamp();
+
+  for (const team of teams) {
+    if (!team.members.length) continue;
+
+    const entries = team.members
+      .slice()
+      .sort((a, b) => Number(b.kills || 0) - Number(a.kills || 0))
+      .map((participant, index) => {
+        const linked = playersByPuuid[String(participant.puuid)] || null;
+        const playerLabel = linked?.discordId
+          ? `<@${linked.discordId}> \`${getParticipantRiotId(participant)}\``
+          : `\`${getParticipantRiotId(participant)}\``;
+        const cs = Number(participant.totalMinionsKilled || 0) + Number(participant.neutralMinionsKilled || 0);
+        const grade = computeCapsGrade(participant, {
+          gameDurationMinutes: durationMinutes,
+          teamKills: team.teamKills,
+          teamDamage: team.teamDamage
+        });
+
+        return [
+          `**${index + 1}.** ${playerLabel} — ${participant.championName || '—'}`,
+          `\`${Number(participant.kills || 0)}/${Number(participant.deaths || 0)}/${Number(participant.assists || 0)}\` (${grade.kda} KDA) • \`${cs}\` CS (${grade.csPerMinute}/min) • \`${formatCompactNumber(participant.goldEarned)}\` ouro`,
+          `Dano \`${formatCompactNumber(participant.totalDamageDealtToChampions)}\` • Visão \`${Number(participant.visionScore || 0)}\` • **Nota CAPS ${grade.score.toFixed(1)} (${grade.grade})**`
+        ].join('\n');
+      });
+
+    splitEmbedFieldChunks(entries).forEach((chunk, index) => {
+      const teamName = `Equipe ${team.teamId}${team.teamId === winningTeamId ? ' - Vencedores' : ' - Derrotados'}`;
+      embed.addFields({
+        name: index === 0 ? teamName : `${teamName} (${index + 1})`,
+        value: chunk
+      });
+    });
+  }
+
+  const ranked = participants.map((participant) => ({
+    participant,
+    grade: computeCapsGrade(participant, {
+      gameDurationMinutes: durationMinutes,
+      teamKills: teams.find((team) => team.teamId === Number(participant.teamId))?.teamKills || 0,
+      teamDamage: teams.find((team) => team.teamId === Number(participant.teamId))?.teamDamage || 0
+    })
+  }));
+
+  if (ranked.length) {
+    const bestBy = (selector, formatter) => {
+      const best = ranked.reduce((winner, current) =>
+        selector(current) > selector(winner) ? current : winner
+      );
+      return formatter(best);
+    };
+
+    const highlights = [
+      bestBy((entry) => Number(entry.participant.totalDamageDealtToChampions || 0),
+        (entry) => `• Maior dano: **${getParticipantRiotId(entry.participant)}** (\`${formatCompactNumber(entry.participant.totalDamageDealtToChampions)}\`)`),
+      bestBy((entry) => Number(entry.participant.totalMinionsKilled || 0) + Number(entry.participant.neutralMinionsKilled || 0),
+        (entry) => `• Mais CS: **${getParticipantRiotId(entry.participant)}** (\`${Number(entry.participant.totalMinionsKilled || 0) + Number(entry.participant.neutralMinionsKilled || 0)}\`)`),
+      bestBy((entry) => entry.grade.kda,
+        (entry) => `• Melhor KDA: **${getParticipantRiotId(entry.participant)}** (\`${entry.grade.kda}\`)`),
+      bestBy((entry) => Number(entry.participant.visionScore || 0),
+        (entry) => `• Mais visão: **${getParticipantRiotId(entry.participant)}** (\`${Number(entry.participant.visionScore || 0)}\`)`)
+    ];
+
+    embed.addFields({ name: '🏆 Destaques', value: highlights.join('\n') });
+  }
+
+  return embed;
+}
+
+async function postMatchStatsLog(guild, embed) {
+  const channelId = config.textChannels?.matchHistoryChannelId;
+  if (!channelId) return false;
+
+  const channel = await guild?.channels?.fetch(channelId).catch(() => null);
+  if (!channel || !channel.isTextBased()) return false;
+
+  await channel.send({ embeds: [embed] }).catch(() => null);
+  return true;
 }
 
 // Promo automática do clube 1x/dia às 08h SP no geral, sem duplicar.
@@ -3963,6 +4201,10 @@ module.exports = {
   getSaoPauloDateParts,
   postDailyRankUpdates,
   postMatchHistoryLog,
+  postMatchStatsLog,
+  computeCapsGrade,
+  buildMatchStatsEmbed,
+  CAPS_GRADE_CS_BASELINE,
   postMvpAnnouncement,
   updateQueueDashboard,
   sendMatchStartAnnouncement,
