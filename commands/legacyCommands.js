@@ -728,6 +728,111 @@ async function handleNickUpdateCommand(message, args = [], targetUserOverride = 
   }
 }
 
+// Troca/desvincula APENAS a conta secundaria (smurf), sem mexer na principal.
+async function handleNickSmurfCommand(message, args = [], targetUserOverride = null) {
+  try {
+    const firstArg = String(args[0] || '').trim();
+    const mentionInArgs = /^<@!?\d+>$/.test(firstArg);
+    const targetUser = targetUserOverride
+      || (mentionInArgs ? message.mentions?.users?.first?.() : null)
+      || message.author;
+    const isChangingAnotherMember = String(targetUser?.id || '') !== String(message.author?.id || '');
+    if (isChangingAnotherMember && !message.member?.permissions?.has(PermissionFlagsBits.Administrator)) {
+      return await replyToMessage(message, '❌ Apenas administradores podem trocar a conta smurf de outro membro.');
+    }
+    if (mentionInArgs && !targetUserOverride && !message.mentions?.users?.first?.()) {
+      return await replyToMessage(message, '❌ Não consegui localizar o membro mencionado. Use `!nicksmurf @membro Smurf#TAG`.');
+    }
+
+    const input = (targetUserOverride ? args : mentionInArgs ? args.slice(1) : args).join(' ').trim();
+    if (!input) {
+      return await replyToMessage(message, '❌ Use `!nicksmurf Smurf#TAG` para trocar sua conta secundária, ou `!nicksmurf remover` para desvinculá-la.');
+    }
+
+    const playerStats = await loadPlayerStats();
+    const storedEntry = Object.values(playerStats.players || {}).find((player) => String(player.discordId || '') === String(targetUser.id));
+    if (!storedEntry?.puuid) {
+      return await replyToMessage(message, '❌ Cadastre a conta principal primeiro com `!cadastrar Nick#TAG`, depois vincule a smurf.');
+    }
+
+    // Desvincular a smurf.
+    if (/^(remover|remove|delete|apagar|nenhuma|off|-)$/i.test(input)) {
+      const hasAlt = Array.isArray(storedEntry.altPuuids) && storedEntry.altPuuids.length > 0;
+      if (!hasAlt) {
+        return await replyToMessage(message, 'ℹ️ Não há conta secundária vinculada para remover.');
+      }
+      upsertPlayerStats(playerStats, { discordId: targetUser.id, nickname: storedEntry.registeredNickname || storedEntry.nickname, puuid: storedEntry.puuid }, {
+        altPuuids: [],
+        altNicknames: []
+      });
+      await savePlayerStats(playerStats);
+      return await replyToMessage(message, `✅ Conta secundária de <@${targetUser.id}> desvinculada.`);
+    }
+
+    const accounts = splitRiotIdInput(input);
+    if (accounts.length !== 1 || !isValidRiotIdFormat(accounts[0])) {
+      return await replyToMessage(message, '❌ Informe apenas UMA conta smurf: `!nicksmurf Smurf#TAG`.\nPara vincular principal + smurf de uma vez, use `!cadastrar Nick#TAG Smurf#TAG`.');
+    }
+
+    await replyToMessage(message, `⏳ Verificando a conta smurf de <@${targetUser.id}>...`);
+
+    const oldAltPuuid = Array.isArray(storedEntry.altPuuids) ? storedEntry.altPuuids[0] : null;
+    if (oldAltPuuid && global.riotService.invalidateCache) {
+      global.riotService.invalidateCache(oldAltPuuid);
+    }
+
+    const rankProfile = await global.riotService.getPlayerRankProfile(accounts[0]);
+    const levelGate = getSummonerLevelGate(rankProfile.summonerLevel);
+    if (!levelGate.ok) {
+      return await replyToMessage(message, `❌ Smurf **${rankProfile.nickname}** level ${levelGate.level}. O mínimo para jogar na CAPS Arena é level ${levelGate.minLevel}.`);
+    }
+
+    if (String(rankProfile.puuid) === String(storedEntry.puuid)) {
+      return await replyToMessage(message, '❌ Essa conta já é a sua **principal**. A smurf precisa ser uma conta diferente.');
+    }
+
+    const conflictingAccount = Object.values(playerStats.players || {}).find((player) => {
+      if (String(player.discordId || '') === String(targetUser.id)) return false;
+      const puuids = [player.puuid, ...(Array.isArray(player.altPuuids) ? player.altPuuids : [])]
+        .filter(Boolean)
+        .map(String);
+      return puuids.includes(String(rankProfile.puuid));
+    });
+    if (conflictingAccount) {
+      return await replyToMessage(message, `❌ A conta **${rankProfile.nickname}** já está vinculada a outro membro. Não alterei o cadastro.`);
+    }
+
+    const existingSmurfEntry = Object.values(playerStats.players || {}).find((player) =>
+      String(player.discordId || '') === String(targetUser.id) &&
+      String(player.puuid || '') === String(rankProfile.puuid));
+    const smurfGames = Number(existingSmurfEntry?.modes?.classic?.customWins || 0) +
+      Number(existingSmurfEntry?.modes?.classic?.customLosses || 0);
+    if (existingSmurfEntry && smurfGames > 0) {
+      return await replyToMessage(message, `⚠️ A conta **${rankProfile.nickname}** já tem ${smurfGames} partida(s) em outro cadastro seu. Peça ao staff para unificar antes de vinculá-la como smurf.`);
+    }
+
+    upsertPlayerStats(playerStats, { discordId: targetUser.id, nickname: storedEntry.registeredNickname || storedEntry.nickname, puuid: storedEntry.puuid }, {
+      altPuuids: [rankProfile.puuid],
+      altNicknames: [rankProfile.nickname]
+    });
+    await savePlayerStats(playerStats);
+
+    const rankStr = rankProfile.isFallbackUnranked
+      ? 'Unranked (base Gold IV)'
+      : `${rankProfile.tier} ${rankProfile.rank} — ${rankProfile.leaguePoints} PDL`;
+    await replyToMessage(message,
+      `✅ Conta smurf de <@${targetUser.id}> atualizada${isChangingAnotherMember ? ` pelo administrador <@${message.author.id}>` : ''}!\n` +
+      `🎮 **${rankProfile.nickname}** · ${rankStr}\n` +
+      `_As estatísticas pós-partida reconhecem a principal e essa smurf._`
+    );
+  } catch (error) {
+    console.error('[ERRO] !nicksmurf:', error);
+    await replyToMessage(message, `❌ Erro ao atualizar smurf: ${error.message}`);
+  } finally {
+    if (message.deletable) await message.delete().catch(() => null);
+  }
+}
+
 async function handleSyncPlayerRankCommand(message, targetUserOverride = null) {
   try {
     if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
@@ -2102,7 +2207,7 @@ function buildAjudaEmbed(page = 1) {
     .setTitle('📚 Guia de Comandos (1/2) — O essencial')
     .setDescription('O básico para jogar na CAPS Arena. O resto está no `!ajuda2`.')
     .addFields(
-      { name: '🕹️ Cadastro (1x)', value: '`!cadastrar Nick#TAG` • Vincula sua conta Riot\n`!cadastrar Nick#TAG Smurf#TAG` • Vincula principal + 1 secundária (smurf)\n`!nick Nick#TAG` • Atualiza seu nick principal' },
+      { name: '🕹️ Cadastro (1x)', value: '`!cadastrar Nick#TAG` • Vincula sua conta Riot\n`!cadastrar Nick#TAG Smurf#TAG` • Vincula principal + 1 secundária (smurf)\n`!nick Nick#TAG` • Atualiza seu nick principal\n`!nicksmurf Smurf#TAG` • Troca a smurf (`!nicksmurf remover` desvincula)' },
       { name: '🎮 Fila e voto', value: '`!entrar` • Fila Classic (no canal Lobby Classic ou Lobby TIER S)\n`!entrar aram` • Fila ARAM\n`!entrar aram 2x2` • ARAM formato (1x1 até 5x5)\n`!fila` • Mostra jogadores em sala\n`!espera` • Entra na espera (🔥 INFERNAL entra na posição 5)\n`!esperatiers` • Espera do Lobby TIER S (só Esmeralda+)\n`!espera ver` • Mostra a ordem • `!espera sair` • Sai da espera\n`!sair` • Sai da sala\n`!votar 1/2` • Vota no vencedor (abre painel com botões p/ os 10 votarem)\n`!votar` • Reabre o painel de votação' },
       { name: '➡️ Página 2', value: '`!ajuda2` • Ranking, clube VIP, salas temporárias, torneio, convites e tempo em call\n`!staff` • Guia da staff (restrito)' }
     );
@@ -3495,7 +3600,7 @@ module.exports = {
   handleUndoSeasonResetCommand, handleRestoreArchivedPeriodCommand, handleCancelStartCommand, handleStartCommand,
   handleSyncAllRolesCommand, handleSyncAllPlayersEloCommand, handleVictoryCommand, handleOnboardingCommand, handleClearCommand,
   buildOnboardingGuideEmbed,
-  handleRegisterCommand, handleNickUpdateCommand, handleSyncPlayerRankCommand, handleVoteCommand, pendingAutoStarts, triggerAutoStart,
+  handleRegisterCommand, handleNickUpdateCommand, handleNickSmurfCommand, handleSyncPlayerRankCommand, handleVoteCommand, pendingAutoStarts, triggerAutoStart,
   handleRematchCommand, handleRouletteCommand, handleRoletaSairCommand, handleRulesCommand, handleStaffCommand, handleStaff2Command, handlePdlCommand,
   handleResultVoteButton, handleClubeCommand, handleClubeAdminCommand, handleClubeFixarCommand, handleQueroLiveCommand, handleLiveCommand,
   handleSocialCommand,

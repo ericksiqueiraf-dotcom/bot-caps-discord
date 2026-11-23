@@ -287,7 +287,8 @@ function buildSlashCommands() {
     new SlashCommandBuilder()
       .setName('cadastrar')
       .setDescription('Vincula sua conta Riot ao Discord (feito uma unica vez).')
-      .addStringOption((option) => option.setName('nick').setDescription('Seu Nick#TAG da Riot, ex: FakerBR#BR1').setRequired(true)),
+      .addStringOption((option) => option.setName('nick').setDescription('Seu Nick#TAG da Riot, ex: FakerBR#BR1').setRequired(true))
+      .addStringOption((option) => option.setName('smurf').setDescription('Conta secundária (smurf) Nick#TAG — opcional').setRequired(false)),
     new SlashCommandBuilder()
       .setName('riotstats')
       .setDescription('Ativa, desativa ou consulta seu consentimento de estatísticas Riot.')
@@ -298,6 +299,11 @@ function buildSlashCommands() {
       .setDescription('Atualiza sua conta Riot; administradores também podem atualizar a de um membro.')
       .addStringOption((option) => option.setName('nick').setDescription('Novo Nick#TAG, ex: FakerBR#BR2').setRequired(true))
       .addUserOption((option) => option.setName('perfil').setDescription('Membro cuja conta será trocada (somente administrador)').setRequired(false)),
+    new SlashCommandBuilder()
+      .setName('nicksmurf')
+      .setDescription('Troca ou remove sua conta secundária (smurf), sem mexer na principal.')
+      .addStringOption((option) => option.setName('nick').setDescription('Smurf#TAG, ou "remover" para desvincular').setRequired(true))
+      .addUserOption((option) => option.setName('perfil').setDescription('Membro cuja smurf será trocada (somente administrador)').setRequired(false)),
     new SlashCommandBuilder()
       .setName('votar')
       .setDescription('Vota no time vencedor da sua partida ativa.')
@@ -921,6 +927,10 @@ async function processCommand(message, rawContent) {
       case 'nick':
         await handlers.handleNickUpdateCommand(message, args);
         break;
+      case 'nicksmurf':
+      case 'smurf':
+        await handlers.handleNickSmurfCommand(message, args);
+        break;
       case 'stats':
       case 'estatisticas':
         await handlers.handleStatsCommand(message);
@@ -1486,13 +1496,21 @@ client.on('interactionCreate', async (interaction) => {
       }
       case 'cadastrar': {
         const cadastrarNick = interaction.options.getString('nick');
-        await handlers.handleRegisterCommand(context, [cadastrarNick]);
+        const cadastrarSmurf = interaction.options.getString('smurf');
+        const cadastrarArgs = cadastrarSmurf ? [cadastrarNick, cadastrarSmurf] : [cadastrarNick];
+        await handlers.handleRegisterCommand(context, cadastrarArgs);
         break;
       }
       case 'nick': {
         const updateNick = interaction.options.getString('nick');
         const profileUser = interaction.options.getUser('perfil');
         await handlers.handleNickUpdateCommand(context, [updateNick], profileUser);
+        break;
+      }
+      case 'nicksmurf': {
+        const smurfNick = interaction.options.getString('nick');
+        const smurfProfileUser = interaction.options.getUser('perfil');
+        await handlers.handleNickSmurfCommand(context, [smurfNick], smurfProfileUser);
         break;
       }
       case 'riotstats': {
