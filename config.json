@@ -6,6 +6,11 @@
     "infernalRoleName": "🔥 INFERNAL",
     "mvpPlayerRoleName": "⭐ MVP",
     "captainRoleId": "1487819172783325255",
+    "anchorRoleIds": [
+      "1487816787666931732",
+      "1487817903561773137",
+      "1487819172783325255"
+    ],
     "rankRoleIds": {
       "Prata": "1552537451388608602"
     },

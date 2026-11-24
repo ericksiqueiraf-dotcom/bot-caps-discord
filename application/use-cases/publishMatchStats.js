@@ -4,6 +4,7 @@
 // vezes com espera entre elas. Nunca lanca erro para fora: o !vitoria nao pode
 // quebrar por causa das estatisticas.
 
+const config = require('../../config.json');
 const {
   buildMatchStatsEmbed,
   postMatchStatsLog
@@ -14,6 +15,48 @@ const RETRY_DELAYS_MS = [20_000, 25_000, 45_000, 60_000, 90_000, 120_000];
 const RATE_LIMIT_DELAY_MS = 120_000;
 
 const inflightKeys = new Set();
+
+// Cargos considerados "ancora": quem cria/hospeda as customs (Capitao, Staff e Admin).
+// Basta UMA conta ancora dentro da partida para o bot achar a custom com seguranca.
+function getAnchorRoleIds() {
+  const configured = Array.isArray(config.roles?.anchorRoleIds) ? config.roles.anchorRoleIds : [];
+  return [...new Set([...configured, config.roles?.captainRoleId].filter(Boolean).map(String))];
+}
+
+function isAnchorMember(member, anchorRoleIds = getAnchorRoleIds()) {
+  if (!member) return false;
+  try {
+    if (member.permissions?.has?.('Administrator')) return true;
+  } catch {
+    /* sem permissoes resolvidas */
+  }
+  try {
+    return anchorRoleIds.some((roleId) => member.roles?.cache?.has?.(roleId) === true);
+  } catch {
+    return false;
+  }
+}
+
+// Marca quais jogadores da sala tem cargo ancora (Capitao/Staff/Admin).
+// Roda uma vez por partida (o resultado fica cacheado em context.resolvedPlayers).
+async function markAnchorPlayers(guild, groups) {
+  if (!Array.isArray(groups) || groups.length === 0) return groups;
+  const anchorRoleIds = getAnchorRoleIds();
+
+  await Promise.all(groups.map(async (group) => {
+    group.isAnchor = false;
+    if (!group.discordId || !guild?.members) return;
+
+    let member = guild.members.cache?.get?.(String(group.discordId)) || null;
+    if (!member && typeof guild.members.fetch === 'function') {
+      member = await guild.members.fetch(String(group.discordId)).catch(() => null);
+    }
+    if (!member) return;
+    group.isAnchor = isAnchorMember(member, anchorRoleIds);
+  }));
+
+  return groups;
+}
 
 function isClassicFiveVersusFive(match) {
   return match?.mode === 'classic' && (match?.format || '5x5') === '5x5';
@@ -41,7 +84,7 @@ function collectKnownPlayers(match, statsData = null) {
     if (!puuids.length) continue;
 
     const nickname = player.nickname || stored?.nickname || stored?.registeredNickname || null;
-    groups.push({ discordId: player.discordId || null, nickname, puuids });
+    groups.push({ discordId: player.discordId || null, nickname, puuids, isAnchor: false });
 
     for (const puuid of puuids) {
       byPuuid[puuid] = { discordId: player.discordId || null, nickname };
@@ -75,6 +118,7 @@ async function resolvePlayers(context) {
   }
 
   context.resolvedPlayers = collectKnownPlayers(context.match, statsData);
+  await markAnchorPlayers(context.guild, context.resolvedPlayers.groups);
   return context.resolvedPlayers;
 }
 
@@ -92,7 +136,18 @@ async function attemptPublish(context) {
   if (!riotService?.findCustomMatchByPuuids) return 'disabled';
 
   const { groups, puuids, byPuuid } = await resolvePlayers(context);
-  if (groups.length < 3) return 'disabled';
+  if (groups.length === 0) return 'disabled';
+
+  const anchorCount = groups.filter((group) => group.isAnchor).length;
+  // Sem conta ancora (Capitao/Staff/Admin) exigimos pelo menos 3 contas conhecidas.
+  if (anchorCount === 0 && groups.length < 3) {
+    console.log('[MATCH STATS] Ignorado: sem conta ancora na sala e menos de 3 contas conhecidas.');
+    return 'disabled';
+  }
+
+  if (attempt === 0) {
+    console.log(`[MATCH STATS] ${groups.length} conta(s) conhecida(s), ${anchorCount} ancora(s) na sala.`);
+  }
 
   let matchData;
   try {
@@ -178,8 +233,8 @@ function publishMatchStats({ guild, match, winningTeam, deps = {} } = {}) {
   if (!isClassicFiveVersusFive(match)) return false;
 
   const { groups } = collectKnownPlayers(match);
-  if (groups.length < 3) {
-    console.log(`[MATCH STATS] Ignorado: apenas ${groups.length} jogador(es) com conta vinculada na sala.`);
+  if (groups.length < 1) {
+    console.log('[MATCH STATS] Ignorado: nenhum jogador da sala tem conta vinculada.');
     return false;
   }
 
@@ -204,5 +259,8 @@ module.exports = {
   // expostos para testes
   isClassicFiveVersusFive,
   collectKnownPlayers,
+  getAnchorRoleIds,
+  isAnchorMember,
+  markAnchorPlayers,
   RETRY_DELAYS_MS
 };

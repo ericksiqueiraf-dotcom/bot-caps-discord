@@ -539,24 +539,31 @@ function createRiotService(apiKey, region = DEFAULT_REGION) {
   async function findCustomMatchByPuuids({ puuids = [], playerGroups = null, startTimeMs = null, count = 5 } = {}) {
     const groups = Array.isArray(playerGroups)
       ? playerGroups
-        .map((group) => [...new Set(
-          (Array.isArray(group?.puuids) ? group.puuids : []).filter(Boolean).map((puuid) => String(puuid))
-        )])
-        .filter((group) => group.length > 0)
+        .map((group) => ({
+          puuids: [...new Set(
+            (Array.isArray(group?.puuids) ? group.puuids : []).filter(Boolean).map((puuid) => String(puuid))
+          )],
+          isAnchor: Boolean(group?.isAnchor)
+        }))
+        .filter((group) => group.puuids.length > 0)
       : [];
 
     const flatPuuids = [...new Set(
       (groups.length
-        ? groups.flat()
+        ? groups.flatMap((group) => group.puuids)
         : (Array.isArray(puuids) ? puuids : [])
       ).filter(Boolean).map((puuid) => String(puuid))
     )].slice(0, 20);
 
-    // Com menos de 3 confirmacoes o risco de pegar a partida errada e alto.
-    if (flatPuuids.length < 3) return null;
+    if (flatPuuids.length < 1) return null;
 
     const totalPlayers = groups.length || flatPuuids.length;
-    const requiredPlayers = Math.max(3, Math.ceil(totalPlayers / 2));
+    const anchorGroups = groups.filter((group) => group.isAnchor);
+    const hasAnchor = anchorGroups.length > 0;
+    // Regra normal (sem ancora): maioria dos jogadores, minimo 3.
+    const strictRequired = Math.max(3, Math.ceil(totalPlayers / 2));
+    // Com uma conta ancora basta 1 confirmacao (ela sempre esta na custom).
+    const minVotes = hasAnchor ? 1 : strictRequired;
 
     const startSeconds = Number.isFinite(Number(startTimeMs))
       ? Math.max(0, Math.floor(Number(startTimeMs) / 1000) - 15 * 60)
@@ -591,7 +598,7 @@ function createRiotService(apiKey, region = DEFAULT_REGION) {
     if (ranked.length === 0) return null;
 
     for (const candidate of ranked) {
-      if (candidate.votes < requiredPlayers) break;
+      if (candidate.votes < minVotes) break;
 
       let match;
       try {
@@ -621,7 +628,14 @@ function createRiotService(apiKey, region = DEFAULT_REGION) {
       const present = groups.length
         ? countPlayerGroupsPresent(participants, groups)
         : participants.filter((participant) => flatPuuids.includes(String(participant.puuid))).length;
-      if (present < requiredPlayers) continue;
+      const anchorsPresent = groups.length
+        ? countPlayerGroupsPresent(participants, anchorGroups)
+        : 0;
+
+      // Aceita se uma conta ancora esta na partida OU se bate a regra normal (3+/maioria).
+      const acceptedByAnchor = hasAnchor && anchorsPresent >= 1;
+      const acceptedByVotes = present >= strictRequired;
+      if (!acceptedByAnchor && !acceptedByVotes) continue;
 
       return match;
     }
