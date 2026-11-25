@@ -5,6 +5,13 @@
 
 ---
 
+## Estado Operacional — 2026-11-25
+
+- **INFERNAL por sequência:** 5 wins = até as 08h; **10 wins = 5 dias**; cada 5 wins adicionais soma **+5 dias**. A validade é estendida (nunca encurtada) e a derrota reseta o marco da streak no modo jogado, para a próxima sequência de 5 contar de novo.
+- **Ranking/cargo TOP 1 INFERNAL:** uma única ordenação (conquistas > melhor sequência > nick) alimenta o embed, o badge do perfil e o cargo. `announceTopOneChanges` reconcilia o cargo exclusivo a cada `!vitoria` e no boot, removendo portadores antigos/órfãos.
+- **Correção aplicada:** coringahelp (10 seguidas) virou TOP 1 com 5 dias retroativos; lufty caiu para 2º (2 conquistas, melhor sequência 5). O cargo antigo de zumas/Y.A.B.A foi removido (não estava no ranking). Anúncio postado em `#conquistas`; `caps-bot` e `caps-bot-teste` reiniciados.
+- **Testes:** 359 no total, 355 verdes; 4 falhas pré-existentes (`balance` ×2, `clube-vip`, `evento-sexta`). Novos: `tests/infernal-streak.test.js` (9).
+
 ## Estado Operacional — 2026-11-02
 
 - **Balanceamento da fila (atualizado):** `services/balanceService.js:getBalanceWeight()` usa `player.mmr` quando disponível (MMR atual da fila, com base Riot e desempenho CAPS) e recua para `baseMmr` em torneios/chamadas sem MMR híbrido. O split testa todas as combinações e minimiza a diferença da soma; o embed agora chama os totais de MMR e explica a composição. Partidas já iniciadas não são rebalanceadas.

@@ -83,7 +83,9 @@ const KNOWN_EXPORT_GAPS = {
       'announceTopOneChanges', 'buildMvpMuralEmbed', 'getAvatarFrameType', 'getTopOneBadges',
       'recordWeeklyActivity', 'startWeeklySummaryScheduler',
       // Estatisticas pos-partida (Match-V5 por PUUID)
-      'CAPS_GRADE_CS_BASELINE', 'buildMatchStatsEmbed', 'computeCapsGrade', 'postMatchStatsLog'
+      'CAPS_GRADE_CS_BASELINE', 'buildMatchStatsEmbed', 'computeCapsGrade', 'postMatchStatsLog',
+      // Extensão de dias do INFERNAL (10 seguidas = 5 dias) e ranking único
+      'computeInfernalExpiry', 'getInfernalGrantDays', 'getInfernalRanking'
     ],
     lcl: [
       'DESAFIO_RULES_SECTIONS', 'LCL_QUEUE_BUTTON_IDS', 'LCL_TEAM_SIZE', 'addLclPresence',

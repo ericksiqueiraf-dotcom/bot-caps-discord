@@ -387,6 +387,31 @@ function buildClubeEmbed(guild) {
   return embed;
 }
 const INFERNAL_STREAK = 5;
+const INFERNAL_DAY_MS = 24 * 60 * 60 * 1000;
+
+// Dias concedidos por marco de streak:
+// - 5 wins: vale até as 08h do dia seguinte (regra histórica);
+// - 10 wins: 5 dias;
+// - cada 5 wins adicionais somam +5 dias (15 = 10 dias, 20 = 15 dias...).
+function getInfernalGrantDays(streak) {
+  const s = Number(streak || 0);
+  if (s < 10) return 0;
+  return 5 + Math.floor((s - 10) / INFERNAL_STREAK) * 5;
+}
+
+// Calcula a nova validade estendendo o que ainda estiver válido (nunca encurta).
+function computeInfernalExpiry(streak, currentExpiresAt = null, now = Date.now()) {
+  const days = getInfernalGrantDays(streak);
+  const currentMs = currentExpiresAt ? new Date(currentExpiresAt).getTime() : 0;
+  const validCurrentMs = Number.isFinite(currentMs) ? currentMs : 0;
+  const baseMs = Math.max(now, validCurrentMs);
+
+  if (days > 0) return new Date(baseMs + days * INFERNAL_DAY_MS).toISOString();
+  // Marco de 5: se já existe validade futura, estende +1 dia; senão vale até 08h SP.
+  if (validCurrentMs > now) return new Date(validCurrentMs + INFERNAL_DAY_MS).toISOString();
+  return getNextEightAmSaoPauloIso(new Date(now));
+}
+
 const MVP_VOTE_DURATION_MS = 2 * 60 * 1000;
 const pendingMvpVotes = new Map();
 const mvpVoteTimeouts = new Map();
@@ -1087,7 +1112,7 @@ async function hasInfernalPriority(guild, discordId, statsData = null) {
   }
 }
 
-async function syncInfernalRolesAfterMatch(guild, winners = [], losers = []) {
+async function syncInfernalRolesAfterMatch(guild, winners = [], losers = [], match = null) {
   const newlyAwarded = [];
   const removed = [];
   const failed = [];
@@ -1100,47 +1125,69 @@ async function syncInfernalRolesAfterMatch(guild, winners = [], losers = []) {
   }
 
   const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
+  const matchMode = match ? getStatsBucketKey(match.mode, match.format) : null;
 
   // Regra: derrota NAO tira o INFERNAL na hora. O cargo vale até as 08h do dia seguinte
   // (expira via expireInfernalRolesIfDue/reconcile). Aqui só registramos quem perdeu
-  // tendo o cargo, sem remover nada.
-  for (const loser of losers) {
+  // tendo o cargo, sem remover nada. A derrota reseta o marco da streak no modo jogado
+  // para a próxima sequência de 5 contar de novo.
+  if (losers.length > 0) {
     try {
       const statsData = await loadPlayerStats();
-      const stored = getStoredPlayerStats(statsData, loser);
-      const stillValid = stored?.infernalExpiresAt && new Date(stored.infernalExpiresAt).getTime() > Date.now();
-      if (stillValid) {
-        removed.push({ discordId: loser.discordId, nickname: loser.nickname, keptUntil: stored.infernalExpiresAt });
+      let changed = false;
+      for (const loser of losers) {
+        const stored = getStoredPlayerStats(statsData, loser);
+        if (!stored) continue;
+        const lastMilestone = Number(stored.infernalLastMilestone || 0);
+        const sameMode = !stored.infernalMilestoneMode || !matchMode || stored.infernalMilestoneMode === matchMode;
+        if (lastMilestone > 0 && sameMode) {
+          upsertPlayerStats(statsData, loser, { infernalLastMilestone: 0 });
+          changed = true;
+        }
+        const stillValid = stored?.infernalExpiresAt && new Date(stored.infernalExpiresAt).getTime() > Date.now();
+        if (stillValid) {
+          removed.push({ discordId: loser.discordId, nickname: loser.nickname, keptUntil: stored.infernalExpiresAt });
+        }
       }
+      if (changed) await savePlayerStats(statsData);
     } catch (err) {
-      failed.push({ discordId: loser.discordId, action: 'read_db', error: err.message });
+      failed.push({ action: 'read_db', error: err.message });
     }
   }
 
   for (const winner of winners) {
-    if (Number(winner.winStreak || 0) < INFERNAL_STREAK) {
+    const streak = Number(winner.winStreak || 0);
+    if (streak < INFERNAL_STREAK) {
       continue;
     }
 
     const statsData = await loadPlayerStats();
     const stored = getStoredPlayerStats(statsData, winner);
-    const streak = Number(winner.winStreak || 0);
+    const lastMilestone = Number(stored.infernalLastMilestone || 0);
     const stillValid = stored.infernalExpiresAt && new Date(stored.infernalExpiresAt).getTime() > Date.now();
     // Regra: 1 conquista INFERNAL a cada 5 vitorias consecutivas (marcos 5, 10, 15...).
     // Streak 6 = 1x INFERNAL; streak 10 = 2x. O mesmo marco da mesma streak nao conta de novo;
     // nova streak apos derrota conta normalmente (marco 5 de novo).
     const isMilestone = streak % INFERNAL_STREAK === 0;
-    const isNewMilestone = isMilestone && streak !== Number(stored.infernalLastMilestone || 0);
+    const isNewMilestone = isMilestone && streak !== lastMilestone;
 
     if (!isNewMilestone) {
       // Selo em curso valido ou streak sem marco novo (ex: 6a vitoria) — nada a conceder.
       continue;
     }
 
-    const infernalExpiresAt = getNextEightAmSaoPauloIso();
+    const infernalExpiresAt = computeInfernalExpiry(streak, stored.infernalExpiresAt);
+    const infernalDays = getInfernalGrantDays(streak);
     const infernalCount = Number(stored.infernalCount || 0) + 1;
+    const infernalBestStreak = Math.max(Number(stored.infernalBestStreak || 0), streak);
     try {
-      upsertPlayerStats(statsData, winner, { infernalExpiresAt, infernalCount, infernalLastMilestone: streak });
+      upsertPlayerStats(statsData, winner, {
+        infernalExpiresAt,
+        infernalCount,
+        infernalLastMilestone: streak,
+        infernalBestStreak,
+        infernalMilestoneMode: matchMode || stored.infernalMilestoneMode || null
+      });
       await savePlayerStats(statsData);
     } catch (err) {
       failed.push({ discordId: winner.discordId, action: 'save_db', error: err.message });
@@ -1152,22 +1199,30 @@ async function syncInfernalRolesAfterMatch(guild, winners = [], losers = []) {
       failed.push({ discordId: winner.discordId, action: 'add_role', error: 'member_not_found' });
       continue;
     }
-    if (!member.roles.cache.has(infernalRole.id)) {
+    const hadRole = member.roles.cache.has(infernalRole.id);
+    if (!hadRole) {
       if (botMember && infernalRole.position >= botMember.roles.highest.position) {
         failed.push({ discordId: winner.discordId, action: 'add_role', error: 'hierarchy' });
         continue;
       }
       try {
         await member.roles.add(infernalRole);
-        newlyAwarded.push({
-          discordId: winner.discordId,
-          nickname: winner.nickname,
-          winStreak: Number(winner.winStreak || 0),
-          infernalExpiresAt
-        });
       } catch (err) {
         failed.push({ discordId: winner.discordId, action: 'add_role', error: err.message });
+        continue;
       }
+    }
+
+    // Anuncia tanto o primeiro selo quanto a extensão de quem já tinha o cargo.
+    if (!hadRole || stillValid) {
+      newlyAwarded.push({
+        discordId: winner.discordId,
+        nickname: winner.nickname,
+        winStreak: streak,
+        infernalExpiresAt,
+        infernalDays,
+        extended: Boolean(hadRole && stillValid)
+      });
     }
 
     // Degustação do clube: nova conquista INFERNAL ganha 💜 Apoiador até o
@@ -1260,13 +1315,22 @@ async function postInfernalAnnouncement(guild, awarded = []) {
 
   const mentions = awarded.map((p) => `<@${p.discordId}>`).join(' ');
   const lines = awarded
-    .map((p) => `• **${p.nickname || p.discordId}** — \`${p.winStreak}\` vitorias seguidas (vale ate ${formatDateTimeForHistory(p.infernalExpiresAt)})${p.trialVip ? '\n  💜 Degustação **Apoiador** até o INFERNAL vencer!' : ''}`)
+    .map((p) => {
+      const bonus = Number(p.infernalDays || 0) > 0 ? ` — **+${p.infernalDays} dias**` : '';
+      return `• **${p.nickname || p.discordId}** — \`${p.winStreak}\` vitorias seguidas${bonus} (vale ate ${formatDateTimeForHistory(p.infernalExpiresAt)})${p.trialVip ? '\n  💜 Degustação **Apoiador** até o INFERNAL vencer!' : ''}`;
+    })
     .join('\n');
+  const onlyExtensions = awarded.every((p) => p.extended);
+  const bestStreak = Math.max(...awarded.map((p) => Number(p.winStreak || 0)));
 
   const embed = new EmbedBuilder()
     .setColor(THEME.RANK)
-    .setTitle('🔥 NOVO INFERNAL 🔥')
-    .setDescription(`${mentions}\nChegou a **${INFERNAL_STREAK} vitorias seguidas** e conquistou o cargo **${INFERNAL_ROLE_NAME}**!`)
+    .setTitle(onlyExtensions ? '🔥 INFERNAL ESTENDIDO 🔥' : '🔥 NOVO INFERNAL 🔥')
+    .setDescription(
+      onlyExtensions
+        ? `${mentions}\nChegou a **${bestStreak} vitorias seguidas** e o cargo **${INFERNAL_ROLE_NAME}** foi estendido!`
+        : `${mentions}\nChegou a **${bestStreak} vitorias seguidas** e conquistou o cargo **${INFERNAL_ROLE_NAME}**!`
+    )
     .addFields({ name: 'Conquistas', value: lines || 'Sem detalhes' })
     .setFooter({ text: `${FOOTER_PREFIX} • Streak INFERNAL` })
     .setTimestamp();
@@ -1877,7 +1941,7 @@ const RULES_SECTIONS = [
   },
   {
     name: '🔥 5. Cargo INFERNAL (5 vitórias seguidas)',
-    value: 'Fez 5 wins seguidas? Ganha o cargo até as **08h da manhã seguinte** (perder no caminho não tira). Dá prioridade: entra direto na **posição 5 da `!espera`** e **não cai na roleta**. `!sync infernal` (admin) conserta casos travados.'
+    value: 'Fez 5 wins seguidas? Ganha o cargo até as **08h da manhã seguinte** (perder no caminho não tira). **10 seguidas = 5 dias** e cada 5 vitórias a mais soma **+5 dias**. Dá prioridade: entra direto na **posição 5 da `!espera`** e **não cai na roleta**. `!sync infernal` (admin) conserta casos travados.'
   },
   {
     name: '⏳ 6. Espera e 🎯 roleta',
@@ -2391,6 +2455,27 @@ function formatMasteryPoints(points) {
   return `${points}`;
 }
 
+// ─── Ranking único do INFERNAL (badge, cargo TOP 1 e embed usam a mesma ordem) ─
+// Mais conquistas > melhor sequência > nick. Assim 10 seguidas vencem duas
+// sequências de 5, e o cargo nunca fica em alguém fora do topo.
+function getInfernalRanking(statsData) {
+  const now = Date.now();
+  return Object.values(statsData?.players || {})
+    .map((p) => ({
+      discordId: p.discordId,
+      nickname: p.registeredNickname || p.nickname || p.discordId,
+      infernalCount: Number(p.infernalCount || 0),
+      bestStreak: Number(p.infernalBestStreak || p.infernalLastMilestone || 0),
+      active: Boolean(p.infernalExpiresAt && new Date(p.infernalExpiresAt).getTime() > now)
+    }))
+    .filter((p) => p.discordId && p.infernalCount > 0)
+    .sort((a, b) =>
+      b.infernalCount - a.infernalCount
+      || b.bestStreak - a.bestStreak
+      || String(a.nickname).localeCompare(String(b.nickname))
+    );
+}
+
 // ─── Badges TOP 1 do perfil (mesmos rankings dos comandos !placar/!topstreak/!toprankinfernal) ──
 function getTopOneBadges(statsData, seasonMeta, systemMeta, discordId) {
   const badges = [];
@@ -2406,10 +2491,7 @@ function getTopOneBadges(statsData, seasonMeta, systemMeta, discordId) {
 
     // Streak e INFERNAL medem a mesma coisa (5 wins seguidas): mantemos só o INFERNAL.
 
-    const infernalTop = Object.values(statsData?.players || {})
-      .map((p) => ({ discordId: p.discordId, infernalCount: Number(p.infernalCount || 0) }))
-      .filter((p) => p.discordId && p.infernalCount > 0)
-      .sort((a, b) => b.infernalCount - a.infernalCount)[0];
+    const infernalTop = getInfernalRanking(statsData)[0];
     if (infernalTop?.discordId === discordId) badges.push('🔥 TOP 1 INFERNAL');
   } catch { /* badges sao cosméticas: nunca quebrar o perfil */ }
   return badges;
@@ -2454,14 +2536,7 @@ async function postAchievementEmbed(guild, embed) {
 }
 
 function getTopOneLeaderboards(statsData, seasonMeta, systemMeta) {
-  const infernalTop = Object.values(statsData?.players || {})
-    .map((p) => ({
-      discordId: p.discordId,
-      nickname: p.registeredNickname || p.nickname || p.discordId,
-      infernalCount: Number(p.infernalCount || 0)
-    }))
-    .filter((p) => p.discordId && p.infernalCount > 0)
-    .sort((a, b) => b.infernalCount - a.infernalCount)[0] || null;
+  const infernalTop = getInfernalRanking(statsData)[0] || null;
 
   return {
     classic: getRankedPlayersByMode(statsData, QUEUE_MODES.CLASSIC, null, seasonMeta)[0] || null,
@@ -2495,10 +2570,44 @@ async function announceTopOneChanges(guild) {
     systemMeta.topOneAnnouncements ||= {};
     let changed = false;
 
+    // Cache completo para enxergar todos os portadores dos cargos TOP 1.
+    if (guild.members.cache.size < guild.memberCount) {
+      await guild.members.fetch().catch(() => null);
+    }
+
     for (const key of Object.keys(TOP_ONE_LABELS)) {
       const leader = tops[key];
-      if (!leader?.discordId) continue;
-      if (systemMeta.topOneAnnouncements[key] === leader.discordId) continue;
+      const previous = systemMeta.topOneAnnouncements[key];
+      const role = await ensureNamedRole(guild, TOP_ONE_ROLE_NAMES[key]);
+
+      // Cargo é exclusivo: remove de todos que não são o líder atual, mesmo
+      // quando o líder não mudou (corrige cargos antigos/órfãos).
+      if (role) {
+        for (const member of [...role.members.values()]) {
+          if (!leader?.discordId || member.id !== leader.discordId) {
+            await member.roles.remove(role, 'Perdeu a lideranca do TOP 1').catch(() => null);
+          }
+        }
+        if (leader?.discordId) {
+          const leaderMember = guild.members.cache.get(leader.discordId)
+            || await guild.members.fetch(leader.discordId).catch(() => null);
+          if (leaderMember && !leaderMember.roles.cache.has(role.id)) {
+            await leaderMember.roles.add(role, 'Novo lider do TOP 1').catch((error) => {
+              console.warn('[CONQUISTAS] Falha ao dar cargo de TOP 1:', error.message);
+            });
+          }
+        }
+      }
+
+      if (!leader?.discordId) {
+        if (previous) {
+          delete systemMeta.topOneAnnouncements[key];
+          changed = true;
+        }
+        continue;
+      }
+      if (previous === leader.discordId) continue;
+
       systemMeta.topOneAnnouncements[key] = leader.discordId;
       changed = true;
 
@@ -2513,22 +2622,6 @@ async function announceTopOneChanges(guild) {
         .setFooter({ text: `${FOOTER_PREFIX} • Conquistas` })
         .setTimestamp();
       await postAchievementEmbed(guild, embed);
-
-      const role = await ensureNamedRole(guild, TOP_ONE_ROLE_NAMES[key]);
-      if (role) {
-        for (const member of [...role.members.values()]) {
-          if (member.id !== leader.discordId) {
-            await member.roles.remove(role, 'Perdeu a lideranca do TOP 1').catch(() => null);
-          }
-        }
-        const leaderMember = guild.members.cache.get(leader.discordId)
-          || await guild.members.fetch(leader.discordId).catch(() => null);
-        if (leaderMember) {
-          await leaderMember.roles.add(role, 'Novo lider do TOP 1').catch((error) => {
-            console.warn('[CONQUISTAS] Falha ao dar cargo de TOP 1:', error.message);
-          });
-        }
-      }
     }
 
     if (changed) {
@@ -3826,17 +3919,7 @@ function buildTopStreakEmbed(statsData, mode, format = null) {
 }
 
 function buildTopInfernalEmbed(statsData, seasonMeta) {
-  const now = Date.now();
-  const ranked = Object.values(statsData?.players || {})
-    .map((p) => ({
-      discordId: p.discordId,
-      nickname: p.registeredNickname || p.nickname || p.discordId,
-      infernalCount: Number(p.infernalCount || 0),
-      active: Boolean(p.infernalExpiresAt && new Date(p.infernalExpiresAt).getTime() > now)
-    }))
-    .filter((p) => p.discordId && p.infernalCount > 0)
-    .sort((a, b) => b.infernalCount - a.infernalCount || String(a.nickname).localeCompare(String(b.nickname)))
-    .slice(0, 10);
+  const ranked = getInfernalRanking(statsData).slice(0, 10);
   const medals = ['🥇', '🥈', '🥉'];
 
   const embed = new EmbedBuilder()
@@ -3854,7 +3937,8 @@ function buildTopInfernalEmbed(statsData, seasonMeta) {
   const entries = ranked.map((player, index) => {
     const medal = medals[index] || `#${index + 1}`;
     const active = player.active ? ' 🔥' : '';
-    return `${medal} <@${player.discordId}> | \`${player.nickname}\`${active}\nINFERNAL conquistado: **${player.infernalCount}x**`;
+    const best = player.bestStreak > 0 ? ` (melhor sequência: **${player.bestStreak}**)` : '';
+    return `${medal} <@${player.discordId}> | \`${player.nickname}\`${active}\nINFERNAL conquistado: **${player.infernalCount}x**${best}`;
   });
 
   splitEmbedFieldChunks(entries).forEach((chunk, index) => {
@@ -4115,6 +4199,9 @@ module.exports = {
   syncMvpRole,
   clearMvpRoles,
   syncInfernalRolesAfterMatch,
+  getInfernalGrantDays,
+  computeInfernalExpiry,
+  getInfernalRanking,
   hasInfernalPriority,
   reconcileInfernalRoles,
   postInfernalAnnouncement,

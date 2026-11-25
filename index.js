@@ -442,6 +442,7 @@ const {
   handleMvpVoteInteraction,
   resumePendingMvpVotes,
   expireInfernalRolesIfDue,
+  announceTopOneChanges,
   parseQueueJoinButtonId,
   startDailyRankScheduler,
   startWeeklySummaryScheduler,
@@ -540,6 +541,8 @@ client.once('ready', async () => {
     for (const guild of client.guilds.cache.values()) {
       await expireInfernalRolesIfDue(guild);
       await reconcileInfernalRoles(guild).catch(() => null);
+      // Reconcilia os cargos TOP 1 (remove portadores antigos/órfãos).
+      await announceTopOneChanges(guild).catch(() => null);
     }
   } catch (err) {
     console.error('[RESTART] Erro ao expirar cargos INFERNAL:', err);

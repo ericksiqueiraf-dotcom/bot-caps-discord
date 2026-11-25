@@ -111,7 +111,7 @@ async function handleVictoryCommandFlow({
   // INFERNAL: cargo automatico para 5+ vitorias seguidas (vale ate as 08h; derrota nao tira na hora)
   // + anuncio dos recem-premiados no canal de destaques. Nunca quebra o !vitoria.
   try {
-    const infernalAwarded = await syncInfernalRolesAfterMatch(message.guild, winners, losers);
+    const infernalAwarded = await syncInfernalRolesAfterMatch(message.guild, winners, losers, match);
     await postInfernalAnnouncement(message.guild, infernalAwarded);
     if (Array.isArray(infernalAwarded?.failed) && infernalAwarded.failed.length > 0) {
       await replyToMessage(message, `⚠️ INFERNAL com ${infernalAwarded.failed.length} falha(s): ${infernalAwarded.failed.map((f) => `${f.discordId} (${f.error})`).join(', ')}`);
