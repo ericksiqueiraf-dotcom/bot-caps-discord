@@ -30,10 +30,16 @@ describe('duração do cargo INFERNAL', () => {
     assert.equal(expiry, new Date(now + 5 * DAY).toISOString());
   });
 
-  it('estende a validade existente em vez de encurtar', () => {
+  it('10 seguidas garante 5 dias a partir de agora (estende o que for menor)', () => {
     const now = Date.parse('2026-11-25T12:00:00Z');
     const current = new Date(now + 3 * DAY).toISOString();
-    assert.equal(computeInfernalExpiry(10, current, now), new Date(now + 8 * DAY).toISOString());
+    assert.equal(computeInfernalExpiry(10, current, now), new Date(now + 5 * DAY).toISOString());
+  });
+
+  it('não encurta uma validade maior que já exista', () => {
+    const now = Date.parse('2026-11-25T12:00:00Z');
+    const current = new Date(now + 8 * DAY).toISOString();
+    assert.equal(computeInfernalExpiry(10, current, now), current);
   });
 
   it('marco de 5 com validade ativa estende +1 dia', () => {

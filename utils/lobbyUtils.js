@@ -399,14 +399,16 @@ function getInfernalGrantDays(streak) {
   return 5 + Math.floor((s - 10) / INFERNAL_STREAK) * 5;
 }
 
-// Calcula a nova validade estendendo o que ainda estiver válido (nunca encurta).
+// Calcula a nova validade do marco: 10 wins = 5 dias a partir de agora (ou
+// mantém uma validade maior que já exista). Nunca encurta o que está valendo.
 function computeInfernalExpiry(streak, currentExpiresAt = null, now = Date.now()) {
   const days = getInfernalGrantDays(streak);
   const currentMs = currentExpiresAt ? new Date(currentExpiresAt).getTime() : 0;
   const validCurrentMs = Number.isFinite(currentMs) ? currentMs : 0;
-  const baseMs = Math.max(now, validCurrentMs);
 
-  if (days > 0) return new Date(baseMs + days * INFERNAL_DAY_MS).toISOString();
+  if (days > 0) {
+    return new Date(Math.max(now + days * INFERNAL_DAY_MS, validCurrentMs)).toISOString();
+  }
   // Marco de 5: se já existe validade futura, estende +1 dia; senão vale até 08h SP.
   if (validCurrentMs > now) return new Date(validCurrentMs + INFERNAL_DAY_MS).toISOString();
   return getNextEightAmSaoPauloIso(new Date(now));
@@ -1177,7 +1179,6 @@ async function syncInfernalRolesAfterMatch(guild, winners = [], losers = [], mat
     }
 
     const infernalExpiresAt = computeInfernalExpiry(streak, stored.infernalExpiresAt);
-    const infernalDays = getInfernalGrantDays(streak);
     const infernalCount = Number(stored.infernalCount || 0) + 1;
     const infernalBestStreak = Math.max(Number(stored.infernalBestStreak || 0), streak);
     try {
@@ -1220,7 +1221,6 @@ async function syncInfernalRolesAfterMatch(guild, winners = [], losers = [], mat
         nickname: winner.nickname,
         winStreak: streak,
         infernalExpiresAt,
-        infernalDays,
         extended: Boolean(hadRole && stillValid)
       });
     }
@@ -1315,10 +1315,7 @@ async function postInfernalAnnouncement(guild, awarded = []) {
 
   const mentions = awarded.map((p) => `<@${p.discordId}>`).join(' ');
   const lines = awarded
-    .map((p) => {
-      const bonus = Number(p.infernalDays || 0) > 0 ? ` — **+${p.infernalDays} dias**` : '';
-      return `• **${p.nickname || p.discordId}** — \`${p.winStreak}\` vitorias seguidas${bonus} (vale ate ${formatDateTimeForHistory(p.infernalExpiresAt)})${p.trialVip ? '\n  💜 Degustação **Apoiador** até o INFERNAL vencer!' : ''}`;
-    })
+    .map((p) => `• **${p.nickname || p.discordId}** — \`${p.winStreak}\` vitorias seguidas (vale ate ${formatDateTimeForHistory(p.infernalExpiresAt)})${p.trialVip ? '\n  💜 Degustação **Apoiador** até o INFERNAL vencer!' : ''}`)
     .join('\n');
   const onlyExtensions = awarded.every((p) => p.extended);
   const bestStreak = Math.max(...awarded.map((p) => Number(p.winStreak || 0)));
