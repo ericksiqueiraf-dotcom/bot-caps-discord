@@ -108,7 +108,7 @@ async function handleVictoryCommandFlow({
 
   const { winners, losers } = match;
 
-  // INFERNAL: cargo automatico para 5+ vitorias seguidas (vale ate as 08h; derrota nao tira na hora)
+  // INFERNAL: cargo automatico para 5+ vitorias seguidas (5 = 3 dias; 10 = 5 dias; derrota nao tira na hora)
   // + anuncio dos recem-premiados no canal de destaques. Nunca quebra o !vitoria.
   try {
     const infernalAwarded = await syncInfernalRolesAfterMatch(message.guild, winners, losers, match);

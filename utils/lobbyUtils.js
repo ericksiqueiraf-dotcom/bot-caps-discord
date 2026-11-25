@@ -390,17 +390,18 @@ const INFERNAL_STREAK = 5;
 const INFERNAL_DAY_MS = 24 * 60 * 60 * 1000;
 
 // Dias concedidos por marco de streak:
-// - 5 wins: vale até as 08h do dia seguinte (regra histórica);
+// - 5 wins: 3 dias;
 // - 10 wins: 5 dias;
 // - cada 5 wins adicionais somam +5 dias (15 = 10 dias, 20 = 15 dias...).
 function getInfernalGrantDays(streak) {
   const s = Number(streak || 0);
-  if (s < 10) return 0;
+  if (s < INFERNAL_STREAK) return 0;
+  if (s < 10) return 3;
   return 5 + Math.floor((s - 10) / INFERNAL_STREAK) * 5;
 }
 
-// Calcula a nova validade do marco: 10 wins = 5 dias a partir de agora (ou
-// mantém uma validade maior que já exista). Nunca encurta o que está valendo.
+// Calcula a nova validade do marco: 5 wins = 3 dias, 10 wins = 5 dias etc.
+// Mantém uma validade maior que já exista; nunca encurta o que está valendo.
 function computeInfernalExpiry(streak, currentExpiresAt = null, now = Date.now()) {
   const days = getInfernalGrantDays(streak);
   const currentMs = currentExpiresAt ? new Date(currentExpiresAt).getTime() : 0;
@@ -409,8 +410,8 @@ function computeInfernalExpiry(streak, currentExpiresAt = null, now = Date.now()
   if (days > 0) {
     return new Date(Math.max(now + days * INFERNAL_DAY_MS, validCurrentMs)).toISOString();
   }
-  // Marco de 5: se já existe validade futura, estende +1 dia; senão vale até 08h SP.
-  if (validCurrentMs > now) return new Date(validCurrentMs + INFERNAL_DAY_MS).toISOString();
+  // Sem marco (streak < 5): mantém a validade atual ou cai nas 08h SP.
+  if (validCurrentMs > now) return new Date(validCurrentMs).toISOString();
   return getNextEightAmSaoPauloIso(new Date(now));
 }
 
@@ -1129,8 +1130,9 @@ async function syncInfernalRolesAfterMatch(guild, winners = [], losers = [], mat
   const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
   const matchMode = match ? getStatsBucketKey(match.mode, match.format) : null;
 
-  // Regra: derrota NAO tira o INFERNAL na hora. O cargo vale até as 08h do dia seguinte
-  // (expira via expireInfernalRolesIfDue/reconcile). Aqui só registramos quem perdeu
+  // Regra: derrota NAO tira o INFERNAL na hora. O cargo vale até a validade do marco
+  // (5 wins = 3 dias; 10 = 5 dias...; expira via expireInfernalRolesIfDue/reconcile).
+  // Aqui só registramos quem perdeu
   // tendo o cargo, sem remover nada. A derrota reseta o marco da streak no modo jogado
   // para a próxima sequência de 5 contar de novo.
   if (losers.length > 0) {
@@ -1938,7 +1940,7 @@ const RULES_SECTIONS = [
   },
   {
     name: '🔥 5. Cargo INFERNAL (5 vitórias seguidas)',
-    value: 'Fez 5 wins seguidas? Ganha o cargo até as **08h da manhã seguinte** (perder no caminho não tira). **10 seguidas = 5 dias** e cada 5 vitórias a mais soma **+5 dias**. Dá prioridade: entra direto na **posição 5 da `!espera`** e **não cai na roleta**. `!sync infernal` (admin) conserta casos travados.'
+    value: 'Fez 5 wins seguidas? Ganha o cargo por **3 dias** (perder no caminho não tira). **10 seguidas = 5 dias** e cada 5 vitórias a mais soma **+5 dias**. Dá prioridade: entra direto na **posição 5 da `!espera`** e **não cai na roleta**. `!sync infernal` (admin) conserta casos travados.'
   },
   {
     name: '⏳ 6. Espera e 🎯 roleta',

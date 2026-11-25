@@ -1,4 +1,4 @@
-// INFERNAL: extensão de dias por sequência (10 seguidas = 5 dias) e ranking único.
+// INFERNAL: duração por sequência (5 = 3 dias, 10 = 5 dias) e ranking único.
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const {
@@ -11,10 +11,10 @@ const {
 const DAY = 24 * 60 * 60 * 1000;
 
 describe('duração do cargo INFERNAL', () => {
-  it('marco de 5 mantém a regra antiga (até 08h SP)', () => {
-    assert.equal(getInfernalGrantDays(5), 0);
-    assert.equal(getInfernalGrantDays(6), 0);
-    assert.equal(getInfernalGrantDays(9), 0);
+  it('5 seguidas = 3 dias (6 a 9 mantêm o mesmo marco)', () => {
+    assert.equal(getInfernalGrantDays(5), 3);
+    assert.equal(getInfernalGrantDays(6), 3);
+    assert.equal(getInfernalGrantDays(9), 3);
   });
 
   it('10 seguidas = 5 dias; cada 5 a mais soma +5 dias', () => {
@@ -42,15 +42,28 @@ describe('duração do cargo INFERNAL', () => {
     assert.equal(computeInfernalExpiry(10, current, now), current);
   });
 
-  it('marco de 5 com validade ativa estende +1 dia', () => {
+  it('5 seguidas sem validade atual vale 3 dias a partir de agora', () => {
+    const now = Date.parse('2026-11-25T12:00:00Z');
+    assert.equal(computeInfernalExpiry(5, null, now), new Date(now + 3 * DAY).toISOString());
+  });
+
+  it('5 seguidas garante 3 dias (estende o que for menor)', () => {
     const now = Date.parse('2026-11-25T12:00:00Z');
     const current = new Date(now + 2 * DAY).toISOString();
     assert.equal(computeInfernalExpiry(5, current, now), new Date(now + 3 * DAY).toISOString());
   });
 
-  it('marco de 5 sem validade ativa cai nas 08h de São Paulo', () => {
+  it('5 seguidas não encurta uma validade maior', () => {
     const now = Date.parse('2026-11-25T12:00:00Z');
-    const expiry = new Date(computeInfernalExpiry(5, null, now));
+    const current = new Date(now + 5 * DAY).toISOString();
+    assert.equal(computeInfernalExpiry(5, current, now), current);
+  });
+
+  it('streak abaixo de 5 mantém a validade atual ou cai nas 08h SP', () => {
+    const now = Date.parse('2026-11-25T12:00:00Z');
+    const current = new Date(now + 2 * DAY).toISOString();
+    assert.equal(computeInfernalExpiry(4, current, now), current);
+    const expiry = new Date(computeInfernalExpiry(4, null, now));
     assert.ok(expiry.getTime() > now);
     assert.ok(expiry.getTime() <= now + DAY);
     assert.equal(expiry.getUTCHours(), 11); // 08h em São Paulo (UTC-3)
