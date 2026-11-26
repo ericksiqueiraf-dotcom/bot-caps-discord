@@ -249,7 +249,7 @@ async function executeRouletteDraw({ guild, origin, pool, count, winners, deps }
 }
 
 async function handleRouletteCommandFlow({ message, args, deps }) {
-  const { loadSystemMeta, replyToMessage, hasInfernalPriority } = deps;
+  const { loadSystemMeta, replyToMessage, hasInfernalRouletteProtection } = deps;
 
   const { count, letter } = parseRouletteArgs(args);
   const staff = hasStaffPower(message.member);
@@ -294,7 +294,7 @@ async function handleRouletteCommandFlow({ message, args, deps }) {
   const optOutIds = getOptOutIds(message.guild.id, origin.letter || targetLetter, origin.matchId);
   const pool = [];
   for (const loser of applyOptOuts(losers, optOutIds)) {
-    const infernal = await hasInfernalPriority(message.guild, loser.discordId).catch(() => false);
+    const infernal = await hasInfernalRouletteProtection(message.guild, loser.discordId).catch(() => false);
     if (infernal && !allowInfernal) continue;
     pool.push({ discordId: loser.discordId, nickname: loser.nickname, isInfernal: Boolean(infernal), allowInfernal: Boolean(allowInfernal) });
   }

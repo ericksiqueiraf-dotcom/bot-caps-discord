@@ -1099,17 +1099,43 @@ async function clearMvpRoles(guild) {
   }
 }
 
+// A proteção da roleta vale para a PRIMEIRA derrota depois de uma vitória.
+// Se perder de novo sem vencer, volta a ser roletável até ganhar de novo.
+function hasInfernalProtectionAvailable(stored, now = Date.now()) {
+  if (!stored?.infernalExpiresAt) return false;
+  if (new Date(stored.infernalExpiresAt).getTime() <= now) return false;
+  return Number(stored.infernalLossesSinceWin || 0) < 2;
+}
+
+function findStoredByDiscordId(data, discordId) {
+  return Object.values(data?.players || {}).find((entry) => entry.discordId === discordId) || null;
+}
+
 async function hasInfernalPriority(guild, discordId, statsData = null) {
   if (!guild || !discordId) return false;
   try {
     const data = statsData || await loadPlayerStats();
-    const stored = Object.values(data.players || {}).find((entry) => entry.discordId === discordId) || null;
+    const stored = findStoredByDiscordId(data, discordId);
     const validDb = stored?.infernalExpiresAt && new Date(stored.infernalExpiresAt).getTime() > Date.now();
     if (!validDb) return false;
     const member = await guild.members.fetch(discordId).catch(() => null);
     const role = findInfernalRole(guild);
     if (!role) return true; // banco válido mesmo sem cargo no servidor
     return Boolean(member?.roles.cache.has(role.id));
+  } catch {
+    return false;
+  }
+}
+
+// Proteção da roleta: além do cargo válido, exige que o jogador não tenha
+// perdido duas partidas seguidas sem vencer (benefício não pode ser usado 2x seguidas).
+async function hasInfernalRouletteProtection(guild, discordId, statsData = null) {
+  if (!guild || !discordId) return false;
+  try {
+    const data = statsData || await loadPlayerStats();
+    const stored = findStoredByDiscordId(data, discordId);
+    if (!hasInfernalProtectionAvailable(stored)) return false;
+    return hasInfernalPriority(guild, discordId, data);
   } catch {
     return false;
   }
@@ -1142,15 +1168,23 @@ async function syncInfernalRolesAfterMatch(guild, winners = [], losers = [], mat
       for (const loser of losers) {
         const stored = getStoredPlayerStats(statsData, loser);
         if (!stored) continue;
+        const stillValid = stored?.infernalExpiresAt && new Date(stored.infernalExpiresAt).getTime() > Date.now();
+        const updates = {};
         const lastMilestone = Number(stored.infernalLastMilestone || 0);
         const sameMode = !stored.infernalMilestoneMode || !matchMode || stored.infernalMilestoneMode === matchMode;
         if (lastMilestone > 0 && sameMode) {
-          upsertPlayerStats(statsData, loser, { infernalLastMilestone: 0 });
-          changed = true;
+          updates.infernalLastMilestone = 0;
         }
-        const stillValid = stored?.infernalExpiresAt && new Date(stored.infernalExpiresAt).getTime() > Date.now();
         if (stillValid) {
+          // Primeira derrota da sequência usa o benefício; a segunda já não usa.
+          updates.infernalLossesSinceWin = Math.min(2, Number(stored.infernalLossesSinceWin || 0) + 1);
           removed.push({ discordId: loser.discordId, nickname: loser.nickname, keptUntil: stored.infernalExpiresAt });
+        } else if (Number(stored.infernalLossesSinceWin || 0) > 0) {
+          updates.infernalLossesSinceWin = 0;
+        }
+        if (Object.keys(updates).length > 0) {
+          upsertPlayerStats(statsData, loser, updates);
+          changed = true;
         }
       }
       if (changed) await savePlayerStats(statsData);
@@ -1161,39 +1195,51 @@ async function syncInfernalRolesAfterMatch(guild, winners = [], losers = [], mat
 
   for (const winner of winners) {
     const streak = Number(winner.winStreak || 0);
-    if (streak < INFERNAL_STREAK) {
-      continue;
-    }
-
     const statsData = await loadPlayerStats();
     const stored = getStoredPlayerStats(statsData, winner);
-    const lastMilestone = Number(stored.infernalLastMilestone || 0);
     const stillValid = stored.infernalExpiresAt && new Date(stored.infernalExpiresAt).getTime() > Date.now();
     // Regra: 1 conquista INFERNAL a cada 5 vitorias consecutivas (marcos 5, 10, 15...).
     // Streak 6 = 1x INFERNAL; streak 10 = 2x. O mesmo marco da mesma streak nao conta de novo;
     // nova streak apos derrota conta normalmente (marco 5 de novo).
-    const isMilestone = streak % INFERNAL_STREAK === 0;
-    const isNewMilestone = isMilestone && streak !== lastMilestone;
+    let isNewMilestone = false;
+    let infernalExpiresAt = null;
+    let infernalCount = 0;
+    let infernalBestStreak = 0;
+    if (streak >= INFERNAL_STREAK) {
+      const lastMilestone = Number(stored.infernalLastMilestone || 0);
+      const isMilestone = streak % INFERNAL_STREAK === 0;
+      isNewMilestone = isMilestone && streak !== lastMilestone;
+      if (isNewMilestone) {
+        infernalExpiresAt = computeInfernalExpiry(streak, stored.infernalExpiresAt);
+        infernalCount = Number(stored.infernalCount || 0) + 1;
+        infernalBestStreak = Math.max(Number(stored.infernalBestStreak || 0), streak);
+      }
+    }
+
+    // Vitória renova o benefício do INFERNAL, mesmo sem novo marco.
+    const resetProtection = Number(stored.infernalLossesSinceWin || 0) > 0;
+    if (isNewMilestone || resetProtection) {
+      const updates = isNewMilestone
+        ? {
+            infernalExpiresAt,
+            infernalCount,
+            infernalLastMilestone: streak,
+            infernalBestStreak,
+            infernalMilestoneMode: matchMode || stored.infernalMilestoneMode || null,
+            infernalLossesSinceWin: 0
+          }
+        : { infernalLossesSinceWin: 0 };
+      try {
+        upsertPlayerStats(statsData, winner, updates);
+        await savePlayerStats(statsData);
+      } catch (err) {
+        failed.push({ discordId: winner.discordId, action: 'save_db', error: err.message });
+        continue;
+      }
+    }
 
     if (!isNewMilestone) {
       // Selo em curso valido ou streak sem marco novo (ex: 6a vitoria) — nada a conceder.
-      continue;
-    }
-
-    const infernalExpiresAt = computeInfernalExpiry(streak, stored.infernalExpiresAt);
-    const infernalCount = Number(stored.infernalCount || 0) + 1;
-    const infernalBestStreak = Math.max(Number(stored.infernalBestStreak || 0), streak);
-    try {
-      upsertPlayerStats(statsData, winner, {
-        infernalExpiresAt,
-        infernalCount,
-        infernalLastMilestone: streak,
-        infernalBestStreak,
-        infernalMilestoneMode: matchMode || stored.infernalMilestoneMode || null
-      });
-      await savePlayerStats(statsData);
-    } catch (err) {
-      failed.push({ discordId: winner.discordId, action: 'save_db', error: err.message });
       continue;
     }
 
@@ -1471,7 +1517,7 @@ async function expireInfernalRolesIfDue(guild) {
       continue;
     }
 
-    upsertPlayerStats(statsData, player, { infernalExpiresAt: null });
+    upsertPlayerStats(statsData, player, { infernalExpiresAt: null, infernalLossesSinceWin: 0 });
     changed = true;
 
     if (!infernalRole || !player.discordId) {
@@ -1940,7 +1986,7 @@ const RULES_SECTIONS = [
   },
   {
     name: '🔥 5. Cargo INFERNAL (5 vitórias seguidas)',
-    value: 'Fez 5 wins seguidas? Ganha o cargo por **3 dias** (perder no caminho não tira). **10 seguidas = 5 dias** e cada 5 vitórias a mais soma **+5 dias**. Dá prioridade: entra direto na **posição 5 da `!espera`** e **não cai na roleta**. `!sync infernal` (admin) conserta casos travados.'
+    value: 'Fez 5 wins seguidas? Ganha o cargo por **3 dias** (perder no caminho não tira). **10 seguidas = 5 dias** e cada 5 vitórias a mais soma **+5 dias**. Dá prioridade: entra direto na **posição 5 da `!espera`** e **não cai na roleta**. A proteção da roleta vale na **primeira derrota** da sequência; se perder de novo sem vencer, volta a ser roletável (o cargo e a prioridade da espera seguem valendo até o prazo). `!sync infernal` (admin) conserta casos travados.'
   },
   {
     name: '⏳ 6. Espera e 🎯 roleta',
@@ -4202,6 +4248,7 @@ module.exports = {
   computeInfernalExpiry,
   getInfernalRanking,
   hasInfernalPriority,
+  hasInfernalRouletteProtection,
   reconcileInfernalRoles,
   postInfernalAnnouncement,
   postRouletteAnnouncement,

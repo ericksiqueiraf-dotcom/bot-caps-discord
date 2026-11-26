@@ -5,7 +5,9 @@ const {
   getInfernalGrantDays,
   computeInfernalExpiry,
   getInfernalRanking,
-  buildTopInfernalEmbed
+  buildTopInfernalEmbed,
+  hasInfernalPriority,
+  hasInfernalRouletteProtection
 } = require('../utils/lobbyUtils');
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -67,6 +69,49 @@ describe('duração do cargo INFERNAL', () => {
     assert.ok(expiry.getTime() > now);
     assert.ok(expiry.getTime() <= now + DAY);
     assert.equal(expiry.getUTCHours(), 11); // 08h em São Paulo (UTC-3)
+  });
+});
+
+describe('proteção da roleta do INFERNAL (não pode usar 2x seguidas)', () => {
+  // Guild mínima: sem cargo cadastrado, o banco válido já libera a prioridade.
+  const guild = { roles: { cache: [] }, members: { fetch: async () => null } };
+  const future = new Date(Date.now() + DAY).toISOString();
+  const past = new Date(Date.now() - DAY).toISOString();
+  const statsWith = (expiresAt, losses) => ({
+    players: {
+      'discord:1': {
+        discordId: '1',
+        nickname: 'Ana#BR1',
+        infernalExpiresAt: expiresAt,
+        infernalLossesSinceWin: losses
+      }
+    }
+  });
+
+  it('sem derrotas desde a última vitória, continua protegido', async () => {
+    assert.equal(await hasInfernalRouletteProtection(guild, '1', statsWith(future, 0)), true);
+  });
+
+  it('após a primeira derrota, ainda fica protegido (benefício usado 1x)', async () => {
+    assert.equal(await hasInfernalRouletteProtection(guild, '1', statsWith(future, 1)), true);
+  });
+
+  it('após a segunda derrota sem vencer, volta a ser roletável', async () => {
+    assert.equal(await hasInfernalRouletteProtection(guild, '1', statsWith(future, 2)), false);
+  });
+
+  it('vitória zera a contagem e libera a proteção de novo', async () => {
+    // A vitória grava infernalLossesSinceWin = 0.
+    assert.equal(await hasInfernalRouletteProtection(guild, '1', statsWith(future, 0)), true);
+  });
+
+  it('cargo vencido ou inexistente não protege', async () => {
+    assert.equal(await hasInfernalRouletteProtection(guild, '1', statsWith(past, 0)), false);
+    assert.equal(await hasInfernalRouletteProtection(guild, '1', statsWith(null, 0)), false);
+  });
+
+  it('a prioridade da espera continua valendo mesmo após 2 derrotas', async () => {
+    assert.equal(await hasInfernalPriority(guild, '1', statsWith(future, 2)), true);
   });
 });
 
