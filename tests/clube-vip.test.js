@@ -40,31 +40,33 @@ function mockGuild(membersById = {}, roleCounts = {}) {
 }
 
 describe('clube VIP (status, sem vantagem competitiva)', () => {
-  it('getMemberVipTier prioriza o maior tier', () => {
+  it('getMemberVipTier prioriza o maior tier (Apoiador e Lendário)', () => {
     assert.equal(getMemberVipTier(mockMember(['Jogador'])), null);
     assert.equal(getMemberVipTier(mockMember(['💜 Apoiador'])), '💜 Apoiador');
-    assert.equal(getMemberVipTier(mockMember(['💜 Apoiador', '⭐ VIP'])), '⭐ VIP');
-    assert.equal(getMemberVipTier(mockMember(['⭐ VIP', '👑 Lendário'])), '👑 Lendário');
+    assert.equal(getMemberVipTier(mockMember(['💜 Apoiador', '👑 Lendário'])), '👑 Lendário');
+    // Cargo legado ⭐ VIP não é mais um tier (migrado para Lendário).
+    assert.equal(getMemberVipTier(mockMember(['⭐ VIP'])), null);
     assert.equal(getMemberVipTier(null), null);
   });
 
   it('getVipSeal retorna o emoji do tier', () => {
     assert.equal(getVipSeal('👑 Lendário'), ' 👑');
-    assert.equal(getVipSeal('⭐ VIP'), ' ⭐');
     assert.equal(getVipSeal('💜 Apoiador'), ' 💜');
+    assert.equal(getVipSeal('⭐ VIP'), '');
     assert.equal(getVipSeal('Jogador'), '');
   });
 
   it('buildVipTierResolver usa o cache sem fetch', () => {
-    const guild = mockGuild({ 1: ['⭐ VIP'], 2: ['Jogador'] });
+    const guild = mockGuild({ 1: ['👑 Lendário'], 2: ['Jogador'] });
     const resolve = buildVipTierResolver(guild);
-    assert.equal(resolve('1'), ' ⭐');
+    assert.equal(resolve('1'), ' 👑');
     assert.equal(resolve('2'), '');
     assert.equal(resolve('999'), '');
     assert.equal(buildVipTierResolver(null)('1'), '');
   });
 
-  it('buildClubeEmbed lista tiers, contagens e regra sem vantagem', () => {    const guild = mockGuild({}, { '💜 Apoiador': 3, '⭐ VIP': 0, '👑 Lendário': 1 });
+  it('buildClubeEmbed lista tiers, contagens e regra sem vantagem', () => {
+    const guild = mockGuild({}, { '💜 Apoiador': 3, '👑 Lendário': 1 });
     const embed = buildClubeEmbed(guild);
     const data = embed.toJSON();
     assert.match(data.title, /Clube VIP/);
@@ -73,19 +75,22 @@ describe('clube VIP (status, sem vantagem competitiva)', () => {
     for (const tier of VIP_TIERS) {
       assert.ok(names.includes(tier.name), `ficha do ${tier.name}`);
     }
+    assert.equal(VIP_TIERS.length, 2);
     assert.ok(names.includes('3 membro(s)'));
+    assert.ok(!names.includes('⭐ VIP'));
   });
 
-  it('buildClubeDetalEmbed tem beneficios por tier com precos e limites', () => {
+  it('buildClubeDetalEmbed tem 2 tiers, precos novos e beneficios unificados', () => {
     const embed = buildClubeDetalEmbed();
     const data = embed.toJSON();
     assert.match(data.title, /benefícios detalhados/);
     assert.match(data.description, /NÃO dá vantagem/);
-    assert.equal(data.fields.length, 4);
+    assert.equal(data.fields.length, 3);
     const text = data.fields.map((f) => `${f.name} ${f.value}`).join('\n');
     assert.ok(text.includes('R$ 9,99'));
-    assert.ok(text.includes('R$ 16,90'));
-    assert.ok(text.includes('R$ 21,90'));
+    assert.ok(text.includes('R$ 14,90'));
+    assert.ok(!text.includes('16,90'));
+    assert.ok(!text.includes('21,90'));
     assert.ok(text.includes('!salalock'));
     assert.ok(text.includes('!live'));
     assert.ok(JSON.stringify(data).length < 6000);
@@ -114,11 +119,12 @@ describe('!live e promo automática', () => {
     assert.equal(parseLiveLink(''), null);
   });
 
-  it('normalizePresentearTier entende nomes, emojis e abreviacoes', () => {
+  it('normalizePresentearTier entende nomes, emojis e o apelido legado VIP', () => {
     const legacy = require('../commands/legacyCommands');
-    assert.equal(legacy.normalizePresentearTier('vip'), 'vip');
-    assert.equal(legacy.normalizePresentearTier('VIP'), 'vip');
-    assert.equal(legacy.normalizePresentearTier('⭐ VIP'), 'vip');
+    // VIP foi unificado no Lendário; entrada antiga vira Lendário.
+    assert.equal(legacy.normalizePresentearTier('vip'), 'lendario');
+    assert.equal(legacy.normalizePresentearTier('VIP'), 'lendario');
+    assert.equal(legacy.normalizePresentearTier('⭐ VIP'), 'lendario');
     assert.equal(legacy.normalizePresentearTier('apoiador'), 'apoiador');
     assert.equal(legacy.normalizePresentearTier('💜 Apoiador'), 'apoiador');
     assert.equal(legacy.normalizePresentearTier('lendario'), 'lendario');
@@ -127,11 +133,11 @@ describe('!live e promo automática', () => {
     assert.equal(legacy.normalizePresentearTier('gold'), null);
     assert.equal(legacy.normalizePresentearTier(null), null);
   });
-  it('cooldown do !live por tier (Lendario 6h, VIP 12h, Apoiador 24h)', () => {
+  it('cooldown do !live por tier (Lendário 6h, Apoiador 24h)', () => {
     const { LIVE_COOLDOWN_BY_TIER_MS } = require('../commands/legacyCommands');
     assert.equal(LIVE_COOLDOWN_BY_TIER_MS['👑 Lendário'], 6 * 3600000);
-    assert.equal(LIVE_COOLDOWN_BY_TIER_MS['⭐ VIP'], 12 * 3600000);
     assert.equal(LIVE_COOLDOWN_BY_TIER_MS['💜 Apoiador'], 24 * 3600000);
+    assert.equal(LIVE_COOLDOWN_BY_TIER_MS['⭐ VIP'], undefined);
     assert.equal(LIVE_COOLDOWN_BY_TIER_MS['Jogador'], undefined);
   });
 
@@ -152,11 +158,11 @@ describe('!live e promo automática', () => {
     assert.ok(JSON.stringify(promo).length < 6000);
   });
 
-  it('shouldPostClubePromo com intervalo mínimo de 10h', () => {
+  it('shouldPostClubePromo com intervalo mínimo de 20h', () => {
     const now = Date.now();
     assert.equal(shouldPostClubePromo(null, now), true);
-    assert.equal(shouldPostClubePromo(new Date(now - 3600 * 1000).toISOString(), now), false);
-    assert.equal(shouldPostClubePromo(new Date(now - 11 * 3600 * 1000).toISOString(), now), true);
+    assert.equal(shouldPostClubePromo(new Date(now - 19 * 3600 * 1000).toISOString(), now), false);
+    assert.equal(shouldPostClubePromo(new Date(now - 21 * 3600 * 1000).toISOString(), now), true);
   });
 
   it('findPromoChannel acha o geral', () => {

@@ -42,8 +42,9 @@ comandos, regras e arquivos envolvidos. Tudo aplicado em TESTRE
 | Tier | Preço | Benefícios |
 |---|---|---|
 | 💜 Apoiador R$ 9,99 | 9,99 | Lounge VIP, selo no perfil/ranking, boas-vindas |
-| ⭐ VIP R$ 16,90 | 16,90 | Tudo do Apoiador + criar sala temporária e comandos de dono (`!sala`, `!convidar`, `!salalock`, `!salalimit`, `!salaexpulsar`, `!limparvoz`) |
-| 👑 Lendário R$ 21,90 | 21,90 | Tudo do VIP + `!live` (divulgar stream c/ ping, cooldown por tier) + destaque + topo da lista |
+| 👑 Lendário R$ 14,90 | 14,90 | Tudo do Apoiador + criar sala temporária e comandos de dono (`!sala`, `!convidar`, `!salalock`, `!salalimit`, `!salaexpulsar`, `!limparvoz`) + `!live` (divulgar stream c/ ping, 6h) + destaque + topo da lista |
+
+> O antigo tier **⭐ VIP** foi unificado no **👑 Lendário** (2026-11-27). Pagamentos e assinaturas antigas com `tierKey: vip` são tratados como Lendário.
 
 **Regra de ouro (no embed):** o clube NÃO dá vantagem em fila, sorteio, PDL ou vitória.
 
@@ -64,7 +65,6 @@ Divulgar stream (Twitch/YouTube/Kick) com ping no cargo 🔴 Ao Vivo:
 | Tier | Cooldown |
 |---|---|
 | 👑 Lendário | 6h |
-| ⭐ VIP | 12h |
 | 💜 Apoiador | 24h |
 | Sem clube | bloqueado |
 
@@ -100,7 +100,7 @@ Mata-mata com sorteio por rodada, inscrição **individual**:
 
 ## 6. Captação de membros
 
-- **`!convite` + `!topconvites`** (+ slash): link pessoal por membro; atribuição por diff de usos; anti-fraude (conta <7 dias não conta, saída em 24h estorna, 1 ponto por membro). Metas: **3** = cargo 🌱 Recrutador, **5** = destaque na Arena, **10** = 7 dias de ⭐ VIP grátis (expira sozinho). Ranking mensal (zera dia 1º).
+- **`!convite` + `!topconvites`** (+ slash): link pessoal por membro; atribuição por diff de usos; anti-fraude (conta <7 dias não conta, saída em 24h estorna, 1 ponto por membro). Metas: **3** = cargo 🌱 Recrutador, **5** = destaque na Arena, **10** = 7 dias de 👑 Lendário grátis (expira sozinho). Ranking mensal (zera dia 1º).
 - **Boas-vindas que vendem:** texto de conversão ("sua vaga está esperando", 2 minutos) + botão verde **⚡ Quero jogar agora** (abre o cadastro direto).
 
 ---

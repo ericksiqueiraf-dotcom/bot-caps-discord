@@ -161,7 +161,7 @@ async function findChannel(guild, name, categoryId) {
 }
 
 // Permissoes da area VIP: visivel para todos (@everyone ve, mas nao interage);
-// acesso total so para membros (Apoiador/VIP/Lendario) e gestores (Admin/Moderador/Staff).
+// acesso total so para membros (Apoiador/Lendario) e gestores (Admin/Moderador/Staff).
 // Puro e testavel: recebe IDs prontos.
 function buildVipTextOverwrites({ everyoneId, memberIds = [], managerIds = [] }) {
   return [
@@ -502,11 +502,11 @@ async function main() {
     config.roles = { ...config.roles, registeredPlayerRoleId: roles.Jogador.id, visitanteRoleId: roles.Visitante?.id || config.roles?.visitanteRoleId || '', captainRoleId: roles['👑 Capitão LCL'].id };
     config.voiceChannels = { ...config.voiceChannels, ...voiceIds };
     config.textChannels = { ...config.textChannels, ...textIds };
-    const creatorIds = [roles['👑 Capitão LCL']?.id, roles['🛠️ Staff']?.id, roles['⭐ VIP']?.id, roles['👑 Lendário']?.id].filter(Boolean);
+    const creatorIds = [roles['👑 Capitão LCL']?.id, roles['🛠️ Staff']?.id, roles['👑 Lendário']?.id].filter(Boolean);
     config.tempVoice = {
       userLimit: Number(config.tempVoice?.userLimit || 10),
       deleteDelaySeconds: Number(config.tempVoice?.deleteDelaySeconds || 60),
-      allowedRoleNames: config.tempVoice?.allowedRoleNames?.length ? config.tempVoice.allowedRoleNames : ['🛠️ Staff', '👑 Capitão LCL', 'Staff', 'Capitão', 'Capitão LCL', '👑 Capitão de Customs', '⭐ VIP', '👑 Lendário'],
+      allowedRoleNames: config.tempVoice?.allowedRoleNames?.length ? config.tempVoice.allowedRoleNames : ['🛠️ Staff', '👑 Capitão LCL', 'Staff', 'Capitão', 'Capitão LCL', '👑 Capitão de Customs', '👑 Lendário'],
       allowedRoleIds: [...new Set([...(config.tempVoice?.allowedRoleIds || []), ...creatorIds])],
       hubChannelId: tempVoiceIds.hubChannelId || config.tempVoice?.hubChannelId || ''
     };

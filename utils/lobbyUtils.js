@@ -147,7 +147,6 @@ const INFERNAL_ROLE_NAME = config.roles?.infernalRoleName || '🔥 INFERNAL';
 // Ordem = prioridade (maior tier primeiro). Nomes exatos dos cargos no Discord.
 const VIP_TIERS = [
   { name: '👑 Lendário', seal: '👑' },
-  { name: '⭐ VIP', seal: '⭐' },
   { name: '💜 Apoiador', seal: '💜' }
 ];
 
@@ -167,11 +166,10 @@ function getVipSeal(tierName) {
   return tier ? ` ${tier.seal}` : '';
 }
 
-// Moldura do avatar no !perfil, por cargo (prioridade: Lendário > INFERNAL > VIP > Apoiador).
+// Moldura do avatar no !perfil, por cargo (prioridade: Lendário > INFERNAL > Apoiador).
 const AVATAR_FRAME_BY_ROLE = [
   { roleName: '👑 Lendário', frameType: 'lendario' },
   { roleName: config.roles?.infernalRoleName || '🔥 INFERNAL', frameType: 'infernal' },
-  { roleName: '⭐ VIP', frameType: 'vip' },
   { roleName: '💜 Apoiador', frameType: 'apoiador' }
 ];
 
@@ -259,7 +257,7 @@ function buildClubePromoEmbed(config) {
     .setColor(THEME.RANK)
     .setTitle('💎 Já conhece o Clube VIP?')
     .setDescription(
-      [line('💜', 'Apoiador', 'apoiador'), line('⭐', 'VIP', 'vip'), line('👑', 'Lendário', 'lendario')].join('\n')
+      [line('💜', 'Apoiador', 'apoiador'), line('👑', 'Lendário', 'lendario')].join('\n')
       + '\n\nStatus e comodidades **sem vantagem no jogo**. Use `!clube` para assinar via PIX.'
     )
     .setFooter({ text: `${FOOTER_PREFIX} • Clube VIP` })
@@ -334,12 +332,8 @@ function buildClubeDetalEmbed() {
         value: 'Para quem quer apoiar a Arena e ser reconhecido:\n• Acesso ao lounge 💎・CLUBE VIP\n• Selo 💜 no perfil (`!perfil`) e no ranking\n• Anúncio de boas-vindas ao entrar no clube'
       },
       {
-        name: tierName('⭐', '⭐ VIP', 'vip'),
-        value: 'O queridinho da galera — tudo do Apoiador, mais:\n• **Sua própria sala de voz**: entre no ➕・criar-sala e o bot cria uma sala sua\n• `!sala <nome>` para personalizar • `!convidar @usuário` para chamar os amigos\n• `!salalock` / `!salalimit <0-99>` / `!salaexpulsar @u` para gerenciar\n• `!limparvoz` para encerrar a sala'
-      },
-      {
         name: tierName('👑', '👑 Lendário', 'lendario'),
-        value: 'O topo da Arena — tudo do VIP, mais:\n• `!live <link>` para **divulgar sua stream** (Twitch/YouTube/Kick) com ping 🔴 Ao Vivo para a comunidade (1x a cada 6h)\n• Anúncio de destaque ao entrar no clube\n• Nome no topo da lista de membros'
+        value: 'O topo da Arena — tudo do Apoiador, mais:\n• **Sua própria sala de voz**: entre no ➕・criar-sala e o bot cria uma sala sua\n• `!sala <nome>` para personalizar • `!convidar @usuário` para chamar os amigos\n• `!salalock` / `!salalimit <0-99>` / `!salaexpulsar @u` para gerenciar • `!limparvoz` para encerrar\n• `!live <link>` para **divulgar sua stream** (Twitch/YouTube/Kick) com ping 🔴 Ao Vivo (1x a cada 6h)\n• Anúncio de destaque ao entrar no clube • nome no topo da lista de membros'
       },
       {
         name: 'Como aderir',
@@ -370,12 +364,8 @@ function buildClubeEmbed(guild) {
         value: 'O primeiro passo para apoiar a Arena e ser reconhecido: acesso ao lounge 💎・CLUBE VIP • selo 💜 no perfil (`!perfil`) e no ranking • anúncio de boas-vindas ao entrar no clube.'
       },
       {
-        name: tierName('⭐', '⭐ VIP', 'vip'),
-        value: 'O queridinho da galera: tudo do Apoiador + **sua própria sala de voz** no ➕・criar-sala para jogar com os amigos • `!sala <nome>` para personalizar • `!convidar @usuário` para chamar gente • `!limparvoz` para encerrar.'
-      },
-      {
         name: tierName('👑', '👑 Lendário', 'lendario'),
-        value: 'O topo da Arena: tudo do VIP + `!live <link>` para **divulgar sua stream** (Twitch/YouTube/Kick) com ping 🔴 Ao Vivo para a comunidade (1x a cada 6h) • anúncio de destaque • nome no topo da lista de membros.'
+        value: 'O topo da Arena: tudo do Apoiador + **sua própria sala de voz** no ➕・criar-sala para jogar com os amigos • `!sala <nome>` para personalizar • `!convidar @usuário` para chamar gente • `!limparvoz` para encerrar • `!live <link>` para **divulgar sua stream** (Twitch/YouTube/Kick) com ping 🔴 Ao Vivo (1x a cada 6h) • anúncio de destaque • nome no topo da lista de membros.'
       },
       {
         name: 'Como aderir',

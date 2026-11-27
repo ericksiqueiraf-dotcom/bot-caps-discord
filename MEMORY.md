@@ -5,6 +5,13 @@
 
 ---
 
+## Estado Operacional — 2026-11-27
+
+- **Clube VIP unificado:** apenas 2 tiers — **💜 Apoiador R$ 9,99** e **👑 Lendário R$ 14,90** (30 dias). O antigo **⭐ VIP** foi removido do código e do servidor; o Lendário absorveu os benefícios do VIP (sala de voz própria) + `!live` 6h.
+- **Migração aplicada:** 5 assinaturas `vip` antigas viraram `lendario`; `klebersonk888` recebeu 👑 Lendário (ericksiqueiraf já tinha); cargo ⭐ VIP apagado da CAPS ARENA. Script: `scripts/migrate-vip-to-lendario.js` (dry-run por padrão; `--apply` executa).
+- **Aliases legados:** `tierKey: 'vip'` em pagamentos/referências antigas resolve para `lendario` (`normalizeTierKey`), então PIX pendentes não quebram.
+- **Testes:** 368 no total, 365 verdes; 3 falhas pré-existentes (`balance` ×2, `evento-sexta`). `clube-vip` corrigido (intervalo da promo = 20h).
+
 ## Estado Operacional — 2026-11-25
 
 - **INFERNAL por sequência:** **5 wins = 3 dias**; **10 wins = 5 dias**; cada 5 wins adicionais soma **+5 dias**. A validade nunca é encurtada e a derrota reseta o marco da streak no modo jogado, para a próxima sequência de 5 contar de novo.

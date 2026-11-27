@@ -82,11 +82,9 @@
       "Capitão LCL",
       "👑 Capitão de Customs",
       "🛠️ Moderador",
-      "⭐ VIP",
       "👑 Lendário"
     ],
     "allowedRoleIds": [
-      "1559622673661821018",
       "1559622674936758443"
     ],
     "hubChannelId": "1559622714736779316"
@@ -96,12 +94,8 @@
       "preco": 9.99,
       "dias": 30
     },
-    "vip": {
-      "preco": 16.9,
-      "dias": 30
-    },
     "lendario": {
-      "preco": 21.9,
+      "preco": 14.9,
       "dias": 30
     }
   },

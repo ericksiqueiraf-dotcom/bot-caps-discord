@@ -1353,8 +1353,8 @@ async function handleAjudaFixarCommand(message) {
 function normalizePresentearTier(raw) {
   const v = String(raw || '').toLowerCase();
   if (v.includes('apoiador') || v.includes('💜')) return 'apoiador';
-  if (v === 'vip' || v.includes('⭐')) return 'vip';
-  if (v.includes('lendario') || v.includes('lendário') || v.includes('👑')) return 'lendario';
+  // "VIP" foi unificado no Lendário; aceitamos como apelido legado.
+  if (v === 'vip' || v.includes('⭐') || v.includes('lendario') || v.includes('lendário') || v.includes('👑')) return 'lendario';
   return null;
 }
 
@@ -1368,10 +1368,10 @@ async function handlePresentearCommand(message, args = [], targetUserOverride = 
     const tierKey = normalizePresentearTier(args.find((a) => normalizePresentearTier(a)));
     const diasArg = args.map(Number).find((n) => Number.isInteger(n));
     if (!targetUser) {
-      return await replyToMessage(message, '❌ Use: `!presentear @usuário <apoiador|vip|lendario> [dias]`.');
+      return await replyToMessage(message, '❌ Use: `!presentear @usuário <apoiador|lendario> [dias]`.');
     }
     if (!tierKey) {
-      return await replyToMessage(message, '❌ Tier inválido. Use: `apoiador`, `vip` ou `lendario`.');
+      return await replyToMessage(message, '❌ Tier inválido. Use: `apoiador` ou `lendario`.');
     }
     const tier = getClubeTierConfig(config, tierKey);
     if (!tier) {
@@ -1431,7 +1431,6 @@ async function handleQueroLiveCommand(message) {
 
 const LIVE_COOLDOWN_BY_TIER_MS = {
   '👑 Lendário': 6 * 60 * 60 * 1000,
-  '⭐ VIP': 12 * 60 * 60 * 1000,
   '💜 Apoiador': 24 * 60 * 60 * 1000
 };
 
@@ -1441,7 +1440,7 @@ async function handleLiveCommand(message, args = []) {
   const liveTier = getMemberVipTier(message.member);
   const tierCooldownMs = LIVE_COOLDOWN_BY_TIER_MS[liveTier] || 0;
   if (!tierCooldownMs) {
-    return await replyToMessage(message, '❌ O `!live` é do **Clube VIP** (Apoiador 24h, VIP 12h, Lendário 6h). Veja o `!clube`.');
+    return await replyToMessage(message, '❌ O `!live` é do **Clube VIP** (Apoiador 24h, Lendário 6h). Veja o `!clube`.');
   }
   const parsed = parseLiveLink(args.join(' '));
   if (!parsed) {
@@ -1567,7 +1566,7 @@ async function handleConviteCommand(message) {
     const stats = getRecruiterStats(store, message.author.id);
     await replyToMessage(message,
       `🔗 Seu link pessoal: ${invite.url}\n` +
-      `Traga gente e ganhe: **3** = cargo 🌱 Recrutador • **5** = destaque na Arena • **10** = **7 dias de ⭐ VIP grátis**\n` +
+      `Traga gente e ganhe: **3** = cargo 🌱 Recrutador • **5** = destaque na Arena • **10** = **7 dias de 👑 Lendário grátis**\n` +
       `Você já trouxe **${stats.lifetime}** (${stats.month} este mês). Use \`!topconvites\` para ver o ranking.`
     );
   } catch (error) {
@@ -1591,7 +1590,7 @@ async function handleTopConvitesCommand(message) {
     const embed = new EmbedBuilder()
       .setColor(THEME?.RANK ?? '#FFD700')
       .setTitle(`🔗 Top convites — ${month.slice(5)}/${month.slice(0, 4)}`)
-      .setDescription(lines.join('\n') + '\n\nMetas: 3 = 🌱 Recrutador • 5 = destaque • 10 = 7 dias de ⭐ VIP grátis')
+      .setDescription(lines.join('\n') + '\n\nMetas: 3 = 🌱 Recrutador • 5 = destaque • 10 = 7 dias de 👑 Lendário grátis')
       .setFooter({ text: `${FOOTER_PREFIX} • zera todo dia 1º` })
       .setTimestamp();
     await replyToMessage(message, { embeds: [embed] });
@@ -2197,7 +2196,7 @@ function buildAjudaEmbed(page = 1) {
       .setDescription('Ranking, clube VIP, salas temporárias e extras. Página 1 no `!ajuda`.')
       .addFields(
         { name: '🏆 Ranking e pós-jogo', value: '`!roleta N A` • Sorteia na hora quem sai da sala A (N = 1–5)\n`!roletasair A` • Fica fora da próxima (sem sorteio nem subida)\n`!palpite <1|2> <10-100> [sala]` • Aposta na partida ativa, também como espectador; indique a sala se houver várias (ex.: `!palpite 1 50 A`)\n`!perfil` • Seus Pontos Custom (base 1000) e Elo LoL\n`!placar` • Ranking CLASSIC geral (pontos custom, todos os elos)\n`!placar duelo` • TOP 10 dos duelos 1v1 (vitórias em duelo)\n`!placar tt` • TWISTED TREELINE 3x3 (antigo 3x3)\n`!top10` • Top 10 (classic, duelo ou tt)\n`!topstreak` • Ranking Streak 🔥 (classic ou tt)\n`!toprankinfernal` • Quem mais pegou INFERNAL na temporada 🔥\n🗳️ Após a partida, vote no MVP no canal de destaques • 🔥 5 wins seguidas = cargo INFERNAL por 3 dias; 10 seguidas = 5 dias (+5 dias a cada 5 wins) • prioridade na espera + proteção na roleta na 1ª derrota da sequência (renova ao vencer)' },
-        { name: '💎 Clube VIP', value: '`!clube` • Tiers, assinatura PIX e renovação -10%\n`!querolive` • Entrar/sair do ping 🔴 Ao Vivo\n`!live <link>` • Divulgar live Twitch/YouTube/Kick (Lendário 6h, VIP 12h, Apoiador 24h)' },
+        { name: '💎 Clube VIP', value: '`!clube` • Tiers, assinatura PIX e renovação -10%\n`!querolive` • Entrar/sair do ping 🔴 Ao Vivo\n`!live <link>` • Divulgar live Twitch/YouTube/Kick (Lendário 6h, Apoiador 24h)' },
         { name: '🔊 Salas temporárias (dono da sala)', value: 'Entre no ➕・criar-sala para ganhar sua sala\n`!salahub` • Lista as salas ativas\n`!sala` • Mostra sua sala • `!sala <nome>` renomeia\n`!convidar @u` • Chama alguém p/ sua sala\n`!salalock` • Tranca (`!salalock abrir` destranca)\n`!salalimit <0-99>` • Limite de usuários (0 = sem limite)\n`!salaexpulsar @u` • Remove alguém da sala\n`!limparvoz` • Apaga sua sala (dentro dela)' },
         { name: '🎁 Extras', value: '`!convite` • Seu link pessoal (traga gente e ganhe recompensas)\n`!topconvites` • Ranking de quem mais trouxe gente\n`!torneio` • Torneio CAPS ARENA — fase de pontos + final (entrar, lista, status, classificacao — staff: `!torneioon`/`!torneiooff`/`!torneio start`)\n`!tempo` • Seu tempo em call • `!topvoz` • Ranking de call\n`!palpite <1|2> <10-100> [sala]` • Bolão de partida ativa, também para espectadores (ex.: `!palpite 1 50 A`) • `!missoes` • Missões da semana\n`!duelo @u [10-200]` • Desafio de PDL — quem matar primeiro vence (`!duelo aceitar`/`recusar`; staff declara com `!duelo vitoria @vitorioso @perdedor`) • `!duelo rank` • Top 10 dos duelos\n`!social` • Instagram, Twitch, TikTok e YouTube oficiais da CAPS ARENA\n🌅 Primeira vitória do dia vale +50% PDL (automático)\n`!regras` • Regulamento completo' },
         { name: '⬅️ Página 1', value: '`!ajuda` • Cadastro, fila e voto\n`!staff` • Guia da staff (restrito)' }

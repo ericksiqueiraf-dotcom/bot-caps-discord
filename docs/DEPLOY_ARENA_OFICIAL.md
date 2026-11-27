@@ -18,14 +18,14 @@ Pagamentos do SnapFlow (external_reference=sess_*) são ignorados pelo webhook.
 
 ## Checklist pré-deploy
 
-- [ ] Cargos existem na ARENA: `💜 Apoiador`, `⭐ VIP`, `👑 Lendário` (confirmado via API em 2026-10-14)
+- [ ] Cargos existem na ARENA: `💜 Apoiador`, `👑 Lendário` (VIP unificado no Lendário em 2026-11-27)
 - [ ] `MP_ACCESS_TOKEN` de **produção** (`APP_USR-`) em mãos
 - [ ] Canal `👑┃parceiros` existe na ARENA (anúncios de adesão)
 - [ ] URL pública: **opcional** (só acelera via webhook; o poller cobre sem ela)
 
 ## Checklist pré-deploy
 
-- [ ] Cargos existem na ARENA: `💜 Apoiador`, `⭐ VIP`, `👑 Lendário` (confirmado via API em 2026-10-14)
+- [ ] Cargos existem na ARENA: `💜 Apoiador`, `👑 Lendário` (VIP unificado no Lendário em 2026-11-27)
 - [ ] `MP_ACCESS_TOKEN` de **produção** (`APP_USR-`) em mãos
 - [ ] URL pública **fixa** apontando para o painel prod (VPS ou túnel fixo — o `trycloudflare.com` rotativo **não serve** para produção)
 - [ ] Canal `👑┃parceiros` existe na ARENA (anúncios de adesão)
@@ -45,8 +45,7 @@ Após qualquer operação no PM2, conferir `pm2 describe <nome>` (script path + 
 ```json
 "clubePagamentos": {
   "apoiador": { "preco": 9.99, "dias": 30 },
-  "vip": { "preco": 19.99, "dias": 30 },
-  "lendario": { "preco": 29.99, "dias": 30 }
+  "lendario": { "preco": 14.90, "dias": 30 }
 }
 ```
 
@@ -97,4 +96,4 @@ Anti-duplo: paymentId já processado é ignorado. Pagamentos do SnapFlow
 | `!clube` sem botões | `MP_ACCESS_TOKEN` vazio no processo → restart com `--update-env` |
 | Pagou e cargo não entrou | webhook não alcançou o painel (URL/túnel) → testar passo 4; ver log `[WEBHOOK MP]` no `caps-admin` |
 | Porta em uso no admin-teste | :3031 = `lcl-admin`, :3030 = `caps-admin`; teste usa :3032 |
-| Cargo errado/não achado | nomes exatos: `💜 Apoiador`, `⭐ VIP`, `👑 Lendário` |
+| Cargo errado/não achado | nomes exatos: `💜 Apoiador`, `👑 Lendário` |

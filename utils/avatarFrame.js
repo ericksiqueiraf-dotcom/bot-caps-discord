@@ -2,11 +2,10 @@ const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const axios = require('axios');
 
 // Molduras do avatar no !perfil, por status no Discord.
-// Cores: ouro p/ Lendário, fogo p/ INFERNAL, roxo p/ VIP, roxo suave p/ Apoiador.
+// Cores: ouro p/ Lendário, fogo p/ INFERNAL, roxo suave p/ Apoiador.
 const FRAME_STYLES = {
   lendario: { colors: ['#FFD700', '#FF9D00', '#FFD700'] },
   infernal: { colors: ['#FF3D00', '#FFB300', '#FF3D00'] },
-  vip: { colors: ['#B388FF', '#7C4DFF', '#B388FF'] },
   apoiador: { colors: ['#A98BE0', '#8A6CC8', '#A98BE0'] },
   default: { colors: ['#5865F2', '#3C45A5', '#5865F2'] }
 };

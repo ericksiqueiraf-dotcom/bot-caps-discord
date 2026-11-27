@@ -143,7 +143,6 @@ function buildSlashCommands() {
       .addStringOption((option) => option.setName('tier').setDescription('Tier').setRequired(true)
         .addChoices(
           { name: 'Apoiador', value: 'apoiador' },
-          { name: 'VIP', value: 'vip' },
           { name: 'Lendário', value: 'lendario' }
         ))
       .addIntegerOption((option) => option.setName('dias').setDescription('Dias (padrão do tier)').setRequired(false).setMinValue(1).setMaxValue(365)),
@@ -1665,8 +1664,8 @@ async function grantRecruitRewards(guild, inviterId, lifetime, unlocked) {
       }
     }
     if (unlocked.includes(10)) {
-      const vipRole = guild.roles.cache.find((r) => r.name === '⭐ VIP');
-      if (vipRole) await inviter.roles.add(vipRole, 'Meta de 10 convites: 7 dias de VIP').catch(() => null);
+      const lendarioRole = guild.roles.cache.find((r) => r.name === '👑 Lendário');
+      if (lendarioRole) await inviter.roles.add(lendarioRole, 'Meta de 10 convites: 7 dias de Lendário').catch(() => null);
       const { loadVipSubscriptions, saveVipSubscriptions } = require('./services/dataService');
       const { subscriptions } = await loadVipSubscriptions();
       const now = Date.now();
@@ -1674,7 +1673,7 @@ async function grantRecruitRewards(guild, inviterId, lifetime, unlocked) {
         paymentId: `free-recruta:${guild.id}:${inviterId}:${now}`,
         guildId: guild.id,
         discordId: inviterId,
-        tierKey: 'vip',
+        tierKey: 'lendario',
         status: 'active',
         startedAt: new Date(now).toISOString(),
         expiresAt: new Date(now + 7 * 24 * 3600 * 1000).toISOString(),
@@ -1683,14 +1682,14 @@ async function grantRecruitRewards(guild, inviterId, lifetime, unlocked) {
       await saveVipSubscriptions({ subscriptions });
     }
     const festa = unlocked.includes(10)
-      ? '\n🏆 **7 dias de ⭐ VIP ativos!** Aproveite!'
+      ? '\n🏆 **7 dias de 👑 Lendário ativos!** Aproveite!'
       : unlocked.includes(5)
         ? `\n🌟 Você é o **DESTAQUE** da Arena! Faltam **${10 - lifetime}** para os 7 dias de VIP.`
         : unlocked.includes(3)
           ? `\n🌱 Cargo **Recrutador** garantido! Faltam **${5 - lifetime}** para o destaque.`
           : '';
     await inviter.send(
-      `🔗 **Recrutamento CAPS Arena**\nVocê já trouxe **${lifetime} pessoa(s)**! Metas: 3 = 🌱 Recrutador • 5 = destaque • 10 = 7 dias de ⭐ VIP grátis.${festa}`
+      `🔗 **Recrutamento CAPS Arena**\nVocê já trouxe **${lifetime} pessoa(s)**! Metas: 3 = 🌱 Recrutador • 5 = destaque • 10 = 7 dias de 👑 Lendário grátis.${festa}`
     ).catch(() => null);
   } catch (error) {
     console.error('[CONVITE] Erro nas recompensas:', error.message);

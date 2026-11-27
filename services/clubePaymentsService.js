@@ -11,24 +11,32 @@ const MP_API_BASE = 'https://api.mercadopago.com';
 
 const TIER_ROLE_NAMES = {
   apoiador: '💜 Apoiador',
-  vip: '⭐ VIP',
   lendario: '👑 Lendário'
 };
 const TIER_KEYS = Object.keys(TIER_ROLE_NAMES);
+// "VIP" foi unificado no Lendário: aceitamos referências antigas para não
+// perder PIX pendentes nem presentes dados antes da migração.
+const LEGACY_TIER_ALIASES = { vip: 'lendario' };
 const DEFAULT_PRICES = {
   apoiador: { preco: 9.99, dias: 30 },
-  vip: { preco: 19.99, dias: 30 },
-  lendario: { preco: 29.99, dias: 30 }
+  lendario: { preco: 14.9, dias: 30 }
 };
 const PIX_EXPIRY_MINUTES = 30;
 
+function normalizeTierKey(tierKey) {
+  const key = String(tierKey || '').toLowerCase();
+  const normalized = LEGACY_TIER_ALIASES[key] || key;
+  return TIER_KEYS.includes(normalized) ? normalized : null;
+}
+
 function getClubeTierConfig(config, tierKey) {
-  if (!TIER_KEYS.includes(tierKey)) return null;
-  const fromConfig = config?.clubePagamentos?.[tierKey] || {};
-  const preco = Number(fromConfig.preco ?? DEFAULT_PRICES[tierKey].preco);
-  const dias = Number(fromConfig.dias ?? DEFAULT_PRICES[tierKey].dias);
+  const key = normalizeTierKey(tierKey);
+  if (!key) return null;
+  const fromConfig = config?.clubePagamentos?.[key] || {};
+  const preco = Number(fromConfig.preco ?? DEFAULT_PRICES[key].preco);
+  const dias = Number(fromConfig.dias ?? DEFAULT_PRICES[key].dias);
   if (!Number.isFinite(preco) || preco <= 0 || !Number.isFinite(dias) || dias <= 0) return null;
-  return { key: tierKey, roleName: TIER_ROLE_NAMES[tierKey], preco, dias };
+  return { key, roleName: TIER_ROLE_NAMES[key], preco, dias };
 }
 
 function isValidEmail(value) {
@@ -36,7 +44,8 @@ function isValidEmail(value) {
 }
 
 function buildExternalReference(guildId, discordId, tierKey) {
-  return `caps-vip:${guildId}:${discordId}:${tierKey}`;
+  const key = normalizeTierKey(tierKey) || tierKey;
+  return `caps-vip:${guildId}:${discordId}:${key}`;
 }
 
 // Só aceita referências do clube (ignora pagamentos do SnapFlow no mesmo webhook).
@@ -44,8 +53,9 @@ function parseVipReference(ref) {
   const parts = String(ref || '').split(':');
   if (parts.length !== 4 || parts[0] !== 'caps-vip') return null;
   const [, guildId, discordId, tierKey] = parts;
-  if (!guildId || !discordId || !TIER_KEYS.includes(tierKey)) return null;
-  return { guildId, discordId, tierKey };
+  const key = normalizeTierKey(tierKey);
+  if (!guildId || !discordId || !key) return null;
+  return { guildId, discordId, tierKey: key };
 }
 
 function pixExpiryIso(nowMs = Date.now()) {
@@ -278,7 +288,7 @@ async function recordPendingPayment(
   const { subscriptions } = await storeApi.loadVipSubscriptions();
   const kept = subscriptions.filter((s) => String(s?.paymentId || '') !== String(paymentId));
   kept.push({
-    discordId: String(discordId), guildId: String(guildId), tierKey,
+    discordId: String(discordId), guildId: String(guildId), tierKey: normalizeTierKey(tierKey) || tierKey,
     paymentId: String(paymentId), status: 'pending',
     startedAt: new Date().toISOString(), pixExpiresAt: pixExpiresAt || null
   });
@@ -449,6 +459,7 @@ module.exports = {
   TIER_ROLE_NAMES,
   DEFAULT_PRICES,
   PIX_EXPIRY_MINUTES,
+  normalizeTierKey,
   getClubeTierConfig,
   isValidEmail,
   buildExternalReference,
